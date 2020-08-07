@@ -1,0 +1,7 @@
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: RouteMonitor
+metadata:
+  name: routemonitor-sample
+spec:
+  # Add fields here
+  foo: bar
