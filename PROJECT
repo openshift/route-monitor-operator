@@ -1,0 +1,6 @@
+domain: openshift.io
+layout: go.kubebuilder.io/v2
+repo: github.com/RiRa12621/openshift-route-monitor-operator
+version: 3-alpha
+plugins:
+  go.operator-sdk.io/v2-alpha: {}
