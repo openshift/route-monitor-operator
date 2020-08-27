@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	//"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -141,14 +142,14 @@ func (r *RouteMonitorReconciler) deploymentForBlackboxExporter(m *monitoringv1al
 
 // deploymentForServiceMonitor returns a ServiceMonitor
 func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alpha1.RouteMonitor) *monitoringv1.ServiceMonitor {
-	ls := labelsForRouteMonitor(m.Name)
+	var ls metav1.LabelSelector = metav1.Convert_Map_string_To_string_To_v1_LabelSelector(labelsForRouteMonitor(m.Name), &metav1.LabelSelector{}, nil)
 	// Currently we only support `http_2xx` as module
 	// Still make it a variable so we can easily add functionality later
 	modules := []string{"http_2xx"}
 
-	params := monitoringv1.Params{
-		Module: []string{modules},
-		Target: []string{m.Url},
+	params := map[string][]string{
+		"Module": modules,
+		"Target": []string{m.Spec.Url},
 	}
 
 	endpoint := monitoringv1.Endpoint{
@@ -160,11 +161,11 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 		ScrapeTimeout: "15s",
 		Path:          "/probe",
 		Scheme:        "http",
-		TargetPort:    "9115",
-		Params:        []monitoringv1Params{params},
-		MetricRelabelings: monitoringv1.MetricRelabelConfigs{
-			Replacement:  m.url,
-			SourceLabels: "[]",
+		// TargetPort:    intstr.FromInt(9115),
+		Params: params,
+		MetricRelabelConfigs: monitoringv1.RelabelConfig{
+			Replacement:  m.Spec.Url,
+			SourceLabels: []string{},
 			TargetLabel:  "RouteMonitorUrl",
 		},
 	}
@@ -175,7 +176,7 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 			// ServiceMonitors need to be in `openshift-monitoring` to be picked up by cluster-monitoring-operator
 			Namespace: "openshift-monitoring",
 		},
-		TypesMeta: metav1.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       monitoringv1.ServiceMonitorsKind,
 			APIVersion: monitoringv1.SchemeGroupVersion.String(),
 		},
@@ -183,7 +184,7 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 			JobLabel:  m.Name,
 			Endpoints: []monitoringv1.Endpoint{endpoint},
 			Selector:  ls,
-			NameSpaceSelector: monitoringv1.NamespaceSelector{
+			NamespaceSelector: monitoringv1.NamespaceSelector{
 				MatchNames: []string{m.Namespace},
 			},
 		},

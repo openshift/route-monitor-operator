@@ -28,9 +28,9 @@ type RouteMonitorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of RouteMonitor. Edit RouteMonitor_types.go to remove/update
 	Route     string `json:"route"`
 	Namespace string `json:"namespace"`
+	Url       string `json:"url"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor
