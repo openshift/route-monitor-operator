@@ -1,0 +1,24 @@
+# permissions for end users to edit routemonitors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: routemonitor-editor-role
+rules:
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - routemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - routemonitors/status
+  verbs:
+  - get
