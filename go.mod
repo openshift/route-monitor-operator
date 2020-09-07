@@ -1,4 +1,4 @@
-module github.com/RiRa12621/openshift-route-monitor-operator
+module github.com/openshift/route-monitor-operator
 
 go 1.13
 

@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	monitoringv1alpha1 "github.com/RiRa12621/openshift-route-monitor-operator/api/v1alpha1"
-	"github.com/RiRa12621/openshift-route-monitor-operator/controllers"
+	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
