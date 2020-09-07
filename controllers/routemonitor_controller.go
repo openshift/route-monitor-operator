@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	monitoringv1alpha1 "github.com/RiRa12621/openshift-route-monitor-operator/api/v1alpha1"
+	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
@@ -142,14 +142,19 @@ func (r *RouteMonitorReconciler) deploymentForBlackboxExporter(m *monitoringv1al
 
 // deploymentForServiceMonitor returns a ServiceMonitor
 func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alpha1.RouteMonitor) *monitoringv1.ServiceMonitor {
-	var ls metav1.LabelSelector = metav1.Convert_Map_string_To_string_To_v1_LabelSelector(labelsForRouteMonitor(m.Name), &metav1.LabelSelector{}, nil)
+	var ls *metav1.LabelSelector
+	routeMonitorLabels := labelsForRouteMonitor(m.Name)
+	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, ls, nil)
+	if err != nil {
+		r.Log.Error(err, "Failed to convert LabelSelector to it's components")
+	}
 	// Currently we only support `http_2xx` as module
 	// Still make it a variable so we can easily add functionality later
 	modules := []string{"http_2xx"}
 
 	params := map[string][]string{
 		"Module": modules,
-		"Target": []string{m.Spec.Url},
+		"Target": {m.Spec.Url},
 	}
 
 	endpoint := monitoringv1.Endpoint{
@@ -163,10 +168,13 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 		Scheme:        "http",
 		// TargetPort:    intstr.FromInt(9115),
 		Params: params,
-		MetricRelabelConfigs: monitoringv1.RelabelConfig{
-			Replacement:  m.Spec.Url,
-			SourceLabels: []string{},
-			TargetLabel:  "RouteMonitorUrl",
+		MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
+			//&monitoringv1.RelabelConfig{
+			{
+				Replacement:  m.Spec.Url,
+				SourceLabels: []string{},
+				TargetLabel:  "RouteMonitorUrl",
+			},
 		},
 	}
 
@@ -183,7 +191,7 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 		Spec: monitoringv1.ServiceMonitorSpec{
 			JobLabel:  m.Name,
 			Endpoints: []monitoringv1.Endpoint{endpoint},
-			Selector:  ls,
+			Selector:  *ls,
 			NamespaceSelector: monitoringv1.NamespaceSelector{
 				MatchNames: []string{m.Namespace},
 			},

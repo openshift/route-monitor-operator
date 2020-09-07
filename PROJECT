@@ -1,6 +1,6 @@
 domain: openshift.io
 layout: go.kubebuilder.io/v2
-repo: github.com/RiRa12621/openshift-route-monitor-operator
+repo: github.com/openshift/route-monitor-operator
 resources:
 - group: monitoring
   kind: RouteMonitor
