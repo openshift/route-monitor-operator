@@ -3,5 +3,6 @@ kind: RouteMonitor
 metadata:
   name: routemonitor-sample
 spec:
-  # Add fields here
-  foo: bar
+  namespace: routenamespace
+  route: routename
+  url: routeurl
