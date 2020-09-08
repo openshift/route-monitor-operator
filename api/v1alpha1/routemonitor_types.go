@@ -30,7 +30,7 @@ type RouteMonitorSpec struct {
 
 	Route     string `json:"route"`
 	Namespace string `json:"namespace"`
-	Url       string `json:"url"`
+	URL       string `json:"url"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor

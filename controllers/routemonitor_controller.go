@@ -32,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	routev1 "github.com/openshift/api/route/v1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -45,7 +46,7 @@ type RouteMonitorReconciler struct {
 
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -58,7 +59,19 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	routeMonitor := &monitoringv1alpha1.RouteMonitor{}
 	err := r.Get(ctx, req.NamespacedName, routeMonitor)
 	if err != nil {
-		log.Error(err, "Failed to get routeMonitor")
+		log.Error(err, "Cannot get RouteMonitor", "RouteMonitor.Name", req.Name, "RouteMonitor.Namespace", req.Namespace)
+	}
+
+	// Get route to extract the URL from it, should not be required
+	actualRouteInfo := types.NamespacedName{Name: routeMonitor.Spec.Route, Namespace: routeMonitor.Spec.Namespace}
+	foundRoute := &routev1.Route{}
+	err = r.Get(ctx, actualRouteInfo, foundRoute)
+	if err != nil {
+		// Is it not found?
+		if errors.IsNotFound(err) {
+			log.Info("Route not found", "Route.Name", actualRouteInfo.Name, "Route.Namespace", actualRouteInfo.Namespace)
+		}
+		log.Error(err, "Cannot get Route", "Route.Name", actualRouteInfo.Name, "Route.Namespace", actualRouteInfo.Namespace)
 	}
 
 	// Check if there's a blackbox_exporter configmap
@@ -71,15 +84,15 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if errors.IsNotFound(err) {
 			// Create the configmap
 			boxConf := r.configmapForBlackboxExporter(namespacedName)
-			log.Info("Creating a new Configmap", "ConfigMap.Namespace", boxConf.Namespace, "ConfigMap.Name", boxConf.Name)
 			err = r.Create(ctx, boxConf)
 			if err != nil {
-				log.Error(err, "Failed to create new ConfigMap", "ConfigMap.Namespace", boxConf.Namespace, "ConfigMap.Name", boxConf.Name)
+				log.Error(err, "Cannot create new ConfigMap", "ConfigMap.Namespace", boxConf.Namespace, "ConfigMap.Name", boxConf.Name)
 				return ctrl.Result{}, err
 			}
 			// Seems to be all good, should requeue for next step
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
+		log.Error(err, "Cannot get ConfigMap", "ConfigMap.Name", namespacedName.Name, "ConfigMap.Namespace", namespacedName.Namespace)
 	}
 
 	// Check if there's a blackbox_exporter deployment
@@ -92,15 +105,15 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if errors.IsNotFound(err) {
 			// Create the deployment
 			boxDep := r.deploymentForBlackboxExporter(namespacedName)
-			log.Info("Creating a new Deployment", "Deployment.Namespace", boxDep.Namespace, "Deployment.Name", boxDep.Name)
 			err = r.Create(ctx, boxDep)
 			if err != nil {
-				log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", boxDep.Namespace, "Deployment.Name", boxDep.Name)
+				log.Error(err, "Cannot create new Deployment", "Deployment.Namespace", boxDep.Namespace, "Deployment.Name", boxDep.Name)
 				return ctrl.Result{}, err
 			}
 			// Seems to be all good, should requeue for next step
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
+		log.Error(err, "Cannot get BlackBox Deployment", "Deployment.Name", namespacedName.Name, "Deployment.Namespace", namespacedName.Namespace)
 	}
 
 	log.Info("finished blackboxdeploy, starting servicemonitor")
@@ -118,12 +131,12 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			log.Info("Creating a new ServiceMonitor", "Deployment.Namespace", serviceMonitorDep.Namespace, "Deployment.Name", serviceMonitorDep.Name)
 			err = r.Create(ctx, serviceMonitorDep)
 			if err != nil {
-				log.Error(err, "Failed to create new ServiceMonitor", "Deployment.Namespace", serviceMonitorDep.Namespace, "Deployment.Name", serviceMonitorDep.Name)
+				log.Error(err, "Cannot create ServiceMonitor", "ServiceMonitor.Namespace", serviceMonitorDep.Namespace, "ServiceMonitor.Name", serviceMonitorDep.Name)
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
 		}
-		log.Info("servicemonitor exists, nothing to do", foundServiceMonitor.ObjectMeta.Name, foundServiceMonitor.ObjectMeta.Namespace)
+		log.Error(err, "Cannot get ServiceMonitor", "ServiceMonitor.Name", req.Name, "ServiceMonitor.Namespace", "openshift-monitoring")
 	}
 	return ctrl.Result{}, nil
 }
@@ -184,9 +197,11 @@ func (r *RouteMonitorReconciler) configmapForBlackboxExporter(namespacedName typ
 
 // deploymentForServiceMonitor returns a ServiceMonitor
 func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alpha1.RouteMonitor) *monitoringv1.ServiceMonitor {
-	var ls *metav1.LabelSelector
+	var ls = metav1.LabelSelector{}
+
 	routeMonitorLabels := labelsForRouteMonitor(m.ObjectMeta.Name)
-	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, ls, nil)
+	r.Log.Info("after")
+	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, &ls, nil)
 	if err != nil {
 		r.Log.Error(err, "Failed to convert LabelSelector to it's components")
 	}
@@ -196,21 +211,17 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 
 	params := map[string][]string{
 		"Module": modules,
-		"Target": {m.Spec.Url},
+		"Target": {m.Spec.URL},
 	}
 
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: m.ObjectMeta.Name,
+			Name: m.Name,
 			// ServiceMonitors need to be in `openshift-monitoring` to be picked up by cluster-monitoring-operator
 			Namespace: "openshift-monitoring",
 		},
-		TypeMeta: metav1.TypeMeta{
-			Kind:       monitoringv1.ServiceMonitorsKind,
-			APIVersion: monitoringv1.SchemeGroupVersion.String(),
-		},
 		Spec: monitoringv1.ServiceMonitorSpec{
-			JobLabel: m.ObjectMeta.Name,
+			JobLabel: m.Name,
 			Endpoints: []monitoringv1.Endpoint{
 				{
 					// TODO use variable from blackbox exporter deployment
@@ -226,16 +237,14 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 					MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
 						//&monitoringv1.RelabelConfig{
 						{
-							Replacement:  m.Spec.Url,
+							Replacement:  m.Spec.URL,
 							SourceLabels: []string{},
 							TargetLabel:  "RouteMonitorUrl",
 						},
 					},
 				}},
-			Selector: *ls,
-			NamespaceSelector: monitoringv1.NamespaceSelector{
-				MatchNames: []string{m.Namespace},
-			},
+			Selector:          ls,
+			NamespaceSelector: monitoringv1.NamespaceSelector{},
 		},
 	}
 	ctrl.SetControllerReference(m, dep, r.Scheme)
