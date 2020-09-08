@@ -108,7 +108,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	// If not create them
 	foundServiceMonitor := &monitoringv1.ServiceMonitor{}
 	// We need the serviceMonitor to exist in `openshift-monitoring` otherwise Cluster Monitoring Operator will not pick it up
-	err = r.Get(ctx, types.NamespacedName{Name: routeMonitor.Name, Namespace: "openshift-monitoring"}, foundServiceMonitor)
+	err = r.Get(ctx, types.NamespacedName{Name: req.NamespacedName.Name, Namespace: "openshift-monitoring"}, foundServiceMonitor)
 	if err != nil {
 		// Is it not found?
 		if errors.IsNotFound(err) {
@@ -185,7 +185,7 @@ func (r *RouteMonitorReconciler) configmapForBlackboxExporter(namespacedName typ
 // deploymentForServiceMonitor returns a ServiceMonitor
 func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alpha1.RouteMonitor) *monitoringv1.ServiceMonitor {
 	var ls *metav1.LabelSelector
-	routeMonitorLabels := labelsForRouteMonitor(m.Name)
+	routeMonitorLabels := labelsForRouteMonitor(m.ObjectMeta.Name)
 	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, ls, nil)
 	if err != nil {
 		r.Log.Error(err, "Failed to convert LabelSelector to it's components")
@@ -201,7 +201,7 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 
 	dep := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: m.Name,
+			Name: m.ObjectMeta.Name,
 			// ServiceMonitors need to be in `openshift-monitoring` to be picked up by cluster-monitoring-operator
 			Namespace: "openshift-monitoring",
 		},
@@ -210,7 +210,7 @@ func (r *RouteMonitorReconciler) deploymentForServiceMonitor(m *monitoringv1alph
 			APIVersion: monitoringv1.SchemeGroupVersion.String(),
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
-			JobLabel: m.Name,
+			JobLabel: m.ObjectMeta.Name,
 			Endpoints: []monitoringv1.Endpoint{
 				{
 					// TODO use variable from blackbox exporter deployment
