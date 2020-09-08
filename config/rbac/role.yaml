@@ -11,8 +11,11 @@ rules:
   resources:
   - servicemonitors
   verbs:
+  - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - monitoring.openshift.io
