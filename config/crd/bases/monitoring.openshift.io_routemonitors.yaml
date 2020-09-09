@@ -36,19 +36,31 @@ spec:
         spec:
           description: RouteMonitorSpec defines the desired state of RouteMonitor
           properties:
-            namespace:
-              type: string
             route:
-              type: string
-            url:
-              type: string
+              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                Important: Run "make" to regenerate code after modifying this file'
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
+              required:
+              - name
+              - namespace
+              type: object
           required:
-          - namespace
           - route
-          - url
           type: object
         status:
           description: RouteMonitorStatus defines the observed state of RouteMonitor
+          properties:
+            routeURL:
+              description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                of cluster Important: Run "make" to regenerate code after modifying
+                this file'
+              type: string
+          required:
+          - routeURL
           type: object
       type: object
   version: v1alpha1

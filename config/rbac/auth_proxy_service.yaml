@@ -5,7 +5,7 @@ metadata:
     control-plane: controller-manager
 #  name: controller-manager-metrics-service
   name: cmms
-  namespace: system
+  namespace: openshift-monitoring
 spec:
   ports:
   - name: https

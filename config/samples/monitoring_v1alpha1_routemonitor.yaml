@@ -3,6 +3,6 @@ kind: RouteMonitor
 metadata:
   name: routemonitor-sample
 spec:
-  namespace: routenamespace
-  route: routename
-  url: routeurl
+  route:
+    namespace: routenamespace
+    name: routename
