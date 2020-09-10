@@ -27,16 +27,14 @@ import (
 type RouteMonitorSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-
-	Route     string `json:"route"`
-	Namespace string `json:"namespace"`
-	URL       string `json:"url"`
+	Route RouteMonitorRouteSpec `json:"route"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor
 type RouteMonitorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	RouteURL string `json:"routeURL"`
 }
 
 // +kubebuilder:object:root=true
