@@ -16,3 +16,6 @@
 
 # binary for the operator
 bin/manager
+
+# vim tmp files
+*.swp

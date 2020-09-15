@@ -1,6 +1,8 @@
 package v1alpha1
 
 type RouteMonitorRouteSpec struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+	// Name is the name of the Route
+	Name string `json:"name,omitempty"`
+	// Namespace is the namespace of the Route
+	Namespace string `json:"namespace,omitempty"`
 }

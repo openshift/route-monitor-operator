@@ -25,16 +25,14 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	Route RouteMonitorRouteSpec `json:"route"`
+	// Route is the resource that holds the name and Namespace of the Route to monitor
+	Route RouteMonitorRouteSpec `json:"route,omitempty"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor
 type RouteMonitorStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	RouteURL string `json:"routeURL"`
+	// RouteURL is the url extracted from the Route resource
+	RouteURL string `json:"routeURL,omitempty"`
 }
 
 // +kubebuilder:object:root=true
