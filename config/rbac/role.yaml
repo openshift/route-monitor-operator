@@ -12,11 +12,8 @@ rules:
   - services
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - apps
@@ -24,11 +21,8 @@ rules:
   - deployments
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - monitoring.coreos.com
@@ -38,8 +32,6 @@ rules:
   - create
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - monitoring.openshift.io

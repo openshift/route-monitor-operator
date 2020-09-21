@@ -28,9 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	routev1 "github.com/openshift/api/route/v1"
-	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/controllers"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
+	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -46,6 +48,7 @@ func init() {
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 
+	utilruntime.Must(monitoringopenshiftiov1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -72,14 +75,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.RouteMonitorReconciler{
+	routeMonitorReconciler := &routemonitor.RouteMonitorReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("RouteMonitor"),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}
+	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
@@ -87,4 +92,7 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+
+	setupLog.V(1).Info("`mgr.Start` is blocking:",
+		"so this message (or anything that resides after it) won't execute")
 }
