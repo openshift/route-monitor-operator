@@ -44,13 +44,42 @@ type RouteMonitorReconciler struct {
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 
-	// Should happen once but cannot input in main.go
-	err := r.CreateBlackBoxExporterResources(ctx)
+	routeMonitor, err := r.GetRouteMonitor(ctx, req)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	routeMonitor, err := r.GetRouteMonitor(ctx, req)
+	// Handle deletion of RouteMonitor Resource
+	shouldDelete := r.WasDeleteRequested(routeMonitor)
+
+	if shouldDelete {
+		shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
+		if err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+
+		// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
+		if shouldDeleteBlackBoxResources {
+			err := r.DeleteBlackBoxExporterResources(ctx)
+			if err != nil {
+				return ctrl.Result{Requeue: true}, err
+			}
+		}
+
+		res, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
+		if err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+		if res != nil {
+			return *res, nil
+		}
+
+		// Break Reconcile early and do not requeue as this was a deletion request
+		return ctrl.Result{Requeue: false}, nil
+	}
+
+	// Should happen once but cannot input in main.go
+	err = r.CreateBlackBoxExporterResources(ctx)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -68,9 +97,12 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return *res, nil
 	}
 
-	err = r.CreateServiceMonitor(ctx, routeMonitor)
+	res, err = r.CreateServiceMonitor(ctx, routeMonitor)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
+	}
+	if res != nil {
+		return *res, nil
 	}
 
 	return ctrl.Result{Requeue: false}, nil
