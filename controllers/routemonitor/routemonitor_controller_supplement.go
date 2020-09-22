@@ -42,6 +42,15 @@ func commonTemplateLables() map[string]string {
 	return map[string]string{"app": blackBoxName}
 }
 
+// RouteMonitorAdapter is an interface of RouteMonitorReconciler with the intention of mocks
+// This will test the higher order functions like CreateBlackBoxExporterResources and DeleteBlackBoxExporterResources
+type RouteMonitorAdapter interface {
+	CreateBlackBoxExporterDeployment(ctx context.Context) error
+	CreateBlackBoxExporterService(ctx context.Context) error
+	DeleteBlackBoxExporterService(ctx context.Context) error
+	DeleteBlackBoxExporterDeployment(ctx context.Context) error
+}
+
 // GetRouteMonitor return the RouteMonitor that is tested
 func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, error) {
 	res := &v1alpha1.RouteMonitor{}
@@ -222,15 +231,15 @@ func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx conte
 	}
 
 	amountOfRouteMonitors := len(routeMonitors.Items)
-	// If more than one resource exists, and the deletion was requsted there are stil at least one resource using the BlackBoxExporter
-	if amountOfRouteMonitors > 1 {
-		return false, nil
-	}
-
 	if amountOfRouteMonitors == 0 {
 		err := errors.New("Internal Fault: Cannot be in reconcile loop and have not RouteMonitors on cluster")
 		// the response is set to true as this technically a case where we should delete, but as it's not logical that this will happen, returning error
 		return true, err
+	}
+
+	// If more than one resource exists, and the deletion was requsted there are stil at least one resource using the BlackBoxExporter
+	if amountOfRouteMonitors > 1 {
+		return false, nil
 	}
 
 	return true, nil

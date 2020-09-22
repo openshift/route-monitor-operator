@@ -3,6 +3,7 @@ package routemonitor_test
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -25,15 +26,17 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	mocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks"
+	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
+	//routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/routemonitor"
 )
 
 var _ = Describe("Routemonitor", func() {
 	var (
-		routeMonitor          monitoringv1alpha1.RouteMonitor
-		routeMonitorName      string
-		routeMonitorNamespace string
-		routeMonitorRouteSpec monitoringv1alpha1.RouteMonitorRouteSpec
+		routeMonitor                monitoringv1alpha1.RouteMonitor
+		routeMonitorName            string
+		routeMonitorNamespace       string
+		routeMonitorRouteSpec       monitoringv1alpha1.RouteMonitorRouteSpec
+		routeMonitorRequestedDelete bool
 
 		routeMonitorReconciler       routemonitor.RouteMonitorReconciler
 		routeMonitorReconcilerClient client.Client
@@ -42,19 +45,26 @@ var _ = Describe("Routemonitor", func() {
 		route                routev1.Route
 		expectedRouteMonitor monitoringv1alpha1.RouteMonitor
 
-		mockClient       *mocks.MockClient
-		mockStatusWriter *mocks.MockStatusWriter
-		mockCtrl         *gomock.Controller
+		mockClient       *clientmocks.MockClient
+		mockStatusWriter *clientmocks.MockStatusWriter
+		//	mocksReconcile * mock
+		mockCtrl *gomock.Controller
 
-		// createCalledTimes it a toggle for the 'mockClient.EXPECT.Create()'. If set to 0 then ignored
+		// createCalledTimes is a toggle for the 'mockClient.EXPECT.Create()'. If set to 0 then ignored
 		createCalledTimes   int
 		createErrorResponse error
-		// getCalledTimes it a toggle for the 'mockClient.EXPECT.Get()'. If set to 0 then ignored
+		// getCalledTimes is a toggle for the 'mockClient.EXPECT.Get()'. If set to 0 then ignored
 		getCalledTimes   int
 		getErrorResponse error
-		// updateCalledTimes it a toggle for the 'mockClient.EXPECT.Get()'. If set to 0 then ignored
+		// listCalledTimes is a toggle for the 'mockClient.EXPECT.List()'. If set to 0 then ignored
+		listCalledTimes   int
+		listErrorResponse error
+		// updateCalledTimes is a toggle for the 'mockClient.EXPECT.Update()'. If set to 0 then ignored
 		updateCalledTimes   int
 		updateErrorResponse error
+		// delete is a toggle for the 'mockClient.EXPECT.Delete()'. If set to 0 then ignored
+		deleteCalledTimes   int
+		deleteErrorResponse error
 	)
 
 	const (
@@ -69,24 +79,35 @@ var _ = Describe("Routemonitor", func() {
 			ErrStatus: metav1.Status{
 				Reason: metav1.StatusReasonNotFound,
 			}}
-		customError = errors.New("test")
+		customError        = errors.New("test")
+		routeMonitorSecond = monitoringv1alpha1.RouteMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      routeMonitorName + "-but-different",
+				Namespace: routeMonitorNamespace,
+			},
+		}
 	)
+
 	BeforeEach(func() {
 		routeMonitorName = "fake-name"
 		routeMonitorNamespace = "fake-namespace"
 		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
 		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
+		routeMonitorRequestedDelete = false
 
 		mockCtrl = gomock.NewController(GinkgoT())
-		mockClient = mocks.NewMockClient(mockCtrl)
-		mockStatusWriter = mocks.NewMockStatusWriter(mockCtrl)
+		mockClient = clientmocks.NewMockClient(mockCtrl)
+		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 		createCalledTimes = 0
 		createErrorResponse = nil
 		getCalledTimes = 0
 		getErrorResponse = nil
+		listCalledTimes = 0
+		listErrorResponse = nil
 		updateCalledTimes = 0
 		updateErrorResponse = nil
-
+		deleteCalledTimes = 0
+		deleteErrorResponse = nil
 	})
 
 	JustBeforeEach(func() {
@@ -100,6 +121,10 @@ var _ = Describe("Routemonitor", func() {
 				Route: routeMonitorRouteSpec,
 			},
 		}
+		if routeMonitorRequestedDelete {
+			// Decided that epoch time is better then time.Now
+			routeMonitor.DeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
+		}
 		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
 			Log:    logger,
 			Client: routeMonitorReconcilerClient,
@@ -111,17 +136,27 @@ var _ = Describe("Routemonitor", func() {
 				Namespace: routeMonitorNamespace,
 			},
 		}
-		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(getErrorResponse).
-			Times(getCalledTimes)
+
+		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
+			Return(createErrorResponse).
+			Times(createCalledTimes)
 
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
 			Return(updateErrorResponse).
 			Times(updateCalledTimes)
 
-		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-			Return(createErrorResponse).
-			Times(createCalledTimes)
+		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(getErrorResponse).
+			Times(getCalledTimes)
+
+		mockClient.EXPECT().List(gomock.Any(), gomock.Any()).
+			Return(listErrorResponse).
+			Times(listCalledTimes)
+
+		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
+			Return(deleteErrorResponse).
+			Times(deleteCalledTimes)
+
 		expectedRouteMonitor = routeMonitor
 	})
 
@@ -157,6 +192,237 @@ var _ = Describe("Routemonitor", func() {
 				Expect(resRouteMonitor).ToNot(BeNil())
 			})
 		})
+	})
+	Describe("WasDeleteRequested", func() {
+		When("a user Requests a Deletion", func() {
+			//Arrange
+			BeforeEach(func() {
+				routeMonitorRequestedDelete = true
+			})
+			It("should return 'true'", func() {
+				// Act
+				res := routeMonitorReconciler.WasDeleteRequested(&routeMonitor)
+				// Assert
+				Expect(res).To(BeTrue())
+			})
+		})
+		When("a user does nothing", func() {
+			// Arrange
+			It("should return 'false'", func() {
+				// Act
+				res := routeMonitorReconciler.WasDeleteRequested(&routeMonitor)
+				// Assert
+				Expect(res).To(BeFalse())
+			})
+		})
+	})
+	Describe("ShouldDeleteBlackBoxExporterResources", func() {
+		BeforeEach(func() {
+			routeMonitorRequestedDelete = true
+		})
+		When("a delete was not requested (user did nothing)", func() {
+			BeforeEach(func() {
+				routeMonitorRequestedDelete = false
+			})
+			// Arrange
+			It("should stop early and return 'false'", func() {
+				// Act
+				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, &routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(BeFalse())
+			})
+		})
+		When("the `List` command fails", func() {
+			// Arrange
+			BeforeEach(func() {
+				listCalledTimes = 1
+				listErrorResponse = customError
+				routeMonitorReconcilerClient = mockClient
+			})
+			It("should fail with the List error", func() {
+				// Act
+				_, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, &routeMonitor)
+				//Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+		When("there are no RouteMonitors", func() {
+			It("should technically return  'true' but return InternalFault error", func() {
+				// Act
+				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, &routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(HavePrefix("Internal Fault:"))
+
+				// is true because it should delete even if there are no items.
+				// but this is in unusual situation because:
+				// - a delete was requested
+				// - there are no items of that resource on the cluster
+				Expect(res).To(BeTrue())
+			})
+		})
+
+		When("there are many RouteMonitors", func() {
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor, &routeMonitorSecond)
+			})
+			It("should return 'false' for too many RouteMonitors", func() {
+				// Act
+				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, &routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(BeFalse())
+			})
+
+		})
+
+		When("there is just one RouteMonitor", func() {
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
+			})
+			It("should return 'true'", func() {
+				// Act
+				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, &routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(BeTrue())
+			})
+
+		})
+	})
+
+	//Describe("DeleteBlackBoxExporterResources", func() {
+	//When("subcommand 'Service' fails unexpectedly", func() {
+	//It("should bubble error", func() {
+	//})
+	//})
+	//})
+
+	Describe("DeleteBlackBoxExporterService", func() {
+		BeforeEach(func() {
+			getCalledTimes = 1
+			routeMonitorReconcilerClient = mockClient
+		})
+
+		When("'Get' return an error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = customError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+
+		When("'Get' return an 'NotFound' error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = notFoundErr
+			})
+			It("should do nothing", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+		When("'Delete' return an an  error", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+				deleteErrorResponse = customError
+			})
+			It("should do nothing", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+
+		When("'Delete' succeeds", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+			})
+			It("should succeed", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+	})
+	Describe("DeleteBlackBoxExporterDeployment", func() {
+		BeforeEach(func() {
+			getCalledTimes = 1
+			routeMonitorReconcilerClient = mockClient
+		})
+
+		When("'Get' return an error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = customError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+
+		When("'Get' return an 'NotFound' error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = notFoundErr
+			})
+			It("should do nothing", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+		When("'Delete' return an an  error", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+				deleteErrorResponse = customError
+			})
+			It("should do nothing", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+
+		When("'Delete' succeeds", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+			})
+			It("should succeed", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
 	})
 	Describe("GetRoute", func() {
 		When("the Route is not found", func() {
@@ -407,7 +673,6 @@ var _ = Describe("Routemonitor", func() {
 					_, err := routeMonitorReconciler.CreateServiceMonitor(ctx, &routeMonitor)
 					//Assert
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(createErrorResponse))
 					Expect(err).To(MatchError(customError))
 				})
 			})

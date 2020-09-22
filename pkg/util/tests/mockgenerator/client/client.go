@@ -1,4 +1,4 @@
 package client
 
-//go:generate mockgen -destination ../../generated/mocks/status-writer.go -package mocks sigs.k8s.io/controller-runtime/pkg/client StatusWriter
-//go:generate mockgen -destination ../../generated/mocks/cr-client.go -package mocks sigs.k8s.io/controller-runtime/pkg/client Client
+//go:generate mockgen -destination ../../generated/mocks/client/status-writer.go -package $GOPACKAGE sigs.k8s.io/controller-runtime/pkg/client StatusWriter
+//go:generate mockgen -destination ../../generated/mocks/client/cr-client.go -package $GOPACKAGE sigs.k8s.io/controller-runtime/pkg/client Client
