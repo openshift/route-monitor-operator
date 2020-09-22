@@ -25,6 +25,23 @@ const (
 	FinalizerKey string = "finalizer.routemonitor.openshift.io"
 )
 
+const ( // All things related BlackBoxExporter
+	blackBoxNamespace  = "openshift-monitoring"
+	blackBoxName       = "blackbox-exporter"
+	blackBoxPortName   = "blackbox"
+	blackBoxPortNumber = 9115
+)
+
+var ( // cannot be a const but doesn't ever change
+	blackBoxNamespacedName = types.NamespacedName{Name: blackBoxName, Namespace: blackBoxNamespace}
+)
+
+// commonTemplateLables creates a set of common labels to most resources
+// this function is here in case we need more labels in the future
+func commonTemplateLables() map[string]string {
+	return map[string]string{"app": blackBoxName}
+}
+
 // GetRouteMonitor return the RouteMonitor that is tested
 func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, error) {
 	res := &v1alpha1.RouteMonitor{}
@@ -86,14 +103,13 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 	return &ctrl.Result{Requeue: true}, nil
 }
 
-var ( // cannot be a const but doesn't ever change
-	blackBoxNamespacedName = types.NamespacedName{Name: blackBoxName, Namespace: blackBoxNamespace}
-)
-
 func (r *RouteMonitorReconciler) CreateBlackBoxExporterResources(ctx context.Context) error {
 	if err := r.CreateBlackBoxExporterDeployment(ctx); err != nil {
 		return err
 	}
+	// Creating Service after because:
+	//
+	// A Service should not point to an empty target (Deployment)
 	if err := r.CreateBlackBoxExporterService(ctx); err != nil {
 		return err
 	}
@@ -188,20 +204,46 @@ func (r *RouteMonitorReconciler) CreateServiceMonitor(ctx context.Context, route
 	return nil, nil
 }
 
-// templateForServiceMonitorName return the generated name from the RouteMonitor.
-// The name is joined by the name and the namespace to create a unique ServiceMonitor for each RouteMonitor
-func (r *RouteMonitorReconciler) templateForServiceMonitorName(routeMonitor *v1alpha1.RouteMonitor) types.NamespacedName {
-	serviceMonitorName := fmt.Sprintf("%s-%s", routeMonitor.Name, routeMonitor.Namespace)
-	return types.NamespacedName{Name: serviceMonitorName, Namespace: blackBoxNamespace}
+/*
+
+This next block is for deletion of the RouteMonitor
+
+*/
+
+func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (bool, error) {
+	// if a delete has not been requested then there is at least one resource using the BlackBoxExporter
+	if !r.WasDeleteRequested(routeMonitor) {
+		return false, nil
+	}
+
+	routeMonitors := &v1alpha1.RouteMonitorList{}
+	if err := r.List(ctx, routeMonitors); err != nil {
+		return false, err
+	}
+
+	amountOfRouteMonitors := len(routeMonitors.Items)
+	// If more than one resource exists, and the deletion was requsted there are stil at least one resource using the BlackBoxExporter
+	if amountOfRouteMonitors > 1 {
+		return false, nil
+	}
+
+	if amountOfRouteMonitors == 0 {
+		err := errors.New("Internal Fault: Cannot be in reconcile loop and have not RouteMonitors on cluster")
+		// the response is set to true as this technically a case where we should delete, but as it's not logical that this will happen, returning error
+		return true, err
+	}
+
+	return true, nil
 }
 
-/************************************************  DELETION BLOCK   ********************************************************************/
-
 func (r *RouteMonitorReconciler) DeleteBlackBoxExporterResources(ctx context.Context) error {
-	if err := r.DeleteBlackBoxExporterDeployment(ctx); err != nil {
+	// Deleting Service first because:
+	//
+	// a Service should not point to an empty target (Deployment)
+	if err := r.DeleteBlackBoxExporterService(ctx); err != nil {
 		return err
 	}
-	if err := r.CreateBlackBoxExporterService(ctx); err != nil {
+	if err := r.DeleteBlackBoxExporterDeployment(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -227,6 +269,7 @@ func (r *RouteMonitorReconciler) DeleteBlackBoxExporterDeployment(ctx context.Co
 	}
 	return nil
 }
+
 func (r *RouteMonitorReconciler) DeleteBlackBoxExporterService(ctx context.Context) error {
 	resource := &corev1.Service{}
 
@@ -263,7 +306,6 @@ func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.C
 		}
 		// After any modification we need to requeue to prevent two threads working on the same code
 		return &ctrl.Result{Requeue: true}, nil
-
 	}
 
 	// if the monitor is not deleting no action is needed
@@ -298,31 +340,7 @@ func (r *RouteMonitorReconciler) DeleteServiceMonitorResource(ctx context.Contex
 	return nil
 }
 
-func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (bool, error) {
-	// if a delete has not been requested then there is at least one resource using the BlackBoxExporter
-	if !r.WasDeleteRequested(routeMonitor) {
-		return false, nil
-	}
-
-	routeMonitors := &v1alpha1.RouteMonitorList{}
-	if err := r.List(ctx, routeMonitors); err != nil {
-		return false, err
-	}
-
-	amountOfRouteMonitors := len(routeMonitors.Items)
-	// If more than one resource exists, and the deletion was requsted there are stil at least one resource using the BlackBoxExporter
-	if amountOfRouteMonitors > 1 {
-		return false, nil
-	}
-
-	if amountOfRouteMonitors == 0 {
-		err := errors.New("Internal Fault: Cannot be in reconcile loop and have not RouteMonitors on cluster")
-		// the response is set to true as this technically a case where we should delete, but as it's not logical that this will happen, returning error
-		return true, err
-	}
-
-	return true, nil
-}
+// Util functions
 
 // WasDeleteRequested verifies if the resource was requested for deletion
 func (r *RouteMonitorReconciler) WasDeleteRequested(routeMonitor *v1alpha1.RouteMonitor) bool {
@@ -332,13 +350,6 @@ func (r *RouteMonitorReconciler) WasDeleteRequested(routeMonitor *v1alpha1.Route
 func (r *RouteMonitorReconciler) HasFinalizer(routeMonitor *v1alpha1.RouteMonitor) bool {
 	return utilfinalizer.Contains(routeMonitor.ObjectMeta.Finalizers, FinalizerKey)
 }
-
-const (
-	blackBoxNamespace  = "openshift-monitoring"
-	blackBoxName       = "blackbox-exporter"
-	blackBoxPortName   = "blackbox"
-	blackBoxPortNumber = 9115
-)
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
 func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() *appsv1.Deployment {
@@ -452,8 +463,9 @@ func (r *RouteMonitorReconciler) templateForServiceMonitorResource(routeMonitor 
 	return serviceMonitor
 }
 
-// commonTemplateLables creates a set of common labels to most resources
-// this function is here in case we need more labels in the future
-func commonTemplateLables() map[string]string {
-	return map[string]string{"app": blackBoxName}
+// templateForServiceMonitorName return the generated name from the RouteMonitor.
+// The name is joined by the name and the namespace to create a unique ServiceMonitor for each RouteMonitor
+func (r *RouteMonitorReconciler) templateForServiceMonitorName(routeMonitor *v1alpha1.RouteMonitor) types.NamespacedName {
+	serviceMonitorName := fmt.Sprintf("%s-%s", routeMonitor.Name, routeMonitor.Namespace)
+	return types.NamespacedName{Name: serviceMonitorName, Namespace: blackBoxNamespace}
 }
