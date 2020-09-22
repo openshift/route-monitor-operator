@@ -11,15 +11,21 @@ metadata:
   namespace: openshift-monitoring
   labels:
     control-plane: controller-manager
+    app: route-monitor-operator
+    component: operator
 spec:
   selector:
     matchLabels:
       control-plane: controller-manager
+      app: route-monitor-operator
+      component: operator
   replicas: 1
   template:
     metadata:
       labels:
         control-plane: controller-manager
+        app: route-monitor-operator
+        component: operator
     spec:
       containers:
       - command:
