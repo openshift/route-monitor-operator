@@ -37,6 +37,7 @@ var _ = Describe("Routemonitor", func() {
 		routeMonitorNamespace       string
 		routeMonitorRouteSpec       monitoringv1alpha1.RouteMonitorRouteSpec
 		routeMonitorRequestedDelete bool
+		routeMonitorFinalizers      []string
 
 		routeMonitorReconciler       routemonitor.RouteMonitorReconciler
 		routeMonitorReconcilerClient client.Client
@@ -94,6 +95,7 @@ var _ = Describe("Routemonitor", func() {
 		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
 		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
 		routeMonitorRequestedDelete = false
+		routeMonitorFinalizers = []string{routemonitor.FinalizerKey}
 
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
@@ -115,7 +117,7 @@ var _ = Describe("Routemonitor", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:       routeMonitorName,
 				Namespace:  routeMonitorNamespace,
-				Finalizers: []string{routemonitor.FinalizerKey},
+				Finalizers: routeMonitorFinalizers,
 			},
 			Spec: monitoringv1alpha1.RouteMonitorSpec{
 				Route: routeMonitorRouteSpec,
@@ -279,6 +281,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 
 		When("there is just one RouteMonitor", func() {
+			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
 			})
@@ -293,12 +296,94 @@ var _ = Describe("Routemonitor", func() {
 		})
 	})
 
+	Describe("HasFinalizer", func() {
+		When("'FinalizerKey' is NOT in the 'Finalizers' list", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorFinalizers = []string{}
+			})
+
+			It("should return false", func() {
+				// Act
+				res := routeMonitorReconciler.HasFinalizer(&routeMonitor)
+				// Assert
+				Expect(res).To(BeFalse())
+			})
+		})
+		When("'FinalizerKey' is in the 'Finalizers' list", func() {
+			It("should return true", func() {
+				// Act
+				res := routeMonitorReconciler.HasFinalizer(&routeMonitor)
+				// Assert
+				Expect(res).To(BeTrue())
+			})
+		})
+	})
+
 	//Describe("DeleteBlackBoxExporterResources", func() {
 	//When("subcommand 'Service' fails unexpectedly", func() {
 	//It("should bubble error", func() {
 	//})
 	//})
 	//})
+	Describe("DeleteServiceMonitorResource", func() {
+		BeforeEach(func() {
+			getCalledTimes = 1
+			routeMonitorReconcilerClient = mockClient
+		})
+		When("'Get' returns an unhandled error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = customError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, &routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+		When("'Get' returns an 'Not found' error", func() {
+			// Arrange
+			BeforeEach(func() {
+				getErrorResponse = notFoundErr
+			})
+			It("should succeed as there is nothing to delete", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, &routeMonitor)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+		When("'Delete' returns an unhandled error", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+				deleteErrorResponse = customError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, &routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customError))
+			})
+		})
+		When("'Delete' passes", func() {
+			// Arrange
+			BeforeEach(func() {
+				deleteCalledTimes = 1
+			})
+			It("should succeed as the object was deleted", func() {
+				// Act
+				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, &routeMonitor)
+				// Assert
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
+	})
 
 	Describe("DeleteBlackBoxExporterService", func() {
 		BeforeEach(func() {
@@ -595,9 +680,9 @@ var _ = Describe("Routemonitor", func() {
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
 				updateCalledTimes = 1
+				routeMonitorFinalizers = nil
 			})
 			JustBeforeEach(func() {
-				routeMonitor.ObjectMeta.Finalizers = nil
 				routeMonitor.Status.RouteURL = routeMonitorStatusRouteURL
 			})
 			It("Should update the RouteMonitor with the finalizer", func() {
