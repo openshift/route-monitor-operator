@@ -106,7 +106,7 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 	}
 	// After each command that modifies the resource we are watching a new reconcile loop starts
 	// in order for there not to be conflicts, we requeue the command and make this code more idempotent
-	return &ctrl.Result{Requeue: true}, nil
+	return &ctrl.Result{Requeue: false}, nil
 }
 
 func (r *RouteMonitorReconciler) CreateBlackBoxExporterResources(ctx context.Context) error {
@@ -181,7 +181,7 @@ func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Contex
 			return nil, err
 		}
 		// After any modification we need to requeue to prevent two threads working on the same code
-		return &ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{Requeue: false}, nil
 	}
 
 	namespacedName := r.templateForServiceMonitorName(routeMonitor)
@@ -318,7 +318,7 @@ func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.C
 			return nil, err
 		}
 		// After any modification we need to requeue to prevent two threads working on the same code
-		return &ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{Requeue: false}, nil
 	}
 
 	// if the monitor is not deleting no action is needed
