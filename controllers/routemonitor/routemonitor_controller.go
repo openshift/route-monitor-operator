@@ -97,7 +97,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return *res, nil
 	}
 
-	res, err = r.CreateServiceMonitor(ctx, routeMonitor)
+	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}

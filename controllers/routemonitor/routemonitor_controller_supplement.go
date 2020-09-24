@@ -42,15 +42,6 @@ func commonTemplateLables() map[string]string {
 	return map[string]string{"app": blackBoxName}
 }
 
-// RouteMonitorAdapter is an interface of RouteMonitorReconciler with the intention of mocks
-// This will test the higher order functions like CreateBlackBoxExporterResources and DeleteBlackBoxExporterResources
-type RouteMonitorAdapter interface {
-	CreateBlackBoxExporterDeployment(ctx context.Context) error
-	CreateBlackBoxExporterService(ctx context.Context) error
-	DeleteBlackBoxExporterService(ctx context.Context) error
-	DeleteBlackBoxExporterDeployment(ctx context.Context) error
-}
-
 // GetRouteMonitor return the RouteMonitor that is tested
 func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, error) {
 	res := &v1alpha1.RouteMonitor{}
@@ -171,7 +162,7 @@ func (r *RouteMonitorReconciler) CreateBlackBoxExporterService(ctx context.Conte
 	return nil
 }
 
-func (r *RouteMonitorReconciler) CreateServiceMonitor(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
+func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
 		return nil, customerrors.NoHost
@@ -300,8 +291,15 @@ func (r *RouteMonitorReconciler) DeleteBlackBoxExporterService(ctx context.Conte
 	return nil
 }
 
+// DeleteServiceMonitorResourceCommand is purely for testing purposes
+var DeleteServiceMonitorResourceCommand func(context.Context, *v1alpha1.RouteMonitor) error
+
 func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
-	err := r.DeleteServiceMonitorResource(ctx, routeMonitor)
+	if DeleteServiceMonitorResourceCommand == nil {
+		DeleteServiceMonitorResourceCommand = r.DeleteServiceMonitorResource
+	}
+
+	err := DeleteServiceMonitorResourceCommand(ctx, routeMonitor)
 	if err != nil {
 		return nil, err
 	}
