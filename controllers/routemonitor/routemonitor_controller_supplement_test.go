@@ -183,12 +183,12 @@ var _ = Describe("Routemonitor", func() {
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
 			})
-			It("should return Not Found Error", func() {
+			It("should stop requeue", func() {
 				// Act
-				resRouteMonitor, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
+				resRouteMonitor, res, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(&ctrl.Result{Requeue: false}))
 				Expect(resRouteMonitor).To(BeNil())
 			})
 		})
@@ -200,7 +200,7 @@ var _ = Describe("Routemonitor", func() {
 
 			It("should return the object", func() {
 				// Act
-				resRouteMonitor, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
+				resRouteMonitor, _, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resRouteMonitor).NotTo(BeNil())

@@ -34,38 +34,47 @@ type RouteMonitorReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;
-// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;
+// +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
+	log := r.Log.WithName("Reconcile")
 
-	routeMonitor, err := r.GetRouteMonitor(ctx, req)
+	log.Info("Entering GetRouteMonitor")
+	routeMonitor, res, err := r.GetRouteMonitor(ctx, req)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
+	}
+	if res != nil {
+		return *res, nil
 	}
 
 	// Handle deletion of RouteMonitor Resource
 	shouldDelete := r.WasDeleteRequested(routeMonitor)
+	log.Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
 		shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
 		if err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
+		log.Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
 		// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
 		if shouldDeleteBlackBoxResources {
+			log.Info("Entering DeleteBlackBoxExporterResources")
 			err := r.DeleteBlackBoxExporterResources(ctx)
 			if err != nil {
 				return ctrl.Result{Requeue: true}, err
 			}
 		}
 
+		log.Info("Entering DeleteRouteMonitorAndDependencies")
 		res, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
 		if err != nil {
 			return ctrl.Result{Requeue: true}, err
@@ -78,18 +87,21 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{Requeue: false}, nil
 	}
 
+	log.Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
 	err = r.CreateBlackBoxExporterResources(ctx)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 
+	log.Info("Entering GetRoute")
 	route, err := r.GetRoute(ctx, routeMonitor)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	res, err := r.UpdateRouteURL(ctx, route, routeMonitor)
+	log.Info("Entering UpdateRouteURL")
+	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}
@@ -97,6 +109,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return *res, nil
 	}
 
+	log.Info("Entering CreateServiceMonitorResource")
 	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
 	if err != nil {
 		return ctrl.Result{Requeue: true}, err
