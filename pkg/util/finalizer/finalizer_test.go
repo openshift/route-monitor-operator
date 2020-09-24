@@ -5,11 +5,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Finalizer", func() {
 	const (
-		key = "fake-key"
+		key       = "fake-key"
+		secondKey = "second-fake-key"
 	)
 	var (
 		list []string
@@ -31,7 +33,7 @@ var _ = Describe("Finalizer", func() {
 		When("list is full and key is not there", func() {
 			// Arrange
 			BeforeEach(func() {
-				list = []string{"second-fake-key"}
+				list = []string{secondKey}
 			})
 			It("should Return false for a key isn't in the list", func() {
 				// Act
@@ -50,6 +52,41 @@ var _ = Describe("Finalizer", func() {
 				res := finalizer.Contains(list, key)
 				// Asset
 				Expect(res).To(BeTrue())
+			})
+		})
+	})
+	Describe("Remove", func() {
+		When("object doesnt have the finalizer in Finalizers", func() {
+			It("should return an empty list", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{}}
+				// Act
+				finalizer.Remove(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{}))
+			})
+		})
+		When("object doesnt have the finalizer in Finalizers", func() {
+			It("should return the same list", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{secondKey}}
+				// Act
+				finalizer.Remove(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{secondKey}))
+			})
+		})
+		When("key in object fianlizers", func() {
+			It("should remove the key", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{key}}
+				// Act
+				finalizer.Remove(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
 		})
 	})
