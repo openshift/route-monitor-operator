@@ -36,9 +36,9 @@ var ( // cannot be a const but doesn't ever change
 	blackBoxNamespacedName = types.NamespacedName{Name: blackBoxName, Namespace: blackBoxNamespace}
 )
 
-// commonTemplateLables creates a set of common labels to most resources
+// generateBlackBoxLables creates a set of common labels to most resources
 // this function is here in case we need more labels in the future
-func commonTemplateLables() map[string]string {
+func generateBlackBoxLables() map[string]string {
 	return map[string]string{"app": blackBoxName}
 }
 
@@ -366,7 +366,7 @@ func (r *RouteMonitorReconciler) HasFinalizer(routeMonitor *v1alpha1.RouteMonito
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
 func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() *appsv1.Deployment {
-	labels := commonTemplateLables()
+	labels := generateBlackBoxLables()
 	// hardcode the replicasize for no
 	//replicas := m.Spec.Size
 	var replicas int32 = 1
@@ -404,7 +404,7 @@ func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() *appsv1
 
 // templateForBlackBoxExporterService returns a blackbox service
 func (r *RouteMonitorReconciler) templateForBlackBoxExporterService() *corev1.Service {
-	labels := commonTemplateLables()
+	labels := generateBlackBoxLables()
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -429,7 +429,7 @@ func (r *RouteMonitorReconciler) templateForServiceMonitorResource(routeMonitor 
 
 	routeURL := routeMonitor.Status.RouteURL
 
-	routeMonitorLabels := commonTemplateLables()
+	routeMonitorLabels := generateBlackBoxLables()
 	var labelSelector = metav1.LabelSelector{}
 	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, &labelSelector, nil)
 	if err != nil {
