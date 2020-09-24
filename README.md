@@ -7,7 +7,7 @@ or any vanilla Prometheus Operator.
 ## How does this work?
 
 ### Exporter
-The operator is making sure that here is one deployment + service of the [blackbox exporter](https://github.com/prometheus/blackbox_exporter).
+The operator is making sure that there is one deployment + service of the [blackbox exporter](https://github.com/prometheus/blackbox_exporter).
 If it does not exist in `openshift-monitoring`, it creates one.
 
 ### ServiceMonitors
