@@ -188,6 +188,7 @@ var _ = Describe("Routemonitor", func() {
 				resRouteMonitor, res, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
 				Expect(res).To(Equal(&ctrl.Result{Requeue: false}))
 				Expect(resRouteMonitor).To(BeNil())
 			})
@@ -376,7 +377,8 @@ var _ = Describe("Routemonitor", func() {
 				res, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, &routeMonitor)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(&ctrl.Result{Requeue: true}))
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(&ctrl.Result{Requeue: false}))
 			})
 		})
 		When("the resource doesnt have a finalizer but not deletion was requested", func() {
@@ -762,7 +764,8 @@ var _ = Describe("Routemonitor", func() {
 				res, err := routeMonitorReconciler.UpdateRouteURL(ctx, &route, &routeMonitor)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(&ctrl.Result{Requeue: true}))
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(&ctrl.Result{Requeue: false}))
 			})
 		})
 	})
@@ -799,7 +802,7 @@ var _ = Describe("Routemonitor", func() {
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
-				Expect(resp.Requeue).To(Equal(true))
+				Expect(resp).To(Equal(&ctrl.Result{Requeue: false}))
 
 			})
 
