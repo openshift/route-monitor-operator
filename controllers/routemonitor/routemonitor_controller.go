@@ -59,23 +59,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
-		shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-		if err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-		log.Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
-
-		// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
-		if shouldDeleteBlackBoxResources {
-			log.Info("Entering DeleteBlackBoxExporterResources")
-			err := r.DeleteBlackBoxExporterResources(ctx)
-			if err != nil {
-				return ctrl.Result{Requeue: true}, err
-			}
-		}
-
-		log.Info("Entering DeleteRouteMonitorAndDependencies")
-		res, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
+		res, err := r.PerformRouteMonitorDeletion(ctx, routeMonitor)
 		if err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
