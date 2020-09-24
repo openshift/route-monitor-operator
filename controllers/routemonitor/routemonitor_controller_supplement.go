@@ -312,7 +312,6 @@ func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.C
 
 	if r.HasFinalizer(routeMonitor) {
 		// if finalizer is still here and ServiceMonitor is deleted, then remove it
-		// TODO: this delete function was modified, might not work
 		utilfinalizer.Remove(routeMonitor, FinalizerKey)
 		if err := r.Update(ctx, routeMonitor); err != nil {
 			return nil, err
