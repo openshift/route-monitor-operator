@@ -43,13 +43,19 @@ func commonTemplateLables() map[string]string {
 }
 
 // GetRouteMonitor return the RouteMonitor that is tested
-func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, error) {
+func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, *ctrl.Result, error) {
 	res := &v1alpha1.RouteMonitor{}
 	err := r.Client.Get(ctx, req.NamespacedName, res)
 	if err != nil {
-		return nil, err
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return nil, nil, err
+		}
+		r.Log.Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
+		return nil, &ctrl.Result{Requeue: false}, nil
 	}
-	return res, nil
+	return res, nil, nil
 }
 
 // GetRoute returns the Route from the RouteMonitor spec

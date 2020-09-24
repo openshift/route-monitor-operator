@@ -94,5 +94,5 @@ func main() {
 	}
 
 	setupLog.V(1).Info("`mgr.Start` is blocking:",
-		"so this message (or anything that resides after it) won't execute")
+		"so this message (or anything that resides after it) won't execute until teardown", nil)
 }
