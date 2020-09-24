@@ -210,11 +210,35 @@ func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Contex
 	return nil, nil
 }
 
-/*
+func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
+	log := r.Log.WithName("Delete")
+	shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
+	if err != nil {
+		return &ctrl.Result{Requeue: true}, err
+	}
+	log.Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
-This next block is for deletion of the RouteMonitor
+	// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
+	if shouldDeleteBlackBoxResources {
+		log.Info("Entering DeleteBlackBoxExporterResources")
+		err := r.DeleteBlackBoxExporterResources(ctx)
+		if err != nil {
+			return &ctrl.Result{Requeue: true}, err
+		}
+	}
 
-*/
+	log.Info("Entering DeleteRouteMonitorAndDependencies")
+	res, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
+	if err != nil {
+		return &ctrl.Result{Requeue: true}, err
+	}
+	if res != nil {
+		return res, nil
+	}
+
+	// Break Reconcile early and do not requeue as this was a deletion request
+	return &ctrl.Result{Requeue: false}, nil
+}
 
 func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (bool, error) {
 	// if a delete has not been requested then there is at least one resource using the BlackBoxExporter
