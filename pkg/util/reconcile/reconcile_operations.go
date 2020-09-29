@@ -1,67 +1,35 @@
 package reconcile
 
-import "time"
+import (
+	ctrl "sigs.k8s.io/controller-runtime"
+	"time"
+)
 
-type OperationResult struct {
-	RequeueDelay   time.Duration
-	RequeueRequest bool
-	CancelRequest  bool
-}
-
-func StopProcessing() (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   0,
-		RequeueRequest: false,
-		CancelRequest:  true,
+func StopProcessing() (result ctrl.Result, err error) {
+	result = ctrl.Result{
+		Requeue: false,
 	}
 	return
 }
 
-func RequeueWithError(errIn error) (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   0,
-		RequeueRequest: true,
-		CancelRequest:  false,
+func RequeueWith(errIn error) (result ctrl.Result, err error) {
+	result = ctrl.Result{
+		Requeue: true,
 	}
 	err = errIn
 	return
 }
 
-func RequeueOnErrorOrStop(errIn error) (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   0,
-		RequeueRequest: false,
-		CancelRequest:  true,
+func RequeueAfter(delay time.Duration, errIn error) (result ctrl.Result, err error) {
+	result = ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: delay,
 	}
 	err = errIn
 	return
 }
 
-func RequeueOnErrorOrContinue(errIn error) (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   0,
-		RequeueRequest: false,
-		CancelRequest:  false,
-	}
-	err = errIn
-	return
-}
-
-func RequeueAfter(delay time.Duration, errIn error) (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   delay,
-		RequeueRequest: true,
-		CancelRequest:  false,
-	}
-	err = errIn
-	return
-}
-
-func ContinueProcessing() (result OperationResult, err error) {
-	result = OperationResult{
-		RequeueDelay:   0,
-		RequeueRequest: false,
-		CancelRequest:  false,
-	}
+func ContinueProcessing() (result ctrl.Result, err error) {
+	result = ctrl.Result{}
 	return
 }

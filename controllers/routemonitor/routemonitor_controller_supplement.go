@@ -18,6 +18,7 @@ import (
 
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
+	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -53,7 +54,9 @@ func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.R
 			return nil, nil, err
 		}
 		r.Log.Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
-		return nil, &ctrl.Result{Requeue: false}, nil
+
+		res, err := utilreconcile.StopProcessing()
+		return nil, &res, err
 	}
 	return res, nil, nil
 }
@@ -104,9 +107,8 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 	if err != nil {
 		return nil, err
 	}
-	// After each command that modifies the resource we are watching a new reconcile loop starts
-	// in order for there not to be conflicts, we requeue the command and make this code more idempotent
-	return &ctrl.Result{Requeue: false}, nil
+	res, err := utilreconcile.StopProcessing()
+	return &res, err
 }
 
 func (r *RouteMonitorReconciler) CreateBlackBoxExporterResources(ctx context.Context) error {
@@ -180,8 +182,8 @@ func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Contex
 		if err := r.Update(ctx, routeMonitor); err != nil {
 			return nil, err
 		}
-		// After any modification we need to requeue to prevent two threads working on the same code
-		return &ctrl.Result{Requeue: false}, nil
+		res, err := utilreconcile.StopProcessing()
+		return &res, err
 	}
 
 	namespacedName := r.templateForServiceMonitorName(routeMonitor)
@@ -214,7 +216,8 @@ func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context
 	log := r.Log.WithName("Delete")
 	shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
 	if err != nil {
-		return &ctrl.Result{Requeue: true}, err
+		res, err := utilreconcile.RequeueWith(err)
+		return &res, err
 	}
 	log.Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
@@ -223,21 +226,23 @@ func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context
 		log.Info("Entering DeleteBlackBoxExporterResources")
 		err := r.DeleteBlackBoxExporterResources(ctx)
 		if err != nil {
-			return &ctrl.Result{Requeue: true}, err
+			res, err := utilreconcile.RequeueWith(err)
+			return &res, err
 		}
 	}
 
 	log.Info("Entering DeleteRouteMonitorAndDependencies")
-	res, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
+	deleteRouteMonitorResult, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
 	if err != nil {
-		return &ctrl.Result{Requeue: true}, err
+		res, err := utilreconcile.RequeueWith(err)
+		return &res, err
 	}
-	if res != nil {
-		return res, nil
+	if deleteRouteMonitorResult != nil {
+		return deleteRouteMonitorResult, nil
 	}
 
-	// Break Reconcile early and do not requeue as this was a deletion request
-	return &ctrl.Result{Requeue: false}, nil
+	res, err := utilreconcile.StopProcessing()
+	return &res, err
 }
 
 func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (bool, error) {
@@ -335,13 +340,14 @@ func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.C
 	}
 
 	if r.HasFinalizer(routeMonitor) {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove it
+		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
 		utilfinalizer.Remove(routeMonitor, FinalizerKey)
 		if err := r.Update(ctx, routeMonitor); err != nil {
 			return nil, err
 		}
 		// After any modification we need to requeue to prevent two threads working on the same code
-		return &ctrl.Result{Requeue: false}, nil
+		res, err := utilreconcile.StopProcessing()
+		return &res, err
 	}
 
 	// if the monitor is not deleting no action is needed
