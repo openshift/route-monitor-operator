@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
@@ -48,7 +49,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.Info("Entering GetRouteMonitor")
 	routeMonitor, res, err := r.GetRouteMonitor(ctx, req)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return utilreconcile.RequeueWith(err)
 	}
 	if res != nil {
 		return *res, nil
@@ -61,33 +62,33 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if shouldDelete {
 		res, err := r.PerformRouteMonitorDeletion(ctx, routeMonitor)
 		if err != nil {
-			return ctrl.Result{Requeue: true}, err
+			return utilreconcile.RequeueWith(err)
 		}
 		if res != nil {
 			return *res, nil
 		}
 
-		// Break Reconcile early and do not requeue as this was a deletion request
-		return ctrl.Result{Requeue: false}, nil
+		return utilreconcile.StopProcessing()
 	}
 
 	log.Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
 	err = r.CreateBlackBoxExporterResources(ctx)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return utilreconcile.RequeueWith(err)
 	}
 
 	log.Info("Entering GetRoute")
 	route, err := r.GetRoute(ctx, routeMonitor)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return utilreconcile.RequeueWith(err)
 	}
 
 	log.Info("Entering UpdateRouteURL")
 	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return utilreconcile.RequeueWith(err)
+
 	}
 	if res != nil {
 		return *res, nil
@@ -96,13 +97,13 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.Info("Entering CreateServiceMonitorResource")
 	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
 	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return utilreconcile.RequeueWith(err)
 	}
 	if res != nil {
 		return *res, nil
 	}
 
-	return ctrl.Result{Requeue: false}, nil
+	return utilreconcile.StopProcessing()
 }
 
 func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
