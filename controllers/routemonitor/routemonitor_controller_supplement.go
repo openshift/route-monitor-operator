@@ -53,7 +53,7 @@ func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.R
 			// return unexpectedly
 			return nil, nil, err
 		}
-		r.Log.Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
+		r.Log.V(2).Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
 
 		res, err := utilreconcile.StopProcessing()
 		return nil, &res, err
@@ -94,12 +94,12 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 
 	currentRouteURL := routeMonitor.Status.RouteURL
 	if currentRouteURL == extractedRouteURL {
-		r.Log.V(1).Info("Same RouteURL: currentRouteURL and extractedRouteURL are equal, update not required")
+		r.Log.V(3).Info("Same RouteURL: currentRouteURL and extractedRouteURL are equal, update not required")
 		return nil, nil
 	}
 
 	if currentRouteURL != "" && extractedRouteURL != currentRouteURL {
-		r.Log.V(1).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
+		r.Log.V(3).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
 	}
 
 	routeMonitor.Status.RouteURL = extractedRouteURL
@@ -219,11 +219,11 @@ func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context
 		res, err := utilreconcile.RequeueWith(err)
 		return &res, err
 	}
-	log.Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
+	log.V(2).Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
 	// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
 	if shouldDeleteBlackBoxResources {
-		log.Info("Entering DeleteBlackBoxExporterResources")
+		log.V(2).Info("Entering DeleteBlackBoxExporterResources")
 		err := r.DeleteBlackBoxExporterResources(ctx)
 		if err != nil {
 			res, err := utilreconcile.RequeueWith(err)
@@ -231,7 +231,7 @@ func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context
 		}
 	}
 
-	log.Info("Entering DeleteRouteMonitorAndDependencies")
+	log.V(2).Info("Entering DeleteRouteMonitorAndDependencies")
 	deleteRouteMonitorResult, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
 	if err != nil {
 		res, err := utilreconcile.RequeueWith(err)

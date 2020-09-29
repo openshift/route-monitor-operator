@@ -46,7 +46,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	ctx := context.Background()
 	log := r.Log.WithName("Reconcile")
 
-	log.Info("Entering GetRouteMonitor")
+	log.V(2).Info("Entering GetRouteMonitor")
 	routeMonitor, res, err := r.GetRouteMonitor(ctx, req)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -57,7 +57,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// Handle deletion of RouteMonitor Resource
 	shouldDelete := r.WasDeleteRequested(routeMonitor)
-	log.Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
+	log.V(2).Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
 		res, err := r.PerformRouteMonitorDeletion(ctx, routeMonitor)
@@ -71,20 +71,20 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.StopProcessing()
 	}
 
-	log.Info("Entering CreateBlackBoxExporterResources")
+	log.V(2).Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
 	err = r.CreateBlackBoxExporterResources(ctx)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.Info("Entering GetRoute")
+	log.V(2).Info("Entering GetRoute")
 	route, err := r.GetRoute(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.Info("Entering UpdateRouteURL")
+	log.V(2).Info("Entering UpdateRouteURL")
 	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -94,7 +94,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return *res, nil
 	}
 
-	log.Info("Entering CreateServiceMonitorResource")
+	log.V(2).Info("Entering CreateServiceMonitorResource")
 	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
