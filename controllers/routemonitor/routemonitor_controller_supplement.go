@@ -22,10 +22,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-const (
-	FinalizerKey string = "finalizer.routemonitor.openshift.io"
-)
-
 const ( // All things related BlackBoxExporter
 	blackBoxNamespace  = "openshift-monitoring"
 	blackBoxName       = "blackbox-exporter"
@@ -44,44 +40,48 @@ func generateBlackBoxLables() map[string]string {
 }
 
 // GetRouteMonitor return the RouteMonitor that is tested
-func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (*v1alpha1.RouteMonitor, *ctrl.Result, error) {
-	res := &v1alpha1.RouteMonitor{}
-	err := r.Client.Get(ctx, req.NamespacedName, res)
+// this func has result params and so the return spits out the current values
+func (r *RouteMonitorReconciler) GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.ReconcileOperation, err error) {
+
+	err = r.Get(ctx, req.NamespacedName, &routeMonitor)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
 			// return unexpectedly
-			return nil, nil, err
+			res = utilreconcile.RequeueOperation()
+			return
 		}
 		r.Log.V(2).Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
-
-		res, err := utilreconcile.StopProcessing()
-		return nil, &res, err
+		res = utilreconcile.StopOperation()
+		return
 	}
-	return res, nil, nil
+	res = utilreconcile.ContinueOperation()
+	return
 }
 
 // GetRoute returns the Route from the RouteMonitor spec
-func (r *RouteMonitorReconciler) GetRoute(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*routev1.Route, error) {
-	res := &routev1.Route{}
+func (r *RouteMonitorReconciler) GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (routev1.Route, error) {
+	res := routev1.Route{}
 	nsName := types.NamespacedName{Name: routeMonitor.Spec.Route.Name, Namespace: routeMonitor.Spec.Route.Namespace}
 	if nsName.Name == "" || nsName.Namespace == "" {
 		err := errors.New("Invalid CR: Cannot retrieve route if one of the fields is empty")
-		return nil, err
+		// res here is an empty Route
+		return res, err
 	}
 
-	err := r.Client.Get(ctx, nsName, res)
+	err := r.Get(ctx, nsName, &res)
 	if err != nil {
-		return nil, err
+		// res here is an empty Route
+		return res, err
 	}
 	return res, nil
 }
 
-func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *routev1.Route, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
+func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.ReconcileOperation, error) {
 	amountOfIngress := len(route.Status.Ingress)
 	if amountOfIngress == 0 {
 		err := errors.New("No Ingress: cannot extract route url from the Route resource")
-		return nil, err
+		return utilreconcile.RequeueResponseWith(err)
 	}
 	extractedRouteURL := route.Status.Ingress[0].Host
 	if amountOfIngress > 1 {
@@ -89,13 +89,13 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 	}
 
 	if extractedRouteURL == "" {
-		return nil, customerrors.NoHost
+		return utilreconcile.RequeueResponseWith(customerrors.NoHost)
 	}
 
 	currentRouteURL := routeMonitor.Status.RouteURL
 	if currentRouteURL == extractedRouteURL {
 		r.Log.V(3).Info("Same RouteURL: currentRouteURL and extractedRouteURL are equal, update not required")
-		return nil, nil
+		return utilreconcile.ContinueProcessingResponse()
 	}
 
 	if currentRouteURL != "" && extractedRouteURL != currentRouteURL {
@@ -103,30 +103,30 @@ func (r *RouteMonitorReconciler) UpdateRouteURL(ctx context.Context, route *rout
 	}
 
 	routeMonitor.Status.RouteURL = extractedRouteURL
-	err := r.Client.Status().Update(ctx, routeMonitor)
-	if err != nil {
-		return nil, err
+
+	if err := r.Status().Update(ctx, &routeMonitor); err != nil {
+		return utilreconcile.RequeueResponseWith(err)
 	}
-	res, err := utilreconcile.StopProcessing()
-	return &res, err
+
+	return utilreconcile.StopProcessingResponse()
 }
 
 func (r *RouteMonitorReconciler) CreateBlackBoxExporterResources(ctx context.Context) error {
-	if err := r.CreateBlackBoxExporterDeployment(ctx); err != nil {
+	if err := r.createBlackBoxExporterDeployment(ctx); err != nil {
 		return err
 	}
 	// Creating Service after because:
 	//
 	// A Service should not point to an empty target (Deployment)
-	if err := r.CreateBlackBoxExporterService(ctx); err != nil {
+	if err := r.createBlackBoxExporterService(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *RouteMonitorReconciler) CreateBlackBoxExporterDeployment(ctx context.Context) error {
+func (r *RouteMonitorReconciler) createBlackBoxExporterDeployment(ctx context.Context) error {
 	resource := &appsv1.Deployment{}
-	populationDeploymentFunc := func() *appsv1.Deployment {
+	populationDeploymentFunc := func() appsv1.Deployment {
 		return r.templateForBlackBoxExporterDeployment()
 	}
 	// Does the resource already exist?
@@ -140,7 +140,7 @@ func (r *RouteMonitorReconciler) CreateBlackBoxExporterDeployment(ctx context.Co
 		// populate the resource with the template
 		resource := populationDeploymentFunc()
 		// and create it
-		err = r.Create(ctx, resource)
+		err = r.Create(ctx, &resource)
 		if err != nil {
 			return err
 		}
@@ -148,9 +148,9 @@ func (r *RouteMonitorReconciler) CreateBlackBoxExporterDeployment(ctx context.Co
 	return nil
 }
 
-func (r *RouteMonitorReconciler) CreateBlackBoxExporterService(ctx context.Context) error {
+func (r *RouteMonitorReconciler) createBlackBoxExporterService(ctx context.Context) error {
 	resource := &corev1.Service{}
-	populationServiceFunc := func() *corev1.Service {
+	populationServiceFunc := func() corev1.Service {
 		return r.templateForBlackBoxExporterService()
 	}
 	// Does the resource already exist?
@@ -163,27 +163,26 @@ func (r *RouteMonitorReconciler) CreateBlackBoxExporterService(ctx context.Conte
 		// populate the resource with the template
 		resource := populationServiceFunc()
 		// and create it
-		if err = r.Create(ctx, resource); err != nil {
+		if err = r.Create(ctx, &resource); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
+func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.ReconcileOperation, error) {
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
-		return nil, customerrors.NoHost
+		return utilreconcile.RequeueResponseWith(customerrors.NoHost)
 	}
 
-	if !r.HasFinalizer(routeMonitor) {
+	if !routeMonitor.HasFinalizer() {
 		// If the routeMonitor doesn't have a finalizer, add it
-		utilfinalizer.Add(routeMonitor, FinalizerKey)
-		if err := r.Update(ctx, routeMonitor); err != nil {
-			return nil, err
+		utilfinalizer.Add(&routeMonitor, v1alpha1.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueResponseWith(err)
 		}
-		res, err := utilreconcile.StopProcessing()
-		return &res, err
+		return utilreconcile.StopProcessingResponse()
 	}
 
 	namespacedName := r.templateForServiceMonitorName(routeMonitor)
@@ -198,56 +197,68 @@ func (r *RouteMonitorReconciler) CreateServiceMonitorResource(ctx context.Contex
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
 			// return unexpectedly
-			return nil, err
+			return utilreconcile.RequeueResponseWith(err)
 		}
 		// populate the resource with the template
 		resource := populationFunc()
 		// and create it
-		err = r.Create(ctx, resource)
-		if err != nil {
-			return nil, err
+
+		if err := r.Create(ctx, resource); err != nil {
+			return utilreconcile.RequeueResponseWith(err)
 		}
 	}
-
-	return nil, nil
+	return utilreconcile.ContinueProcessingResponse()
 }
+func (r *RouteMonitorReconciler) PerformBlackBoxExporterDeletion(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
+	log := r.Log.WithName("Delete BlackBoxExporter")
 
-func (r *RouteMonitorReconciler) PerformRouteMonitorDeletion(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
-	log := r.Log.WithName("Delete")
-	shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
+	shouldDeleteBlackBoxResources, err := r.shouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
 	if err != nil {
-		res, err := utilreconcile.RequeueWith(err)
-		return &res, err
+		return err
 	}
 	log.V(2).Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
 	// if this is the last resource then delete the blackbox-exporter resources and then delete the RouteMonitor
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering DeleteBlackBoxExporterResources")
-		err := r.DeleteBlackBoxExporterResources(ctx)
+		err := r.deleteBlackBoxExporterResources(ctx)
 		if err != nil {
-			res, err := utilreconcile.RequeueWith(err)
-			return &res, err
+			return err
 		}
 	}
-
-	log.V(2).Info("Entering DeleteRouteMonitorAndDependencies")
-	deleteRouteMonitorResult, err := r.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-	if err != nil {
-		res, err := utilreconcile.RequeueWith(err)
-		return &res, err
-	}
-	if deleteRouteMonitorResult != nil {
-		return deleteRouteMonitorResult, nil
-	}
-
-	res, err := utilreconcile.StopProcessing()
-	return &res, err
+	return nil
 }
 
-func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (bool, error) {
+func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.ReconcileOperation, error) {
+
+	if err := r.deleteServiceMonitorResource(ctx, routeMonitor); err != nil {
+		return utilreconcile.RequeueResponseWith(err)
+	}
+
+	if routeMonitor.HasFinalizer() {
+		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
+		utilfinalizer.Remove(&routeMonitor, v1alpha1.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueResponseWith(err)
+		}
+		return utilreconcile.StopProcessingResponse()
+	}
+
+	// if the monitor is not deleting no action is needed
+	if !routeMonitor.WasDeleteRequested() {
+		return utilreconcile.ContinueProcessingResponse()
+	}
+
+	if err := r.Delete(ctx, &routeMonitor); err != nil {
+		return utilreconcile.RequeueResponseWith(err)
+	}
+
+	return utilreconcile.ContinueProcessingResponse()
+}
+
+func (r *RouteMonitorReconciler) shouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (bool, error) {
 	// if a delete has not been requested then there is at least one resource using the BlackBoxExporter
-	if !r.WasDeleteRequested(routeMonitor) {
+	if !routeMonitor.WasDeleteRequested() {
 		return false, nil
 	}
 
@@ -271,20 +282,20 @@ func (r *RouteMonitorReconciler) ShouldDeleteBlackBoxExporterResources(ctx conte
 	return true, nil
 }
 
-func (r *RouteMonitorReconciler) DeleteBlackBoxExporterResources(ctx context.Context) error {
+func (r *RouteMonitorReconciler) deleteBlackBoxExporterResources(ctx context.Context) error {
 	// Deleting Service first because:
 	//
 	// a Service should not point to an empty target (Deployment)
-	if err := r.DeleteBlackBoxExporterService(ctx); err != nil {
+	if err := r.deleteBlackBoxExporterService(ctx); err != nil {
 		return err
 	}
-	if err := r.DeleteBlackBoxExporterDeployment(ctx); err != nil {
+	if err := r.deleteBlackBoxExporterDeployment(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *RouteMonitorReconciler) DeleteBlackBoxExporterDeployment(ctx context.Context) error {
+func (r *RouteMonitorReconciler) deleteBlackBoxExporterDeployment(ctx context.Context) error {
 	resource := &appsv1.Deployment{}
 
 	// Does the resource already exist?
@@ -305,7 +316,7 @@ func (r *RouteMonitorReconciler) DeleteBlackBoxExporterDeployment(ctx context.Co
 	return nil
 }
 
-func (r *RouteMonitorReconciler) DeleteBlackBoxExporterService(ctx context.Context) error {
+func (r *RouteMonitorReconciler) deleteBlackBoxExporterService(ctx context.Context) error {
 	resource := &corev1.Service{}
 
 	// Does the resource already exist?
@@ -326,42 +337,7 @@ func (r *RouteMonitorReconciler) DeleteBlackBoxExporterService(ctx context.Conte
 	return nil
 }
 
-// DeleteServiceMonitorResourceCommand is purely for testing purposes
-var DeleteServiceMonitorResourceCommand func(context.Context, *v1alpha1.RouteMonitor) error
-
-func (r *RouteMonitorReconciler) DeleteRouteMonitorAndDependencies(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) (*ctrl.Result, error) {
-	if DeleteServiceMonitorResourceCommand == nil {
-		DeleteServiceMonitorResourceCommand = r.DeleteServiceMonitorResource
-	}
-
-	err := DeleteServiceMonitorResourceCommand(ctx, routeMonitor)
-	if err != nil {
-		return nil, err
-	}
-
-	if r.HasFinalizer(routeMonitor) {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
-		utilfinalizer.Remove(routeMonitor, FinalizerKey)
-		if err := r.Update(ctx, routeMonitor); err != nil {
-			return nil, err
-		}
-		// After any modification we need to requeue to prevent two threads working on the same code
-		res, err := utilreconcile.StopProcessing()
-		return &res, err
-	}
-
-	// if the monitor is not deleting no action is needed
-	if !r.WasDeleteRequested(routeMonitor) {
-		return nil, nil
-	}
-	err = r.Delete(ctx, routeMonitor)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
-}
-
-func (r *RouteMonitorReconciler) DeleteServiceMonitorResource(ctx context.Context, routeMonitor *v1alpha1.RouteMonitor) error {
+func (r *RouteMonitorReconciler) deleteServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
 	namespacedName := r.templateForServiceMonitorName(routeMonitor)
 	resource := &monitoringv1.ServiceMonitor{}
 	// Does the resource already exist?
@@ -382,25 +358,14 @@ func (r *RouteMonitorReconciler) DeleteServiceMonitorResource(ctx context.Contex
 	return nil
 }
 
-// Util functions
-
-// WasDeleteRequested verifies if the resource was requested for deletion
-func (r *RouteMonitorReconciler) WasDeleteRequested(routeMonitor *v1alpha1.RouteMonitor) bool {
-	return routeMonitor.DeletionTimestamp != nil
-}
-
-func (r *RouteMonitorReconciler) HasFinalizer(routeMonitor *v1alpha1.RouteMonitor) bool {
-	return utilfinalizer.Contains(routeMonitor.ObjectMeta.Finalizers, FinalizerKey)
-}
-
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() *appsv1.Deployment {
+func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() appsv1.Deployment {
 	labels := generateBlackBoxLables()
 	// hardcode the replicasize for no
 	//replicas := m.Spec.Size
 	var replicas int32 = 1
 
-	dep := &appsv1.Deployment{
+	dep := appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      blackBoxName,
 			Namespace: blackBoxNamespace,
@@ -432,10 +397,10 @@ func (r *RouteMonitorReconciler) templateForBlackBoxExporterDeployment() *appsv1
 }
 
 // templateForBlackBoxExporterService returns a blackbox service
-func (r *RouteMonitorReconciler) templateForBlackBoxExporterService() *corev1.Service {
+func (r *RouteMonitorReconciler) templateForBlackBoxExporterService() corev1.Service {
 	labels := generateBlackBoxLables()
 
-	svc := &corev1.Service{
+	svc := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      blackBoxName,
 			Namespace: blackBoxNamespace,
@@ -454,7 +419,7 @@ func (r *RouteMonitorReconciler) templateForBlackBoxExporterService() *corev1.Se
 }
 
 // templateForServiceMonitorResource returns a ServiceMonitor
-func (r *RouteMonitorReconciler) templateForServiceMonitorResource(routeMonitor *v1alpha1.RouteMonitor, serviceMonitorName string) *monitoringv1.ServiceMonitor {
+func (r *RouteMonitorReconciler) templateForServiceMonitorResource(routeMonitor v1alpha1.RouteMonitor, serviceMonitorName string) *monitoringv1.ServiceMonitor {
 
 	routeURL := routeMonitor.Status.RouteURL
 
@@ -507,7 +472,7 @@ func (r *RouteMonitorReconciler) templateForServiceMonitorResource(routeMonitor 
 
 // templateForServiceMonitorName return the generated name from the RouteMonitor.
 // The name is joined by the name and the namespace to create a unique ServiceMonitor for each RouteMonitor
-func (r *RouteMonitorReconciler) templateForServiceMonitorName(routeMonitor *v1alpha1.RouteMonitor) types.NamespacedName {
+func (r *RouteMonitorReconciler) templateForServiceMonitorName(routeMonitor v1alpha1.RouteMonitor) types.NamespacedName {
 	serviceMonitorName := fmt.Sprintf("%s-%s", routeMonitor.Name, routeMonitor.Namespace)
 	return types.NamespacedName{Name: serviceMonitorName, Namespace: blackBoxNamespace}
 }

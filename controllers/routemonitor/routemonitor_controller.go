@@ -29,10 +29,13 @@ import (
 )
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
+
 type RouteMonitorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	// RouteMonitorInterface abstracts the Reconciler code from the controller resource
+	RouteMonitorInterface
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create
@@ -47,63 +50,61 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log := r.Log.WithName("Reconcile")
 
 	log.V(2).Info("Entering GetRouteMonitor")
-	routeMonitor, res, err := r.GetRouteMonitor(ctx, req)
+	routeMonitor, reconcileOperation, err := r.GetRouteMonitor(ctx, req)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
+		return reconcileOperation.ToResult(), err
 	}
-	if res != nil {
-		return *res, nil
+	if reconcileOperation.StopProcessing {
+		return utilreconcile.StopProcessingResult()
 	}
 
 	// Handle deletion of RouteMonitor Resource
-	shouldDelete := r.WasDeleteRequested(routeMonitor)
+	shouldDelete := routeMonitor.WasDeleteRequested()
 	log.V(2).Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
-		res, err := r.PerformRouteMonitorDeletion(ctx, routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueWith(err)
+		log.V(2).Info("Entering PerformBlackBoxExporterDeletion")
+		if err := r.PerformBlackBoxExporterDeletion(ctx, routeMonitor); err != nil {
+			return reconcileOperation.ToResult(), err
 		}
-		if res != nil {
-			return *res, nil
+		if reconcileOperation.StopProcessing {
+			return utilreconcile.StopProcessingResult()
 		}
-
-		return utilreconcile.StopProcessing()
+		return reconcileOperation.ToResult(), nil
 	}
 
 	log.V(2).Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
 	err = r.CreateBlackBoxExporterResources(ctx)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
+		return utilreconcile.RequeueResultWith(err)
 	}
 
 	log.V(2).Info("Entering GetRoute")
 	route, err := r.GetRoute(ctx, routeMonitor)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
+		return utilreconcile.RequeueResultWith(err)
 	}
 
 	log.V(2).Info("Entering UpdateRouteURL")
-	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
+	reconcileOperation, err = r.UpdateRouteURL(ctx, route, routeMonitor)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
-
+		return reconcileOperation.ToResult(), err
 	}
-	if res != nil {
-		return *res, nil
+	if reconcileOperation.StopProcessing {
+		return utilreconcile.StopProcessingResult()
 	}
 
 	log.V(2).Info("Entering CreateServiceMonitorResource")
-	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
+	reconcileOperation, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
+		return reconcileOperation.ToResult(), err
 	}
-	if res != nil {
-		return *res, nil
+	if reconcileOperation.StopProcessing {
+		return utilreconcile.StopProcessingResult()
 	}
 
-	return utilreconcile.StopProcessing()
+	return reconcileOperation.ToResult(), nil
 }
 
 func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
