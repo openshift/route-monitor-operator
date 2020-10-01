@@ -274,7 +274,7 @@ func (r *RouteMonitorReconciler) shouldDeleteBlackBoxExporterResources(ctx conte
 		return true, err
 	}
 
-	// If more than one resource exists, and the deletion was requsted there are stil at least one resource using the BlackBoxExporter
+	// If more than one resource exists, and the deletion was requsted there is still at least one resource using the BlackBoxExporter
 	if amountOfRouteMonitors > 1 {
 		return false, nil
 	}
