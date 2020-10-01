@@ -1,4 +1,4 @@
-package routemonitor_test
+package supplement_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestRoutemonitor(t *testing.T) {
+func TestSupplement(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Routemonitor Suite")
+	RunSpecs(t, "Supplement Suite")
 }

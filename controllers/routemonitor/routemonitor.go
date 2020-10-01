@@ -33,6 +33,7 @@ type RouteMonitorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	RouteMonitorActionDoer
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create

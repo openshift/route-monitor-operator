@@ -1,4 +1,4 @@
-package routemonitor_test
+package supplement_test
 
 import (
 	"context"
@@ -10,7 +10,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr/testing"
-	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
+
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ var _ = Describe("Routemonitor", func() {
 		routeMonitorDeletionTimestamp    *metav1.Time
 		routeMonitorStatus               monitoringv1alpha1.RouteMonitorStatus
 
-		routeMonitorReconciler       routemonitor.RouteMonitorReconciler
+		routeMonitorReconciler       supplement.RouteMonitorSupplement
 		routeMonitorReconcilerClient client.Client
 
 		req                  ctrl.Request
@@ -101,7 +102,7 @@ var _ = Describe("Routemonitor", func() {
 	BeforeEach(func() {
 		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
 		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
-		routeMonitorFinalizers = []string{routemonitor.FinalizerKey}
+		routeMonitorFinalizers = []string{supplement.FinalizerKey}
 		routeMonitorEnableCustomResponse = map[string]bool{}
 		routeMonitorCustomResponse = map[string]error{}
 		routeMonitorDeletionTimestamp = nil
@@ -135,7 +136,7 @@ var _ = Describe("Routemonitor", func() {
 			Status: routeMonitorStatus,
 		}
 
-		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
+		routeMonitorReconciler = supplement.RouteMonitorSupplement{
 			Log:    logger,
 			Client: routeMonitorReconcilerClient,
 			Scheme: scheme,
