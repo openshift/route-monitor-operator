@@ -51,8 +51,8 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-	if res != nil {
-		return *res, nil
+	if !res.Continue {
+		return res.Convert(), nil
 	}
 
 	// Handle deletion of RouteMonitor Resource
@@ -64,11 +64,10 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
-		if res != nil {
-			return *res, nil
+		if !res.Continue {
+			return res.Convert(), nil
 		}
-
-		return utilreconcile.StopProcessing()
+		return utilreconcile.Stop()
 	}
 
 	log.V(2).Info("Entering CreateBlackBoxExporterResources")
@@ -88,10 +87,9 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
-
 	}
-	if res != nil {
-		return *res, nil
+	if !res.Continue {
+		return res.Convert(), nil
 	}
 
 	log.V(2).Info("Entering CreateServiceMonitorResource")
@@ -99,11 +97,10 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-	if res != nil {
-		return *res, nil
+	if !res.Continue {
+		return res.Convert(), nil
 	}
-
-	return utilreconcile.StopProcessing()
+	return utilreconcile.Stop()
 }
 
 func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
