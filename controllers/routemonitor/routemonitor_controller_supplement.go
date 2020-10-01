@@ -126,7 +126,7 @@ func (r *RouteMonitorReconciler) CreateBlackBoxExporterResources(ctx context.Con
 
 func (r *RouteMonitorReconciler) createBlackBoxExporterDeployment(ctx context.Context) error {
 	resource := &appsv1.Deployment{}
-	populationDeploymentFunc := func() appsv1.Deployment {
+	populationFunc := func() appsv1.Deployment {
 		return r.templateForBlackBoxExporterDeployment()
 	}
 	// Does the resource already exist?
@@ -138,7 +138,7 @@ func (r *RouteMonitorReconciler) createBlackBoxExporterDeployment(ctx context.Co
 			return err
 		}
 		// populate the resource with the template
-		resource := populationDeploymentFunc()
+		resource := populationFunc()
 		// and create it
 		err = r.Create(ctx, &resource)
 		if err != nil {
@@ -150,7 +150,7 @@ func (r *RouteMonitorReconciler) createBlackBoxExporterDeployment(ctx context.Co
 
 func (r *RouteMonitorReconciler) createBlackBoxExporterService(ctx context.Context) error {
 	resource := &corev1.Service{}
-	populationServiceFunc := func() corev1.Service {
+	populationFunc := func() corev1.Service {
 		return r.templateForBlackBoxExporterService()
 	}
 	// Does the resource already exist?
@@ -161,7 +161,7 @@ func (r *RouteMonitorReconciler) createBlackBoxExporterService(ctx context.Conte
 			return err
 		}
 		// populate the resource with the template
-		resource := populationServiceFunc()
+		resource := populationFunc()
 		// and create it
 		if err = r.Create(ctx, &resource); err != nil {
 			return err
