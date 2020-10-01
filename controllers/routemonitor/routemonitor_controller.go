@@ -34,8 +34,6 @@ type RouteMonitorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
-	// RouteMonitorInterface abstracts the Reconciler code from the controller resource
-	RouteMonitorInterface
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create
