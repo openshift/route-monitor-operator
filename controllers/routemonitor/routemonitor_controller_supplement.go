@@ -269,9 +269,7 @@ func (r *RouteMonitorReconciler) shouldDeleteBlackBoxExporterResources(ctx conte
 
 	amountOfRouteMonitors := len(routeMonitors.Items)
 	if amountOfRouteMonitors == 0 {
-		err := errors.New("Internal Fault: Cannot be in reconcile loop and have not RouteMonitors on cluster")
-		// the response is set to true as this technically a case where we should delete, but as it's not logical that this will happen, returning error
-		return true, err
+		return raiseErrorButShouldDelete()
 	}
 
 	// If more than one resource exists, and the deletion was requsted there is still at least one resource using the BlackBoxExporter
@@ -280,6 +278,12 @@ func (r *RouteMonitorReconciler) shouldDeleteBlackBoxExporterResources(ctx conte
 	}
 
 	return true, nil
+}
+
+// raiseErrorButShouldDelete returns true with an error for the stack theoretically exists
+func raiseErrorButShouldDelete() (bool, error) {
+	err := errors.New("Internal Fault: Cannot be in reconcile loop and have not RouteMonitors on cluster")
+	return true, err
 }
 
 func (r *RouteMonitorReconciler) deleteBlackBoxExporterResources(ctx context.Context) error {
