@@ -34,6 +34,7 @@ type RouteMonitorReconciler struct {
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 	RouteMonitorActionDoer
+	RouteMonitorDeleter
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create
@@ -57,7 +58,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	// Handle deletion of RouteMonitor Resource
-	shouldDelete := r.WasDeleteRequested(routeMonitor)
+	shouldDelete := routeMonitor.WasDeleteRequested()
 	log.V(2).Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {

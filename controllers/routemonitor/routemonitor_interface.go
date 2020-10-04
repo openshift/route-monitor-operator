@@ -10,6 +10,8 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 )
 
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/tests/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter
+
 type RouteMonitorActionDoer interface {
 	GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error)
 	GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (routev1.Route, error)
@@ -18,13 +20,11 @@ type RouteMonitorActionDoer interface {
 	CreateBlackBoxExporterDeployment(ctx context.Context) error
 	CreateBlackBoxExporterService(ctx context.Context) error
 	CreateServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
-	PerformRouteMonitorDeletion(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 	ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (bool, error)
-	DeleteBlackBoxExporterResources(ctx context.Context) error
+}
+
+type RouteMonitorDeleter interface {
 	DeleteBlackBoxExporterDeployment(ctx context.Context) error
 	DeleteBlackBoxExporterService(ctx context.Context) error
-	DeleteRouteMonitorAndDependencies(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 	DeleteServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error
-	WasDeleteRequested(routeMonitor v1alpha1.RouteMonitor) bool
-	HasFinalizer(routeMonitor v1alpha1.RouteMonitor) bool
 }

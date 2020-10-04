@@ -27,10 +27,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/google/gofuzz" // fuzz testing
+	fuzz "github.com/google/gofuzz" // fuzz testing
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
+
 	//routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/routemonitor"
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
 )
 
 var _ = Describe("Routemonitor", func() {
@@ -38,15 +40,13 @@ var _ = Describe("Routemonitor", func() {
 	f := fuzz.New()
 
 	var (
-		routeMonitor                     monitoringv1alpha1.RouteMonitor
-		routeMonitorName                 string
-		routeMonitorNamespace            string
-		routeMonitorRouteSpec            monitoringv1alpha1.RouteMonitorRouteSpec
-		routeMonitorFinalizers           []string
-		routeMonitorEnableCustomResponse map[string]bool
-		routeMonitorCustomResponse       map[string]error
-		routeMonitorDeletionTimestamp    *metav1.Time
-		routeMonitorStatus               monitoringv1alpha1.RouteMonitorStatus
+		routeMonitor                  monitoringv1alpha1.RouteMonitor
+		routeMonitorName              string
+		routeMonitorNamespace         string
+		routeMonitorRouteSpec         monitoringv1alpha1.RouteMonitorRouteSpec
+		routeMonitorFinalizers        []string
+		routeMonitorDeletionTimestamp *metav1.Time
+		routeMonitorStatus            monitoringv1alpha1.RouteMonitorStatus
 
 		routeMonitorReconciler       supplement.RouteMonitorSupplement
 		routeMonitorReconcilerClient client.Client
@@ -102,9 +102,7 @@ var _ = Describe("Routemonitor", func() {
 	BeforeEach(func() {
 		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
 		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
-		routeMonitorFinalizers = []string{supplement.FinalizerKey}
-		routeMonitorEnableCustomResponse = map[string]bool{}
-		routeMonitorCustomResponse = map[string]error{}
+		routeMonitorFinalizers = []string{routemonitorconst.FinalizerKey}
 		routeMonitorDeletionTimestamp = nil
 		routeMonitorStatus = monitoringv1alpha1.RouteMonitorStatus{}
 		mockCtrl = gomock.NewController(GinkgoT())
@@ -209,29 +207,6 @@ var _ = Describe("Routemonitor", func() {
 			})
 		})
 	})
-	Describe("WasDeleteRequested", func() {
-		When("a user Requests a Deletion", func() {
-			//Arrange
-			BeforeEach(func() {
-				routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-			})
-			It("should return 'true'", func() {
-				// Act
-				res := routeMonitorReconciler.WasDeleteRequested(routeMonitor)
-				// Assert
-				Expect(res).To(BeTrue())
-			})
-		})
-		When("a user does nothing", func() {
-			// Arrange
-			It("should return 'false'", func() {
-				// Act
-				res := routeMonitorReconciler.WasDeleteRequested(routeMonitor)
-				// Assert
-				Expect(res).To(BeFalse())
-			})
-		})
-	})
 	Describe("ShouldDeleteBlackBoxExporterResources", func() {
 		BeforeEach(func() {
 			routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
@@ -307,321 +282,6 @@ var _ = Describe("Routemonitor", func() {
 			})
 
 		})
-	})
-
-	Describe("HasFinalizer", func() {
-		When("'FinalizerKey' is NOT in the 'Finalizers' list", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorFinalizers = []string{}
-			})
-
-			It("should return false", func() {
-				// Act
-				res := routeMonitorReconciler.HasFinalizer(routeMonitor)
-				// Assert
-				Expect(res).To(BeFalse())
-			})
-		})
-		When("'FinalizerKey' is in the 'Finalizers' list", func() {
-			It("should return true", func() {
-				// Act
-				res := routeMonitorReconciler.HasFinalizer(routeMonitor)
-				// Assert
-				Expect(res).To(BeTrue())
-			})
-		})
-	})
-
-	Describe("DeleteRouteMonitorAndDependencies", func() {
-		// Arrange
-		BeforeEach(func() {
-			routeMonitorEnableCustomResponse["DeleteServiceMonitorResource"] = true
-			routeMonitorCustomResponse["DeleteServiceMonitorResource"] = nil
-			routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
-		})
-		When("DeleteServiceMonitorResource fails unexpectidly", func() {
-			BeforeEach(func() {
-				routeMonitorCustomResponse["DeleteServiceMonitorResource"] = customError
-			})
-			It("should bubble up the error and return it", func() {
-				// Act
-				Skip("need to mock update")
-				_, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("the resource has a finalizer but 'Update' failed", func() {
-			// Arrange
-			BeforeEach(func() {
-				updateCalledTimes = 1
-				updateErrorResponse = customError
-				routeMonitorReconcilerClient = mockClient
-			})
-			It("Should bubble up the failure", func() {
-				// Act
-				Skip("DeleteRouteMonitorAndDependencies has inner deps that should not be tested")
-				_, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("the resource has a finalizer but 'Update' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				updateCalledTimes = 1
-				routeMonitorReconcilerClient = mockClient
-			})
-			It("Should succeed and call for a requeue", func() {
-				// Act
-				Skip("DeleteRouteMonitorAndDependencies has inner deps that should not be tested")
-				res, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).NotTo(BeNil())
-				Expect(res).To(Equal(utilreconcile.StopOperation()))
-			})
-		})
-		When("the resource doesnt have a finalizer but not deletion was requested", func() {
-			BeforeEach(func() {
-				routeMonitorFinalizers = []string{}
-			})
-			It("should complete successfully", func() {
-				// Act
-				res, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
-			})
-		})
-
-		When("the resource has a finalizer but 'Delete' failed", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorFinalizers = []string{}
-				routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-				deleteCalledTimes = 1
-				deleteErrorResponse = customError
-				routeMonitorReconcilerClient = mockClient
-			})
-			It("Should bubble up the failure", func() {
-				// Act
-				Skip("DeleteRouteMonitorAndDependencies has inner deps that should not be tested")
-				_, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("the resource has a finalizer but 'Delete' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorFinalizers = []string{}
-				routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-				deleteCalledTimes = 1
-				routeMonitorReconcilerClient = mockClient
-			})
-			It("should pass successfully", func() {
-				// Act
-				Skip("DeleteRouteMonitorAndDependencies has inner deps that should not be tested")
-				_, err := routeMonitorReconciler.DeleteRouteMonitorAndDependencies(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(err).To(BeNil())
-			})
-		})
-	})
-	//Describe("DeleteBlackBoxExporterResources", func() {
-	//When("subcommand 'Service' fails unexpectedly", func() {
-	//It("should bubble error", func() {
-	//})
-	//})
-	//})
-	Describe("DeleteServiceMonitorResource", func() {
-		BeforeEach(func() {
-			getCalledTimes = 1
-			routeMonitorReconcilerClient = mockClient
-		})
-		When("'Get' returns an unhandled error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = customError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("'Get' returns an 'Not found' error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = notFoundErr
-			})
-			It("should succeed as there is nothing to delete", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("'Delete' returns an unhandled error", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = customError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("'Delete' passes", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-			})
-			It("should succeed as the object was deleted", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-	})
-
-	Describe("DeleteBlackBoxExporterService", func() {
-		BeforeEach(func() {
-			getCalledTimes = 1
-			routeMonitorReconcilerClient = mockClient
-		})
-
-		When("'Get' return an error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = customError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-
-		When("'Get' return an 'NotFound' error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = notFoundErr
-			})
-			It("should do nothing", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("'Delete' return an an  error", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = customError
-			})
-			It("should do nothing", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-
-		When("'Delete' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-			})
-			It("should succeed", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterService(ctx)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-	})
-
-	Describe("DeleteBlackBoxExporterDeployment", func() {
-		BeforeEach(func() {
-			getCalledTimes = 1
-			routeMonitorReconcilerClient = mockClient
-		})
-
-		When("'Get' return an error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = customError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-
-		When("'Get' return an 'NotFound' error", func() {
-			// Arrange
-			BeforeEach(func() {
-				getErrorResponse = notFoundErr
-			})
-			It("should do nothing", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("'Delete' return an an  error", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = customError
-			})
-			It("should do nothing", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-
-		When("'Delete' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				deleteCalledTimes = 1
-			})
-			It("should succeed", func() {
-				// Act
-				err := routeMonitorReconciler.DeleteBlackBoxExporterDeployment(ctx)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
 	})
 
 	Describe("GetRoute", func() {
