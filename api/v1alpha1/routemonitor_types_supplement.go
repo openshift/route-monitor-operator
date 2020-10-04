@@ -1,8 +1,22 @@
 package v1alpha1
 
+import (
+	"fmt"
+
+	"github.com/openshift/route-monitor-operator/pkg/const/blackbox"
+	"k8s.io/apimachinery/pkg/types"
+)
+
 type RouteMonitorRouteSpec struct {
 	// Name is the name of the Route
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace of the Route
 	Namespace string `json:"namespace,omitempty"`
+}
+
+// templateForServiceMonitorName return the generated name from the RouteMonitor.
+// The name is joined by the name and the namespace to create a unique ServiceMonitor for each RouteMonitor
+func (r *RouteMonitor) TemplateForServiceMonitorName() types.NamespacedName {
+	serviceMonitorName := fmt.Sprintf("%s-%s", r.Name, r.Namespace)
+	return types.NamespacedName{Name: serviceMonitorName, Namespace: blackbox.BlackBoxNamespace}
 }
