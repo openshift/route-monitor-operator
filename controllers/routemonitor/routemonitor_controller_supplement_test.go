@@ -26,9 +26,14 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	mocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks"
+
+	"github.com/google/gofuzz" // fuzz testing
 )
 
 var _ = Describe("Routemonitor", func() {
+	// Add new Fuzzer
+	f := fuzz.New()
+
 	var (
 		routeMonitor          monitoringv1alpha1.RouteMonitor
 		routeMonitorName      string
@@ -64,9 +69,10 @@ var _ = Describe("Routemonitor", func() {
 			}}
 		customError = errors.New("test")
 	)
+	// Start Fuzz testing for values
+	f.Fuzz(&routeMonitorName)
+	f.Fuzz(&routeMonitorNamespace)
 	BeforeEach(func() {
-		routeMonitorName = "fake-name"
-		routeMonitorNamespace = "fake-namespace"
 		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
 		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
 
