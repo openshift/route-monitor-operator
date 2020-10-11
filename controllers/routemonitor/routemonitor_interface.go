@@ -3,6 +3,7 @@ package routemonitor
 import (
 	"context"
 
+	"github.com/openshift/route-monitor-operator/pkg/const/blackbox"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -10,21 +11,23 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 )
 
-//go:generate mockgen -source $GOFILE -destination ../../pkg/util/tests/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/tests/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter,RouteMonitorAdder
 
-type RouteMonitorActionDoer interface {
+type RouteMonitorSupplement interface {
 	GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error)
 	GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (routev1.Route, error)
-	UpdateRouteURL(ctx context.Context, route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
-	CreateBlackBoxExporterResources(ctx context.Context) error
-	CreateBlackBoxExporterDeployment(ctx context.Context) error
-	CreateBlackBoxExporterService(ctx context.Context) error
-	CreateServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
-	ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (bool, error)
+	EnsureRouteURLExists(ctx context.Context, route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 }
 
 type RouteMonitorDeleter interface {
-	DeleteBlackBoxExporterDeployment(ctx context.Context) error
-	DeleteBlackBoxExporterService(ctx context.Context) error
-	DeleteServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error
+	ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (blackbox.ShouldDeleteBlackBoxExporter, error)
+	EnsureBlackBoxExporterDeploymentAbsent(ctx context.Context) error
+	EnsureBlackBoxExporterServiceAbsent(ctx context.Context) error
+	EnsureServiceMonitorResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error
+}
+
+type RouteMonitorAdder interface {
+	EnsureBlackBoxExporterDeploymentExists(ctx context.Context) error
+	EnsureBlackBoxExporterServiceExists(ctx context.Context) error
+	EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 }

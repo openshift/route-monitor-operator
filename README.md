@@ -49,3 +49,4 @@ In order to develop the repo follow these steps to get an env started:
 ## ToDo
 
 * [ ] add option to specify which probes to use
+* [ ] make service monitor use a different interval via modifying a line in the spec of route monitor

@@ -33,7 +33,8 @@ type RouteMonitorReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
-	RouteMonitorActionDoer
+	RouteMonitorSupplement
+	RouteMonitorAdder
 	RouteMonitorDeleter
 }
 
@@ -53,7 +54,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-	if !res.Continue {
+	if res.ShouldStop() {
 		return res.Convert(), nil
 	}
 
@@ -62,11 +63,11 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.V(2).Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
-		res, err := r.PerformRouteMonitorDeletion(ctx, routeMonitor)
+		res, err := r.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
-		if !res.Continue {
+		if res.ShouldStop() {
 			return res.Convert(), nil
 		}
 		return utilreconcile.Stop()
@@ -74,7 +75,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.V(2).Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
-	err = r.CreateBlackBoxExporterResources(ctx)
+	err = r.EnsureBlackBoxExporterResourcesExists(ctx)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
@@ -86,20 +87,20 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.V(2).Info("Entering UpdateRouteURL")
-	res, err = r.UpdateRouteURL(ctx, route, routeMonitor)
+	res, err = r.EnsureRouteURLExists(ctx, route, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-	if !res.Continue {
+	if res.ShouldStop() {
 		return res.Convert(), nil
 	}
 
 	log.V(2).Info("Entering CreateServiceMonitorResource")
-	res, err = r.CreateServiceMonitorResource(ctx, routeMonitor)
+	res, err = r.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-	if !res.Continue {
+	if res.ShouldStop() {
 		return res.Convert(), nil
 	}
 	return utilreconcile.Stop()

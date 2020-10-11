@@ -33,6 +33,8 @@ import (
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
+
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor/adder"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
 	// +kubebuilder:scaffold:imports
@@ -83,8 +85,9 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}
 
-	routeMonitorReconciler.RouteMonitorActionDoer = supplement.New(*routeMonitorReconciler)
+	routeMonitorReconciler.RouteMonitorSupplement = supplement.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorDeleter = deleter.New(*routeMonitorReconciler)
+	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler)
 
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")

@@ -18,3 +18,10 @@ var ( // cannot be a const but doesn't ever change
 func GenerateBlackBoxLables() map[string]string {
 	return map[string]string{"app": BlackBoxName}
 }
+
+type ShouldDeleteBlackBoxExporter bool
+
+var (
+	KeepBlackBoxExporter   ShouldDeleteBlackBoxExporter = false
+	DeleteBlackBoxExporter ShouldDeleteBlackBoxExporter = true
+)

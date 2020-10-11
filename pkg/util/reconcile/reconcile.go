@@ -3,13 +3,24 @@ package reconcile
 import "time"
 
 type Result struct {
-	Requeue      bool
+	Requeue bool
+	// Continue is used mostly by ShouldStop() and it's named this way so the empty Result will stop proccesing
 	Continue     bool
 	RequeueAfter time.Duration
 }
 
+func (r Result) ShouldStop() bool {
+	return !r.Continue
+}
+
 func StopOperation() Result {
 	return Result{}
+}
+
+func RequeueOperation() Result {
+	return Result{
+		Requeue: true,
+	}
 }
 
 func ContinueOperation() Result {
@@ -20,6 +31,11 @@ func ContinueOperation() Result {
 
 func StopReconcile() (result Result, err error) {
 	result = StopOperation()
+	return
+}
+
+func RequeueReconcile() (result Result, err error) {
+	result = RequeueOperation()
 	return
 }
 

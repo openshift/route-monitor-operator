@@ -9,36 +9,37 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1 "github.com/openshift/api/route/v1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	blackbox "github.com/openshift/route-monitor-operator/pkg/const/blackbox"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	reflect "reflect"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 )
 
-// MockRouteMonitorActionDoer is a mock of RouteMonitorActionDoer interface
-type MockRouteMonitorActionDoer struct {
+// MockRouteMonitorSupplement is a mock of RouteMonitorSupplement interface
+type MockRouteMonitorSupplement struct {
 	ctrl     *gomock.Controller
-	recorder *MockRouteMonitorActionDoerMockRecorder
+	recorder *MockRouteMonitorSupplementMockRecorder
 }
 
-// MockRouteMonitorActionDoerMockRecorder is the mock recorder for MockRouteMonitorActionDoer
-type MockRouteMonitorActionDoerMockRecorder struct {
-	mock *MockRouteMonitorActionDoer
+// MockRouteMonitorSupplementMockRecorder is the mock recorder for MockRouteMonitorSupplement
+type MockRouteMonitorSupplementMockRecorder struct {
+	mock *MockRouteMonitorSupplement
 }
 
-// NewMockRouteMonitorActionDoer creates a new mock instance
-func NewMockRouteMonitorActionDoer(ctrl *gomock.Controller) *MockRouteMonitorActionDoer {
-	mock := &MockRouteMonitorActionDoer{ctrl: ctrl}
-	mock.recorder = &MockRouteMonitorActionDoerMockRecorder{mock}
+// NewMockRouteMonitorSupplement creates a new mock instance
+func NewMockRouteMonitorSupplement(ctrl *gomock.Controller) *MockRouteMonitorSupplement {
+	mock := &MockRouteMonitorSupplement{ctrl: ctrl}
+	mock.recorder = &MockRouteMonitorSupplementMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockRouteMonitorActionDoer) EXPECT() *MockRouteMonitorActionDoerMockRecorder {
+func (m *MockRouteMonitorSupplement) EXPECT() *MockRouteMonitorSupplementMockRecorder {
 	return m.recorder
 }
 
 // GetRouteMonitor mocks base method
-func (m *MockRouteMonitorActionDoer) GetRouteMonitor(ctx context.Context, req controllerruntime.Request) (v1alpha1.RouteMonitor, reconcile.Result, error) {
+func (m *MockRouteMonitorSupplement) GetRouteMonitor(ctx context.Context, req controllerruntime.Request) (v1alpha1.RouteMonitor, reconcile.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRouteMonitor", ctx, req)
 	ret0, _ := ret[0].(v1alpha1.RouteMonitor)
@@ -48,13 +49,13 @@ func (m *MockRouteMonitorActionDoer) GetRouteMonitor(ctx context.Context, req co
 }
 
 // GetRouteMonitor indicates an expected call of GetRouteMonitor
-func (mr *MockRouteMonitorActionDoerMockRecorder) GetRouteMonitor(ctx, req interface{}) *gomock.Call {
+func (mr *MockRouteMonitorSupplementMockRecorder) GetRouteMonitor(ctx, req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRouteMonitor", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).GetRouteMonitor), ctx, req)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRouteMonitor", reflect.TypeOf((*MockRouteMonitorSupplement)(nil).GetRouteMonitor), ctx, req)
 }
 
 // GetRoute mocks base method
-func (m *MockRouteMonitorActionDoer) GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (v1.Route, error) {
+func (m *MockRouteMonitorSupplement) GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (v1.Route, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRoute", ctx, routeMonitor)
 	ret0, _ := ret[0].(v1.Route)
@@ -63,96 +64,24 @@ func (m *MockRouteMonitorActionDoer) GetRoute(ctx context.Context, routeMonitor 
 }
 
 // GetRoute indicates an expected call of GetRoute
-func (mr *MockRouteMonitorActionDoerMockRecorder) GetRoute(ctx, routeMonitor interface{}) *gomock.Call {
+func (mr *MockRouteMonitorSupplementMockRecorder) GetRoute(ctx, routeMonitor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoute", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).GetRoute), ctx, routeMonitor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRoute", reflect.TypeOf((*MockRouteMonitorSupplement)(nil).GetRoute), ctx, routeMonitor)
 }
 
-// UpdateRouteURL mocks base method
-func (m *MockRouteMonitorActionDoer) UpdateRouteURL(ctx context.Context, route v1.Route, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
+// EnsureRouteURLExists mocks base method
+func (m *MockRouteMonitorSupplement) EnsureRouteURLExists(ctx context.Context, route v1.Route, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateRouteURL", ctx, route, routeMonitor)
+	ret := m.ctrl.Call(m, "EnsureRouteURLExists", ctx, route, routeMonitor)
 	ret0, _ := ret[0].(reconcile.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateRouteURL indicates an expected call of UpdateRouteURL
-func (mr *MockRouteMonitorActionDoerMockRecorder) UpdateRouteURL(ctx, route, routeMonitor interface{}) *gomock.Call {
+// EnsureRouteURLExists indicates an expected call of EnsureRouteURLExists
+func (mr *MockRouteMonitorSupplementMockRecorder) EnsureRouteURLExists(ctx, route, routeMonitor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRouteURL", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).UpdateRouteURL), ctx, route, routeMonitor)
-}
-
-// CreateBlackBoxExporterResources mocks base method
-func (m *MockRouteMonitorActionDoer) CreateBlackBoxExporterResources(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBlackBoxExporterResources", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateBlackBoxExporterResources indicates an expected call of CreateBlackBoxExporterResources
-func (mr *MockRouteMonitorActionDoerMockRecorder) CreateBlackBoxExporterResources(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBlackBoxExporterResources", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).CreateBlackBoxExporterResources), ctx)
-}
-
-// CreateBlackBoxExporterDeployment mocks base method
-func (m *MockRouteMonitorActionDoer) CreateBlackBoxExporterDeployment(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBlackBoxExporterDeployment", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateBlackBoxExporterDeployment indicates an expected call of CreateBlackBoxExporterDeployment
-func (mr *MockRouteMonitorActionDoerMockRecorder) CreateBlackBoxExporterDeployment(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBlackBoxExporterDeployment", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).CreateBlackBoxExporterDeployment), ctx)
-}
-
-// CreateBlackBoxExporterService mocks base method
-func (m *MockRouteMonitorActionDoer) CreateBlackBoxExporterService(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBlackBoxExporterService", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateBlackBoxExporterService indicates an expected call of CreateBlackBoxExporterService
-func (mr *MockRouteMonitorActionDoerMockRecorder) CreateBlackBoxExporterService(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBlackBoxExporterService", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).CreateBlackBoxExporterService), ctx)
-}
-
-// CreateServiceMonitorResource mocks base method
-func (m *MockRouteMonitorActionDoer) CreateServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateServiceMonitorResource", ctx, routeMonitor)
-	ret0, _ := ret[0].(reconcile.Result)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateServiceMonitorResource indicates an expected call of CreateServiceMonitorResource
-func (mr *MockRouteMonitorActionDoerMockRecorder) CreateServiceMonitorResource(ctx, routeMonitor interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServiceMonitorResource", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).CreateServiceMonitorResource), ctx, routeMonitor)
-}
-
-// ShouldDeleteBlackBoxExporterResources mocks base method
-func (m *MockRouteMonitorActionDoer) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources", ctx, routeMonitor)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources
-func (mr *MockRouteMonitorActionDoerMockRecorder) ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockRouteMonitorActionDoer)(nil).ShouldDeleteBlackBoxExporterResources), ctx, routeMonitor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureRouteURLExists", reflect.TypeOf((*MockRouteMonitorSupplement)(nil).EnsureRouteURLExists), ctx, route, routeMonitor)
 }
 
 // MockRouteMonitorDeleter is a mock of RouteMonitorDeleter interface
@@ -178,44 +107,125 @@ func (m *MockRouteMonitorDeleter) EXPECT() *MockRouteMonitorDeleterMockRecorder 
 	return m.recorder
 }
 
-// DeleteBlackBoxExporterDeployment mocks base method
-func (m *MockRouteMonitorDeleter) DeleteBlackBoxExporterDeployment(ctx context.Context) error {
+// ShouldDeleteBlackBoxExporterResources mocks base method
+func (m *MockRouteMonitorDeleter) ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (blackbox.ShouldDeleteBlackBoxExporter, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteBlackBoxExporterDeployment", ctx)
+	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources", ctx, routeMonitor)
+	ret0, _ := ret[0].(blackbox.ShouldDeleteBlackBoxExporter)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources
+func (mr *MockRouteMonitorDeleterMockRecorder) ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).ShouldDeleteBlackBoxExporterResources), ctx, routeMonitor)
+}
+
+// EnsureBlackBoxExporterDeploymentAbsent mocks base method
+func (m *MockRouteMonitorDeleter) EnsureBlackBoxExporterDeploymentAbsent(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterDeploymentAbsent", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteBlackBoxExporterDeployment indicates an expected call of DeleteBlackBoxExporterDeployment
-func (mr *MockRouteMonitorDeleterMockRecorder) DeleteBlackBoxExporterDeployment(ctx interface{}) *gomock.Call {
+// EnsureBlackBoxExporterDeploymentAbsent indicates an expected call of EnsureBlackBoxExporterDeploymentAbsent
+func (mr *MockRouteMonitorDeleterMockRecorder) EnsureBlackBoxExporterDeploymentAbsent(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlackBoxExporterDeployment", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).DeleteBlackBoxExporterDeployment), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterDeploymentAbsent", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).EnsureBlackBoxExporterDeploymentAbsent), ctx)
 }
 
-// DeleteBlackBoxExporterService mocks base method
-func (m *MockRouteMonitorDeleter) DeleteBlackBoxExporterService(ctx context.Context) error {
+// EnsureBlackBoxExporterServiceAbsent mocks base method
+func (m *MockRouteMonitorDeleter) EnsureBlackBoxExporterServiceAbsent(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteBlackBoxExporterService", ctx)
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterServiceAbsent", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteBlackBoxExporterService indicates an expected call of DeleteBlackBoxExporterService
-func (mr *MockRouteMonitorDeleterMockRecorder) DeleteBlackBoxExporterService(ctx interface{}) *gomock.Call {
+// EnsureBlackBoxExporterServiceAbsent indicates an expected call of EnsureBlackBoxExporterServiceAbsent
+func (mr *MockRouteMonitorDeleterMockRecorder) EnsureBlackBoxExporterServiceAbsent(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBlackBoxExporterService", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).DeleteBlackBoxExporterService), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterServiceAbsent", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).EnsureBlackBoxExporterServiceAbsent), ctx)
 }
 
-// DeleteServiceMonitorResource mocks base method
-func (m *MockRouteMonitorDeleter) DeleteServiceMonitorResource(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
+// EnsureServiceMonitorResourceAbsent mocks base method
+func (m *MockRouteMonitorDeleter) EnsureServiceMonitorResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteServiceMonitorResource", ctx, routeMonitor)
+	ret := m.ctrl.Call(m, "EnsureServiceMonitorResourceAbsent", ctx, routeMonitor)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteServiceMonitorResource indicates an expected call of DeleteServiceMonitorResource
-func (mr *MockRouteMonitorDeleterMockRecorder) DeleteServiceMonitorResource(ctx, routeMonitor interface{}) *gomock.Call {
+// EnsureServiceMonitorResourceAbsent indicates an expected call of EnsureServiceMonitorResourceAbsent
+func (mr *MockRouteMonitorDeleterMockRecorder) EnsureServiceMonitorResourceAbsent(ctx, routeMonitor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorResource", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).DeleteServiceMonitorResource), ctx, routeMonitor)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureServiceMonitorResourceAbsent", reflect.TypeOf((*MockRouteMonitorDeleter)(nil).EnsureServiceMonitorResourceAbsent), ctx, routeMonitor)
+}
+
+// MockRouteMonitorAdder is a mock of RouteMonitorAdder interface
+type MockRouteMonitorAdder struct {
+	ctrl     *gomock.Controller
+	recorder *MockRouteMonitorAdderMockRecorder
+}
+
+// MockRouteMonitorAdderMockRecorder is the mock recorder for MockRouteMonitorAdder
+type MockRouteMonitorAdderMockRecorder struct {
+	mock *MockRouteMonitorAdder
+}
+
+// NewMockRouteMonitorAdder creates a new mock instance
+func NewMockRouteMonitorAdder(ctrl *gomock.Controller) *MockRouteMonitorAdder {
+	mock := &MockRouteMonitorAdder{ctrl: ctrl}
+	mock.recorder = &MockRouteMonitorAdderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockRouteMonitorAdder) EXPECT() *MockRouteMonitorAdderMockRecorder {
+	return m.recorder
+}
+
+// EnsureBlackBoxExporterDeploymentExists mocks base method
+func (m *MockRouteMonitorAdder) EnsureBlackBoxExporterDeploymentExists(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterDeploymentExists", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureBlackBoxExporterDeploymentExists indicates an expected call of EnsureBlackBoxExporterDeploymentExists
+func (mr *MockRouteMonitorAdderMockRecorder) EnsureBlackBoxExporterDeploymentExists(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterDeploymentExists", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsureBlackBoxExporterDeploymentExists), ctx)
+}
+
+// EnsureBlackBoxExporterServiceExists mocks base method
+func (m *MockRouteMonitorAdder) EnsureBlackBoxExporterServiceExists(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterServiceExists", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureBlackBoxExporterServiceExists indicates an expected call of EnsureBlackBoxExporterServiceExists
+func (mr *MockRouteMonitorAdderMockRecorder) EnsureBlackBoxExporterServiceExists(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterServiceExists", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsureBlackBoxExporterServiceExists), ctx)
+}
+
+// EnsureServiceMonitorResourceExists mocks base method
+func (m *MockRouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureServiceMonitorResourceExists", ctx, routeMonitor)
+	ret0, _ := ret[0].(reconcile.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnsureServiceMonitorResourceExists indicates an expected call of EnsureServiceMonitorResourceExists
+func (mr *MockRouteMonitorAdderMockRecorder) EnsureServiceMonitorResourceExists(ctx, routeMonitor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureServiceMonitorResourceExists", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsureServiceMonitorResourceExists), ctx, routeMonitor)
 }

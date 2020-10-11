@@ -1,15 +1,11 @@
 package supplement_test
 
 import (
-	"context"
-	"errors"
-	"time"
-
 	"github.com/golang/mock/gomock"
+	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/go-logr/logr/testing"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
 
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
@@ -21,18 +17,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 
-	fuzz "github.com/google/gofuzz" // fuzz testing
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
+	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
-
-	//routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/routemonitor"
-	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
 )
 
 var _ = Describe("Routemonitor", func() {
@@ -40,20 +30,20 @@ var _ = Describe("Routemonitor", func() {
 	f := fuzz.New()
 
 	var (
-		routeMonitor                  monitoringv1alpha1.RouteMonitor
+		routeMonitor                  v1alpha1.RouteMonitor
 		routeMonitorName              string
 		routeMonitorNamespace         string
-		routeMonitorRouteSpec         monitoringv1alpha1.RouteMonitorRouteSpec
+		routeMonitorRouteSpec         v1alpha1.RouteMonitorRouteSpec
 		routeMonitorFinalizers        []string
 		routeMonitorDeletionTimestamp *metav1.Time
-		routeMonitorStatus            monitoringv1alpha1.RouteMonitorStatus
+		routeMonitorStatus            v1alpha1.RouteMonitorStatus
 
-		routeMonitorReconciler       supplement.RouteMonitorSupplement
-		routeMonitorReconcilerClient client.Client
+		routeMonitorSupplement       supplement.RouteMonitorSupplement
+		routeMonitorSupplementClient client.Client
 
 		req                  ctrl.Request
 		route                routev1.Route
-		expectedRouteMonitor monitoringv1alpha1.RouteMonitor
+		expectedRouteMonitor v1alpha1.RouteMonitor
 
 		mockClient       *clientmocks.MockClient
 		mockStatusWriter *clientmocks.MockStatusWriter
@@ -80,31 +70,22 @@ var _ = Describe("Routemonitor", func() {
 	)
 
 	var ( // Practically const vars
-		ctx         = context.TODO()
-		logger      = testing.NullLogger{}
-		scheme      = setScheme(runtime.NewScheme())
-		notFoundErr = &k8serrors.StatusError{
-			ErrStatus: metav1.Status{
-				Reason: metav1.StatusReasonNotFound,
-			}}
-		customError        = errors.New("test")
-		routeMonitorSecond = monitoringv1alpha1.RouteMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      routeMonitorName + "-but-different",
-				Namespace: routeMonitorNamespace,
-			},
-		}
+		ctx    = constinit.Context
+		scheme = constinit.Scheme
 	)
+
 	// Start Fuzz testing for values
 	f.Fuzz(&routeMonitorName)
 	f.Fuzz(&routeMonitorNamespace)
 
 	BeforeEach(func() {
-		routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{}
-		routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
-		routeMonitorFinalizers = []string{routemonitorconst.FinalizerKey}
+		routeMonitorName = "fake-name"
+		routeMonitorNamespace = "fake-namespace"
+		routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{}
+		routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme)
+		routeMonitorFinalizers = routemonitorconst.FinalizerList
 		routeMonitorDeletionTimestamp = nil
-		routeMonitorStatus = monitoringv1alpha1.RouteMonitorStatus{}
+		routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
@@ -121,22 +102,22 @@ var _ = Describe("Routemonitor", func() {
 	})
 
 	JustBeforeEach(func() {
-		routeMonitor = monitoringv1alpha1.RouteMonitor{
+		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              routeMonitorName,
 				Namespace:         routeMonitorNamespace,
 				Finalizers:        routeMonitorFinalizers,
 				DeletionTimestamp: routeMonitorDeletionTimestamp,
 			},
-			Spec: monitoringv1alpha1.RouteMonitorSpec{
+			Spec: v1alpha1.RouteMonitorSpec{
 				Route: routeMonitorRouteSpec,
 			},
 			Status: routeMonitorStatus,
 		}
 
-		routeMonitorReconciler = supplement.RouteMonitorSupplement{
-			Log:    logger,
-			Client: routeMonitorReconcilerClient,
+		routeMonitorSupplement = supplement.RouteMonitorSupplement{
+			Log:    constinit.Logger,
+			Client: routeMonitorSupplementClient,
 			Scheme: scheme,
 		}
 		req = ctrl.Request{
@@ -180,11 +161,11 @@ var _ = Describe("Routemonitor", func() {
 		When("the RouteMonitor is not found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
+				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
 			})
 			It("should stop requeue", func() {
 				// Act
-				resRouteMonitor, res, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
+				resRouteMonitor, res, err := routeMonitorSupplement.GetRouteMonitor(ctx, req)
 				// Assert
 				Skip("make it pass for now")
 				Expect(err).NotTo(HaveOccurred())
@@ -195,92 +176,16 @@ var _ = Describe("Routemonitor", func() {
 		When("the RouteMonitor is found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
+				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
 			})
 
 			It("should return the object", func() {
 				// Act
-				resRouteMonitor, _, err := routeMonitorReconciler.GetRouteMonitor(ctx, req)
+				resRouteMonitor, _, err := routeMonitorSupplement.GetRouteMonitor(ctx, req)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resRouteMonitor).NotTo(BeNil())
 			})
-		})
-	})
-	Describe("ShouldDeleteBlackBoxExporterResources", func() {
-		BeforeEach(func() {
-			routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-		})
-		When("a delete was not requested (user did nothing)", func() {
-			BeforeEach(func() {
-				routeMonitorDeletionTimestamp = nil
-			})
-			// Arrange
-			It("should stop early and return 'false'", func() {
-				// Act
-				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(BeFalse())
-			})
-		})
-		When("the `List` command fails", func() {
-			// Arrange
-			BeforeEach(func() {
-				listCalledTimes = 1
-				listErrorResponse = customError
-				routeMonitorReconcilerClient = mockClient
-			})
-			It("should fail with the List error", func() {
-				// Act
-				_, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customError))
-			})
-		})
-		When("there are no RouteMonitors", func() {
-			It("should technically return  'true' but return InternalFault error", func() {
-				// Act
-				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(HavePrefix("Internal Fault:"))
-
-				// is true because it should delete even if there are no items.
-				// but this is in unusual situation because:
-				// - a delete was requested
-				// - there are no items of that resource on the cluster
-				Expect(res).To(BeTrue())
-			})
-		})
-
-		When("there are many RouteMonitors", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor, &routeMonitorSecond)
-			})
-			It("should return 'false' for too many RouteMonitors", func() {
-				// Act
-				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(BeFalse())
-			})
-		})
-
-		When("there is just one RouteMonitor", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
-			})
-			It("should return 'true'", func() {
-				// Act
-				res, err := routeMonitorReconciler.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(BeTrue())
-			})
-
 		})
 	})
 
@@ -288,7 +193,7 @@ var _ = Describe("Routemonitor", func() {
 		When("the Route is not found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{
+				routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
 					Name:      "Rob",
 					Namespace: "Bob",
 				}
@@ -298,11 +203,11 @@ var _ = Describe("Routemonitor", func() {
 						Namespace: "testns",
 					},
 				}
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &route)
+				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &route)
 			})
 			It("should return a Not Found error", func() {
 				// Act
-				resRoute, err := routeMonitorReconciler.GetRoute(ctx, routeMonitor)
+				resRoute, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
 				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
@@ -313,7 +218,7 @@ var _ = Describe("Routemonitor", func() {
 		When("the Route is found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{
+				routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
 					Name:      routeMonitorName,
 					Namespace: routeMonitorNamespace,
 				}
@@ -324,11 +229,11 @@ var _ = Describe("Routemonitor", func() {
 						Namespace: routeMonitorNamespace,
 					},
 				}
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &route)
+				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &route)
 			})
 			It("should return the route", func() {
 				// Act
-				resRoute, err := routeMonitorReconciler.GetRoute(ctx, routeMonitor)
+				resRoute, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resRoute).ShouldNot(BeNil())
@@ -339,7 +244,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the RouteMonitor doesnt have Spec.Route.Namespace", func() {
 				// Arrange
 				BeforeEach(func() {
-					routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{
+					routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
 						Name: "Rob",
 						// Namespace is omitted
 					}
@@ -347,7 +252,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				It("should return a custom error", func() {
 					// Act
-					resRoute, err := routeMonitorReconciler.GetRoute(ctx, routeMonitor)
+					resRoute, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
 					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
@@ -357,14 +262,14 @@ var _ = Describe("Routemonitor", func() {
 			When("the RouteMonitor doesnt have Spec.Route.Name", func() {
 				// Arrange
 				BeforeEach(func() {
-					routeMonitorRouteSpec = monitoringv1alpha1.RouteMonitorRouteSpec{
+					routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
 						// Name is omitted
 						Namespace: "Bob",
 					}
 				})
 				It("should return a custom error", func() {
 					// Act
-					resRoute, err := routeMonitorReconciler.GetRoute(ctx, routeMonitor)
+					resRoute, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
 					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
@@ -381,7 +286,7 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			It("should return No Ingress error", func() {
 				// Act
-				res, err := routeMonitorReconciler.UpdateRouteURL(ctx, route, routeMonitor)
+				res, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
 				// Assert
 				Expect(res).To(BeZero())
 				Expect(err).To(HaveOccurred())
@@ -399,7 +304,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			It("should return No Host error", func() {
 				// Act
-				res, err := routeMonitorReconciler.UpdateRouteURL(ctx, route, routeMonitor)
+				res, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
 				// Assert
 				Expect(res).To(BeZero())
 				Expect(err).To(HaveOccurred())
@@ -419,7 +324,7 @@ var _ = Describe("Routemonitor", func() {
 					},
 				}
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-				routeMonitorReconcilerClient = mockClient
+				routeMonitorSupplementClient = mockClient
 				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).Times(1).Return(nil)
 			})
 			JustBeforeEach(func() {
@@ -427,7 +332,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			It("should update the first ingress", func() {
 				// Act
-				res, err := routeMonitorReconciler.UpdateRouteURL(ctx, route, routeMonitor)
+				res, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).NotTo(BeNil())
@@ -435,246 +340,4 @@ var _ = Describe("Routemonitor", func() {
 			})
 		})
 	})
-	Describe("CreateServiceMonitorResource", func() {
-		When("the RouteMonitor has no Host", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
-			})
-			It("should return No Host error", func() {
-				// Act
-				_, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.NoHost))
-			})
-		})
-		When("the RouteMonitor has no Finalizer", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				updateCalledTimes = 1
-				routeMonitorFinalizers = nil
-				routeMonitorStatus = monitoringv1alpha1.RouteMonitorStatus{
-					RouteURL: routeMonitorRouteURLDefault,
-				}
-
-			})
-			JustBeforeEach(func() {
-			})
-			It("Should update the RouteMonitor with the finalizer", func() {
-				// Act
-				resp, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp).NotTo(BeNil())
-				Expect(resp).To(Equal(utilreconcile.StopOperation()))
-
-			})
-
-		})
-		Describe("Testing CreateResourceIfNotFound", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = monitoringv1alpha1.RouteMonitorStatus{
-					RouteURL: routeMonitorRouteURLDefault,
-				}
-			})
-
-			When("the resource Exists", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-				})
-				It("should call `Get` and not call `Create`", func() {
-					//Act
-					_, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-
-				})
-			})
-			When("the resource is Not Found", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-				})
-				It("should call `Get` successfully and `Create` the resource", func() {
-					//Act
-					_, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-			When("the resource Get fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = customError
-				})
-				It("should return the error and not call `Create`", func() {
-					//Act
-					_, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(getErrorResponse))
-				})
-			})
-			When("the resource Create fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-					createErrorResponse = customError
-				})
-				It("should call `Get` Successfully and call `Create` but return the error", func() {
-					//Act
-					_, err := routeMonitorReconciler.CreateServiceMonitorResource(ctx, routeMonitor)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(customError))
-				})
-			})
-
-		})
-		Describe("CreateBlackBoxExporterDeployment", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-			})
-
-			When("the resource(deployment) Exists", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-				})
-				It("should call `Get` and not call `Create`", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterDeployment(ctx)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-
-				})
-			})
-			When("the resource(deployment) is Not Found", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-				})
-				It("should call `Get` successfully and `Create` the resource(deployment)", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterDeployment(ctx)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-			When("the resource(deployment) Get fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = customError
-				})
-				It("should return the error and not call `Create`", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterDeployment(ctx)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(getErrorResponse))
-				})
-			})
-			When("the resource(deployment) Create fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-					createErrorResponse = customError
-				})
-				It("should call `Get` Successfully and call `Create` but return the error", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterDeployment(ctx)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(createErrorResponse))
-					Expect(err).To(MatchError(customError))
-				})
-			})
-		})
-		Describe("CreateBlackBoxExporterService", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-			})
-
-			When("the resource(service) Exists", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-				})
-				It("should call `Get` and not call `Create`", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterService(ctx)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-
-				})
-			})
-			When("the resource(service) is Not Found", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-				})
-				It("should call `Get` successfully and `Create` the resource(service)", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterService(ctx)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-			When("the resource(service) Get fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = customError
-				})
-				It("should return the error and not call `Create`", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterService(ctx)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(getErrorResponse))
-				})
-			})
-			When("the resource(service) Create fails unexpectedly", func() {
-				// Arrange
-				BeforeEach(func() {
-					getCalledTimes = 1
-					getErrorResponse = notFoundErr
-					createCalledTimes = 1
-					createErrorResponse = customError
-				})
-				It("should call `Get` Successfully and call `Create` but return the error", func() {
-					//Act
-					err := routeMonitorReconciler.CreateBlackBoxExporterService(ctx)
-					//Assert
-					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError(createErrorResponse))
-					Expect(err).To(MatchError(customError))
-				})
-			})
-		})
-	})
 })
-
-func setScheme(scheme *runtime.Scheme) *runtime.Scheme {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(monitoringv1.AddToScheme(scheme))
-	utilruntime.Must(routev1.AddToScheme(scheme))
-	return scheme
-}
