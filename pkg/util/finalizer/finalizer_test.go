@@ -90,4 +90,49 @@ var _ = Describe("Finalizer", func() {
 			})
 		})
 	})
+	Describe("Add", func() {
+		When("object doesnt have Finalizers", func() {
+			It("should create a list", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{}
+				// Act
+				finalizer.Add(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{key}))
+			})
+		})
+		When("object has empty Finalizers", func() {
+			It("should create a list", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{}}
+				// Act
+				finalizer.Add(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{key}))
+			})
+		})
+		When("object has finalizer in", func() {
+			It("should return a bigger", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{secondKey}}
+				// Act
+				finalizer.Add(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{key, secondKey}))
+			})
+		})
+		When("key in object fianlizers", func() {
+			It("do nothing", func() {
+				// Arrange
+				obj := metav1.ObjectMeta{
+					Finalizers: []string{key}}
+				// Act
+				finalizer.Add(&obj, key)
+				// Assert
+				Expect(obj.Finalizers).To(Equal([]string{key}))
+			})
+		})
+	})
 })

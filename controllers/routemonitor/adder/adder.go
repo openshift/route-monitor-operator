@@ -127,51 +127,11 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	return utilreconcile.ContinueReconcile()
 }
 
-func (r *RouteMonitorAdder) EnsureBlackBoxExporterServiceAbsent(ctx context.Context) error {
-	resource := &corev1.Service{}
-
-	// Does the resource already exist?
-	err := r.Get(ctx, blackbox.BlackBoxNamespacedName, resource)
-	if err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return err
-		}
-		// Resource doesn't exist, nothing to do
-		return nil
-	}
-	err = r.Delete(ctx, resource)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *RouteMonitorAdder) EnsureServiceMonitorResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
-	namespacedName := routeMonitor.TemplateForServiceMonitorName()
-	resource := &monitoringv1.ServiceMonitor{}
-	// Does the resource already exist?
-	err := r.Get(ctx, namespacedName, resource)
-	if err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return err
-		}
-		// Resource doesn't exist, nothing to do
-		return nil
-	}
-	err = r.Delete(ctx, resource)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func (r *RouteMonitorAdder) templateForBlackBoxExporterDeployment() appsv1.Deployment {
+func (*RouteMonitorAdder) templateForBlackBoxExporterDeployment() appsv1.Deployment {
 	labels := blackbox.GenerateBlackBoxLables()
+	labelSelectors := metav1.LabelSelector{
+		MatchLabels: labels}
 	// hardcode the replicasize for no
 	//replicas := m.Spec.Size
 	var replicas int32 = 1
@@ -184,9 +144,7 @@ func (r *RouteMonitorAdder) templateForBlackBoxExporterDeployment() appsv1.Deplo
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
+			Selector: &labelSelectors,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -208,7 +166,7 @@ func (r *RouteMonitorAdder) templateForBlackBoxExporterDeployment() appsv1.Deplo
 }
 
 // templateForBlackBoxExporterService returns a blackbox service
-func (r *RouteMonitorAdder) templateForBlackBoxExporterService() corev1.Service {
+func (*RouteMonitorAdder) templateForBlackBoxExporterService() corev1.Service {
 	labels := blackbox.GenerateBlackBoxLables()
 
 	svc := corev1.Service{
@@ -234,12 +192,11 @@ func (r *RouteMonitorAdder) templateForServiceMonitorResource(routeMonitor v1alp
 
 	routeURL := routeMonitor.Status.RouteURL
 	serviceMonitorName := routeMonitor.TemplateForServiceMonitorName().Name
+
 	routeMonitorLabels := blackbox.GenerateBlackBoxLables()
-	var labelSelector = metav1.LabelSelector{}
-	err := metav1.Convert_Map_string_To_string_To_v1_LabelSelector(&routeMonitorLabels, &labelSelector, nil)
-	if err != nil {
-		r.Log.Error(err, "Failed to convert LabelSelector to it's components")
-	}
+
+	labelSelector := metav1.LabelSelector{MatchLabels: routeMonitorLabels}
+
 	// Currently we only support `http_2xx` as module
 	// Still make it a variable so we can easily add functionality later
 	modules := []string{"http_2xx"}

@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
 
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
+	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
@@ -89,6 +91,7 @@ var _ = Describe("Routemonitor", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+
 		createCalledTimes = 0
 		createErrorResponse = nil
 		getCalledTimes = 0
@@ -114,6 +117,7 @@ var _ = Describe("Routemonitor", func() {
 			},
 			Status: routeMonitorStatus,
 		}
+		expectedRouteMonitor = routeMonitor
 
 		routeMonitorSupplement = supplement.RouteMonitorSupplement{
 			Log:    constinit.Logger,
@@ -151,17 +155,32 @@ var _ = Describe("Routemonitor", func() {
 			Return(deleteErrorResponse).
 			Times(deleteCalledTimes)
 
-		expectedRouteMonitor = routeMonitor
 	})
 
 	AfterEach(func() {
 		mockCtrl.Finish()
 	})
 	Describe("GetRouteMonitor", func() {
+		When("func Get fails unexpectedly", func() {
+			// Arrange
+			BeforeEach(func() {
+				getCalledTimes = 1
+				getErrorResponse = consterror.CustomError
+				routeMonitorSupplementClient = mockClient
+			})
+			It("should stop requeue", func() {
+				// Act
+				_, _, err := routeMonitorSupplement.GetRouteMonitor(ctx, req)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+
+			})
+		})
 		When("the RouteMonitor is not found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
+				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme)
 			})
 			It("should stop requeue", func() {
 				// Act
@@ -190,39 +209,37 @@ var _ = Describe("Routemonitor", func() {
 	})
 
 	Describe("GetRoute", func() {
+		BeforeEach(func() {
+			routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
+				Name:      routeMonitorName,
+				Namespace: routeMonitorNamespace,
+			}
+		})
 		When("the Route is not found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
-					Name:      "Rob",
-					Namespace: "Bob",
-				}
 				route = routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: "testns",
+						Name:      routeMonitorName + "-but-different",
+						Namespace: routeMonitorNamespace,
 					},
 				}
 				routeMonitorSupplementClient = fake.NewFakeClientWithScheme(scheme, &route)
 			})
 			It("should return a Not Found error", func() {
 				// Act
-				resRoute, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
+				res, err := routeMonitorSupplement.GetRoute(ctx, routeMonitor)
 				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
-				Expect(resRoute).To(BeZero())
+				Expect(res).To(BeZero())
 
 			})
 		})
 		When("the Route is found", func() {
 			// Arrange
 			BeforeEach(func() {
-				routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
-					Name:      routeMonitorName,
-					Namespace: routeMonitorNamespace,
-				}
-
+				// Arrange
 				route = routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      routeMonitorName,
@@ -241,14 +258,16 @@ var _ = Describe("Routemonitor", func() {
 		})
 
 		Describe("Missing a RouteMonitor Field", func() {
+			route = routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      routeMonitorName,
+					Namespace: routeMonitorNamespace,
+				},
+			}
 			When("the RouteMonitor doesnt have Spec.Route.Namespace", func() {
 				// Arrange
 				BeforeEach(func() {
-					routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
-						Name: "Rob",
-						// Namespace is omitted
-					}
-
+					routeMonitorRouteSpec.Namespace = ""
 				})
 				It("should return a custom error", func() {
 					// Act
@@ -262,10 +281,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the RouteMonitor doesnt have Spec.Route.Name", func() {
 				// Arrange
 				BeforeEach(func() {
-					routeMonitorRouteSpec = v1alpha1.RouteMonitorRouteSpec{
-						// Name is omitted
-						Namespace: "Bob",
-					}
+					routeMonitorRouteSpec.Name = ""
 				})
 				It("should return a custom error", func() {
 					// Act
@@ -278,9 +294,14 @@ var _ = Describe("Routemonitor", func() {
 			})
 		})
 	})
-	Describe("UpdateRouteURL", func() {
-		BeforeEach(func() {
-			route = routev1.Route{}
+	Describe("EnsureRouteURLExists", func() {
+		var ingresses []string
+		JustBeforeEach(func() {
+			route = routev1.Route{
+				Status: routev1.RouteStatus{
+					Ingress: ConvertToIngressHosts(ingresses),
+				},
+			}
 		})
 		When("the Route has no Ingresses", func() {
 			// Arrange
@@ -296,11 +317,7 @@ var _ = Describe("Routemonitor", func() {
 		When("the Route has no Host", func() {
 			// Arrange
 			BeforeEach(func() {
-				route.Status = routev1.RouteStatus{
-					Ingress: []routev1.RouteIngress{
-						{Host: ""},
-					},
-				}
+				ingresses = []string{""}
 			})
 			It("should return No Host error", func() {
 				// Act
@@ -311,24 +328,54 @@ var _ = Describe("Routemonitor", func() {
 				Expect(err).To(MatchError(customerrors.NoHost))
 			})
 		})
+
+		When("func Update fails unexpectedly", func() {
+			// Arrange
+			var (
+				firstRouteURL = "freddy"
+			)
+			BeforeEach(func() {
+				ingresses = []string{
+					firstRouteURL,
+					"eddie",
+				}
+
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				routeMonitorSupplementClient = mockClient
+			})
+			JustBeforeEach(func() {
+				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(consterror.CustomError)
+
+			})
+			It("should bubble up the error", func() {
+				// Act
+				_, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
 		When("the Route has too many Ingress", func() {
 			// Arrange
 			var (
 				firstRouteURL = "freddy"
 			)
 			BeforeEach(func() {
-				route.Status = routev1.RouteStatus{
-					Ingress: []routev1.RouteIngress{
-						{Host: firstRouteURL},
-						{Host: "eddie"},
-					},
+				ingresses = []string{
+					firstRouteURL,
+					"eddie",
 				}
+
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
 				routeMonitorSupplementClient = mockClient
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).Times(1).Return(nil)
 			})
 			JustBeforeEach(func() {
 				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).Times(1).Return(nil)
+
 			})
 			It("should update the first ingress", func() {
 				// Act
@@ -339,5 +386,87 @@ var _ = Describe("Routemonitor", func() {
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
+		When("the RouteURL is not like the extracted Route", func() {
+			// Arrange
+			var (
+				firstRouteURL = "freddy"
+			)
+			BeforeEach(func() {
+				ingresses = []string{
+					firstRouteURL,
+				}
+
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				routeMonitorSupplementClient = mockClient
+			})
+			JustBeforeEach(func() {
+				routeMonitor.Status.RouteURL = firstRouteURL + "but-different"
+				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).Times(1).Return(nil)
+
+			})
+			It("should update with the Route information", func() {
+				// Act
+				res, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+
+		When("the Route has the same RouteURL as the extracted one", func() {
+			// Arrange
+			BeforeEach(func() {
+				ingresses = []string{
+					routeMonitorRouteURLDefault,
+				}
+
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: routeMonitorRouteURLDefault,
+				}
+				routeMonitorSupplementClient = mockClient
+			})
+			JustBeforeEach(func() {
+				expectedRouteMonitor.Status.RouteURL = routeMonitorRouteURLDefault
+			})
+			It("should skip this operation", func() {
+				// Act
+				res, err := routeMonitorSupplement.EnsureRouteURLExists(ctx, route, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+	})
+	Describe("New", func() {
+		When("func New is called", func() {
+			It("should return a new Deleter object", func() {
+				// Arrange
+				r := routemonitor.RouteMonitorReconciler{
+					Client: routeMonitorSupplementClient,
+					Log:    constinit.Logger,
+					Scheme: constinit.Scheme,
+				}
+				// Act
+				res := supplement.New(r)
+				// Assert
+				Expect(res).To(Equal(&supplement.RouteMonitorSupplement{
+					Client: routeMonitorSupplementClient,
+					Log:    constinit.Logger,
+					Scheme: constinit.Scheme,
+				}))
+			})
+		})
 	})
 })
+
+func ConvertToIngressHosts(in []string) []routev1.RouteIngress {
+	res := make([]routev1.RouteIngress, len(in))
+	for i, s := range in {
+		res[i] = routev1.RouteIngress{
+			Host: s,
+		}
+	}
+	return res
+}

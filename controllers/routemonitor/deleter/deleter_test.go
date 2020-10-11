@@ -9,7 +9,6 @@ import (
 	"time"
 
 	//"reflect"
-
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +21,8 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 )
 
 var _ = Describe("Deleter", func() {
@@ -358,6 +359,26 @@ var _ = Describe("Deleter", func() {
 				Expect(res).To(Equal(blackbox.DeleteBlackBoxExporter))
 			})
 
+		})
+		Describe("New", func() {
+			When("func New is called", func() {
+				It("should return a new Deleter object", func() {
+					// Arrange
+					r := routemonitor.RouteMonitorReconciler{
+						Client: routeMonitorDeleterClient,
+						Log:    constinit.Logger,
+						Scheme: constinit.Scheme,
+					}
+					// Act
+					res := deleter.New(r)
+					// Assert
+					Expect(res).To(Equal(&deleter.RouteMonitorDeleter{
+						Client: routeMonitorDeleterClient,
+						Log:    constinit.Logger,
+						Scheme: constinit.Scheme,
+					}))
+				})
+			})
 		})
 	})
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = Describe("V1alpha1", func() {
@@ -73,6 +74,23 @@ var _ = Describe("V1alpha1", func() {
 				res := routeMonitor.WasDeleteRequested()
 				// Assert
 				Expect(res).To(BeFalse())
+			})
+		})
+	})
+	Describe("TemplateForServiceMonitorName", func() {
+		When("names are set", func() {
+			It("should return a combined name", func() {
+				// Arrange
+				routeMonitor.Name = "olf"
+				routeMonitor.Namespace = "dolf"
+
+				// Act
+				res := routeMonitor.TemplateForServiceMonitorName()
+				// Assert
+				Expect(res).To(Equal(types.NamespacedName{
+					Name:      "olf-dolf",
+					Namespace: "openshift-monitoring",
+				}))
 			})
 		})
 	})
