@@ -54,8 +54,9 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
+
 	if res.ShouldStop() {
-		return res.Convert(), nil
+		return utilreconcile.Stop()
 	}
 
 	// Handle deletion of RouteMonitor Resource
@@ -67,8 +68,9 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
+
 		if res.ShouldStop() {
-			return res.Convert(), nil
+			return utilreconcile.Stop()
 		}
 		return utilreconcile.Stop()
 	}
@@ -92,7 +94,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
-		return res.Convert(), nil
+		return utilreconcile.Stop()
 	}
 
 	log.V(2).Info("Entering CreateServiceMonitorResource")
@@ -101,7 +103,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
-		return res.Convert(), nil
+		return utilreconcile.Stop()
 	}
 	return utilreconcile.Stop()
 }

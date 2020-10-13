@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
@@ -37,21 +38,27 @@ func New(r routemonitor.RouteMonitorReconciler) *RouteMonitorSupplement {
 }
 
 // GetRouteMonitor return the RouteMonitor that is tested
-func (r *RouteMonitorSupplement) GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error) {
-	err = r.Get(ctx, req.NamespacedName, &routeMonitor)
+func (r *RouteMonitorSupplement) GetRouteMonitor(ctx context.Context, req ctrl.Request) (v1alpha1.RouteMonitor, utilreconcile.Result, error) {
+	routeMonitor := v1alpha1.RouteMonitor{}
+	err := r.Get(ctx, req.NamespacedName, &routeMonitor)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
-			return
+			res, err := utilreconcile.RequeueReconcileWith(err)
+			return v1alpha1.RouteMonitor{}, res, err
 		}
 		r.Log.V(2).Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
 
-		res = utilreconcile.StopOperation()
-		err = nil
-		return
+		return v1alpha1.RouteMonitor{}, utilreconcile.StopOperation(), nil
 	}
-	res = utilreconcile.ContinueOperation()
-	return
+
+	// if the resource is empty, we should terminate
+	emptyRouteMonitor := v1alpha1.RouteMonitor{}
+	if reflect.DeepEqual(routeMonitor, emptyRouteMonitor) {
+		return v1alpha1.RouteMonitor{}, utilreconcile.StopOperation(), nil
+	}
+
+	return routeMonitor, utilreconcile.ContinueOperation(), nil
 }
 
 // GetRoute returns the Route from the RouteMonitor spec

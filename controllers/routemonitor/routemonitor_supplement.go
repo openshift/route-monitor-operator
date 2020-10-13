@@ -25,6 +25,7 @@ func (r *RouteMonitorReconciler) EnsureBlackBoxExporterResourcesExists(ctx conte
 
 func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
+
 	shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
@@ -33,7 +34,13 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")
-		return r.ensureBlackBoxExporterResourcesAbsent(ctx, routeMonitor)
+		res, err := r.ensureBlackBoxExporterResourcesAbsent(ctx, routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		if res.ShouldStop() {
+			return utilreconcile.StopReconcile()
+		}
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
@@ -42,16 +49,17 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	res, err := r.ensureFinalizerAbsent(ctx, routeMonitor)
+	log.V(2).Info("Entering ensureRouteMonitorAbsent")
+	res, err := r.ensureServiceMonitorAbsent(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if res.ShouldStop() {
-		return res, nil
+		return utilreconcile.StopReconcile()
 	}
 
-	// the result of EnsureRouteMonitorAbsent is discarded because
-	_, err = r.ensureRouteMonitorAbsent(ctx, routeMonitor)
+	log.V(2).Info("Entering ensureFinalizerAbsent")
+	res, err = r.ensureFinalizerAbsent(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -59,13 +67,15 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 }
 
 func (r *RouteMonitorReconciler) ensureBlackBoxExporterResourcesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	r.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
 	if err := r.EnsureBlackBoxExporterServiceAbsent(ctx); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
+	r.Log.V(2).Info("Entering EnsureBlackBoxExporterDeploymentAbsent")
 	if err := r.EnsureBlackBoxExporterDeploymentAbsent(ctx); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
-	return utilreconcile.RequeueReconcile()
+	return utilreconcile.ContinueReconcile()
 }
 
 func (r *RouteMonitorReconciler) ensureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
@@ -81,8 +91,8 @@ func (r *RouteMonitorReconciler) ensureFinalizerAbsent(ctx context.Context, rout
 	return utilreconcile.ContinueReconcile()
 }
 
-// ensureRouteMonitorAbsent assumes that the ServiceMonitor that is related was deleted
-func (r *RouteMonitorReconciler) ensureRouteMonitorAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+// ensureServiceMonitorAbsent assumes that the ServiceMonitor that is related was deleted
+func (r *RouteMonitorReconciler) ensureServiceMonitorAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	// if the monitor is not deleting no action is needed
 	if !routeMonitor.WasDeleteRequested() {
 		return utilreconcile.ContinueReconcile()

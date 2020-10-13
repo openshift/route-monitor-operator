@@ -235,13 +235,15 @@ var _ = Describe("Routemonitor", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
 					ensureBlackBoxExporterDeploymentAbsentCalledTimes = 1
+					ensureServiceMonitorResourceAbsentCalledTimes = 1
+					updateCalledTimes = 1
 				})
 				It("should reconcile", func() {
 					// Act
 					res, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
 					// Assert
 					Expect(err).NotTo(HaveOccurred())
-					Expect(res).To(Equal(utilreconcile.RequeueOperation()))
+					Expect(res).To(Equal(utilreconcile.StopOperation()))
 				})
 			})
 		})
