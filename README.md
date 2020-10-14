@@ -7,11 +7,11 @@ or any vanilla Prometheus Operator.
 ## How does this work?
 
 ### Exporter
-The operator is making sure that here is one deployment of the [blackbox exporter](https://github.com/prometheus/blackbox_exporter).
+The operator is making sure that there is one deployment + service of the [blackbox exporter](https://github.com/prometheus/blackbox_exporter).
 If it does not exist in `openshift-monitoring`, it creates one.
 
 ### ServiceMonitors
-The probes are effectively configured via `ServiceMonitors`.
+The probes are effectively configured via `ServiceMonitors`, see more details in [Prometheus Operator troubleshooting docs](https://github.com/prometheus-operator/prometheus-operator/blob/566b18b2c9bf62ff3558804a69de5e1127ce8171/Documentation/user-guides/running-exporters.md#the-goal-of-servicemonitors).
 openshift-route-monitor-operator creates `ServiceMonitors` based on the defined `RouteMonitors`.
 
 ### RouteMonitors
@@ -35,7 +35,27 @@ On every Pull Request a GitHub action will trigger `make` to check if everything
 
 Once your PR is merged, an additional action will run make and check those changes in.
 
+## Development
+
+In order to develop the repo follow these steps to get an env started:
+
+1. run `make test` to test build and deploy
+2. change [Makefile](./Makefile) and [config/manager/manager.yaml](config/manager/manager.yaml) to point to the repo you wish to use
+3. build and deploy with `make docker-build docker-push`
+    3.1. if you want to use a local image use IMG=<custom-image>
+4. use `make deploy` to deploy your operator on a cluster you are logged into
+    4.1. this also can have the IMG
+5. check logs with `oc logs -n openshift-logging deploy/route-monitor-operator-controller-manager -c manager`
+6. retrigger pull of pod with `oc delete -n openshift-monitoring -lapp=route-monitor-operator,component=operator`
+
+### Test operator locally
+The [makefile](./Makefile) has a command to run the operator locally:
+
+```
+make run
+```
+
 ## ToDo
 
 * [ ] add option to specify which probes to use
-* [ ] add tests
+* [ ] make service monitor use a different interval via modifying a line in the spec of route monitor

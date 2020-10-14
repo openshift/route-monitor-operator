@@ -11,21 +11,32 @@ metadata:
   namespace: openshift-monitoring
   labels:
     control-plane: controller-manager
+    app: route-monitor-operator
+    component: operator
 spec:
   selector:
     matchLabels:
       control-plane: controller-manager
+      app: route-monitor-operator
+      component: operator
   replicas: 1
   template:
     metadata:
       labels:
         control-plane: controller-manager
+        app: route-monitor-operator
+        component: operator
     spec:
       containers:
       - command:
         - /manager
         args:
         - --enable-leader-election
+        - --zap-log-level=$(LOG_LEVEL)
+        env:
+        - name: LOG_LEVEL
+          # level 1 is debug, so when we want to raise the level we can
+          value: 1
         image: controller:latest
         name: manager
         resources:
