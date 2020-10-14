@@ -186,7 +186,6 @@ var _ = Describe("Routemonitor", func() {
 				// Act
 				resRouteMonitor, res, err := routeMonitorSupplement.GetRouteMonitor(ctx, req)
 				// Assert
-				Skip("make it pass for now")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 				Expect(resRouteMonitor).To(BeZero())
