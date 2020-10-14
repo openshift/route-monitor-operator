@@ -28,6 +28,7 @@ func (r RouteMonitor) WasDeleteRequested() bool {
 	return r.DeletionTimestamp != nil
 }
 
+// HasFinalizer verifies if a finalizer is placed on the resource
 func (r RouteMonitor) HasFinalizer() bool {
 	return utilfinalizer.Contains(r.ObjectMeta.Finalizers, routemonitorconst.FinalizerKey)
 }
