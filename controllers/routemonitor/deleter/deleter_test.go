@@ -18,6 +18,7 @@ import (
 	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,12 +36,9 @@ var _ = Describe("Deleter", func() {
 
 		ctx context.Context
 
-		getCalledTimes      int
-		getErrorResponse    error
-		deleteCalledTimes   int
-		deleteErrorResponse error
-		listErrorResponse   error
-		listCalledTimes     int
+		get    helper.MockHelper
+		delete helper.MockHelper
+		list   helper.MockHelper
 
 		// routeMonitor here is only used to query for the ServiceMonitor
 		routeMonitor v1alpha1.RouteMonitor
@@ -53,12 +51,9 @@ var _ = Describe("Deleter", func() {
 
 		ctx = constinit.Context
 
-		getCalledTimes = 0
-		getErrorResponse = nil
-		deleteCalledTimes = 0
-		deleteErrorResponse = nil
-		listCalledTimes = 0
-		listErrorResponse = nil
+		get = helper.MockHelper{}
+		delete = helper.MockHelper{}
+		list = helper.MockHelper{}
 	})
 	JustBeforeEach(func() {
 		routeMonitorDeleter = deleter.RouteMonitorDeleter{
@@ -68,30 +63,30 @@ var _ = Describe("Deleter", func() {
 		}
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(getErrorResponse).
-			Times(getCalledTimes)
+			Return(get.ErrorResponse).
+			Times(get.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(deleteErrorResponse).
-			Times(deleteCalledTimes)
+			Return(delete.ErrorResponse).
+			Times(delete.CalledTimes)
 
 		mockClient.EXPECT().List(gomock.Any(), gomock.Any()).
-			Return(listErrorResponse).
-			Times(listCalledTimes)
+			Return(list.ErrorResponse).
+			Times(list.CalledTimes)
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
 	})
 	Describe("DeleteBlackBoxExporterDeployment", func() {
 		BeforeEach(func() {
-			getCalledTimes = 1
+			get.CalledTimes = 1
 			routeMonitorDeleterClient = mockClient
 		})
 
 		When("'Get' return an error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble the error up", func() {
 				// Act
@@ -105,7 +100,7 @@ var _ = Describe("Deleter", func() {
 		When("'Get' return an 'NotFound' error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.NotFoundErr
+				get.ErrorResponse = consterror.NotFoundErr
 			})
 			It("should do nothing", func() {
 				// Act
@@ -118,8 +113,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' return an an  error", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = consterror.CustomError
+				delete = helper.CustomErrorHappensOnce()
 			})
 			It("should do nothing", func() {
 				// Act
@@ -133,7 +127,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' succeeds", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
+				delete.CalledTimes = 1
 			})
 			It("should succeed", func() {
 				// Act
@@ -146,14 +140,14 @@ var _ = Describe("Deleter", func() {
 	})
 	Describe("DeleteBlackBoxExporterService", func() {
 		BeforeEach(func() {
-			getCalledTimes = 1
+			get.CalledTimes = 1
 			routeMonitorDeleterClient = mockClient
 		})
 
 		When("'Get' return an error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble the error up", func() {
 				// Act
@@ -167,7 +161,7 @@ var _ = Describe("Deleter", func() {
 		When("'Get' return an 'NotFound' error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.NotFoundErr
+				get.ErrorResponse = consterror.NotFoundErr
 			})
 			It("should do nothing", func() {
 				// Act
@@ -180,8 +174,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' return an an  error", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = consterror.CustomError
+				delete = helper.CustomErrorHappensOnce()
 			})
 			It("should do nothing", func() {
 				// Act
@@ -195,7 +188,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' succeeds", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
+				delete.CalledTimes = 1
 			})
 			It("should succeed", func() {
 				// Act
@@ -209,14 +202,14 @@ var _ = Describe("Deleter", func() {
 
 	Describe("DeleteServiceMonitorResource", func() {
 		BeforeEach(func() {
-			getCalledTimes = 1
+			get.CalledTimes = 1
 			routeMonitorDeleterClient = mockClient
 
 		})
 		When("'Get' returns an unhandled error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble the error up", func() {
 				// Act
@@ -229,7 +222,7 @@ var _ = Describe("Deleter", func() {
 		When("'Get' returns an 'Not found' error", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.NotFoundErr
+				get.ErrorResponse = consterror.NotFoundErr
 			})
 			It("should succeed as there is nothing to delete", func() {
 				// Act
@@ -241,8 +234,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' returns an unhandled error", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
-				deleteErrorResponse = consterror.CustomError
+				delete = helper.CustomErrorHappensOnce()
 				routeMonitorDeleterClient = mockClient
 			})
 			It("should bubble the error up", func() {
@@ -256,7 +248,7 @@ var _ = Describe("Deleter", func() {
 		When("'Delete' passes", func() {
 			// Arrange
 			BeforeEach(func() {
-				deleteCalledTimes = 1
+				delete.CalledTimes = 1
 			})
 			It("should succeed as the object was deleted", func() {
 				// Act
@@ -289,9 +281,7 @@ var _ = Describe("Deleter", func() {
 		When("the `List` command fails", func() {
 			// Arrange
 			BeforeEach(func() {
-				listCalledTimes = 1
-				listErrorResponse = consterror.CustomError
-				routeMonitorDeleterClient = mockClient
+				list = helper.CustomErrorHappensOnce()
 			})
 			It("should fail with the List error", func() {
 				// Act
@@ -303,7 +293,7 @@ var _ = Describe("Deleter", func() {
 		})
 		When("there are no RouteMonitors", func() {
 			BeforeEach(func() {
-				listCalledTimes = 1
+				list.CalledTimes = 1
 			})
 			It("should technically return  'true' but return InternalFault error", func() {
 				// Act

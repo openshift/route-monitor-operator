@@ -19,7 +19,8 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-
+	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
+	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
@@ -42,14 +43,10 @@ var _ = Describe("Adder", func() {
 		routeMonitorStatus     v1alpha1.RouteMonitorStatus
 		routeMonitorFinalizers []string
 
-		getCalledTimes      int
-		getErrorResponse    error
-		deleteCalledTimes   int
-		deleteErrorResponse error
-		createCalledTimes   int
-		createErrorResponse error
-		updateCalledTimes   int
-		updateErrorResponse error
+		get    testhelper.MockHelper
+		delete testhelper.MockHelper
+		create testhelper.MockHelper
+		update testhelper.MockHelper
 	)
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
@@ -59,14 +56,10 @@ var _ = Describe("Adder", func() {
 
 		ctx = constinit.Context
 
-		getCalledTimes = 0
-		getErrorResponse = nil
-		deleteCalledTimes = 0
-		deleteErrorResponse = nil
-		createCalledTimes = 0
-		createErrorResponse = nil
-		updateCalledTimes = 0
-		updateErrorResponse = nil
+		get = testhelper.MockHelper{}
+		delete = testhelper.MockHelper{}
+		create = testhelper.MockHelper{}
+		update = testhelper.MockHelper{}
 
 		routeMonitorAdderClient = mockClient
 		routeMonitorStatus = v1alpha1.RouteMonitorStatus{
@@ -83,20 +76,20 @@ var _ = Describe("Adder", func() {
 		}
 
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(updateErrorResponse).
-			Times(updateCalledTimes)
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(getErrorResponse).
-			Times(getCalledTimes)
+			Return(get.ErrorResponse).
+			Times(get.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(deleteErrorResponse).
-			Times(deleteCalledTimes)
+			Return(delete.ErrorResponse).
+			Times(delete.CalledTimes)
 
 		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-			Return(createErrorResponse).
-			Times(createCalledTimes)
+			Return(create.ErrorResponse).
+			Times(create.CalledTimes)
 
 		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -112,16 +105,14 @@ var _ = Describe("Adder", func() {
 	Describe("Testing CreateResourceIfNotFound", func() {
 		BeforeEach(func() {
 			// Arrange
-			getCalledTimes = 1
-			getErrorResponse = consterror.NotFoundErr
-			createCalledTimes = 1
+			get = helper.NotFoundErrorHappensOnce()
+			create.CalledTimes = 1
 		})
 		When("the resource Exists", func() {
 			BeforeEach(func() {
 				// Arrange
-				getCalledTimes = 1
-				getErrorResponse = nil
-				createCalledTimes = 0
+				get.ErrorResponse = nil
+				create.CalledTimes = 0
 			})
 			It("should call `Get` and not call `Create`", func() {
 				//Act
@@ -133,15 +124,15 @@ var _ = Describe("Adder", func() {
 		When("the resource Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.CustomError
-				createCalledTimes = 0
+				get.ErrorResponse = consterror.CustomError
+				create.CalledTimes = 0
 			})
 			It("should return the error and not call `Create`", func() {
 				//Act
 				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 				//Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(getErrorResponse))
+				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
 
@@ -158,7 +149,7 @@ var _ = Describe("Adder", func() {
 		When("the resource Create fails unexpectedly", func() {
 			BeforeEach(func() {
 				// Arrange
-				createErrorResponse = consterror.CustomError
+				create.ErrorResponse = consterror.CustomError
 			})
 			It("should call `Get` Successfully and call `Create` but return the error", func() {
 				//Act
@@ -174,7 +165,7 @@ var _ = Describe("Adder", func() {
 		BeforeEach(func() {
 			routeMonitorAdderClient = mockClient
 			// Arrange
-			getCalledTimes = 1
+			get.CalledTimes = 1
 
 		})
 
@@ -190,8 +181,8 @@ var _ = Describe("Adder", func() {
 		When("the resource(deployment) is Not Found", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.NotFoundErr
-				createCalledTimes = 1
+				get.ErrorResponse = consterror.NotFoundErr
+				create.CalledTimes = 1
 			})
 			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
 				//Act
@@ -203,29 +194,27 @@ var _ = Describe("Adder", func() {
 		When("the resource(deployment) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.CustomError
 			})
 			It("should return the error and not call `Create`", func() {
 				//Act
 				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
 				//Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(getErrorResponse))
+				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
 		When("the resource(deployment) Create fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getErrorResponse = consterror.NotFoundErr
-				createCalledTimes = 1
-				createErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.NotFoundErr
+				create = helper.CustomErrorHappensOnce()
 			})
 			It("should call `Get` Successfully and call `Create` but return the error", func() {
 				//Act
 				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
 				//Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(createErrorResponse))
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
@@ -238,7 +227,7 @@ var _ = Describe("Adder", func() {
 		When("the resource(service) Exists", func() {
 			// Arrange
 			BeforeEach(func() {
-				getCalledTimes = 1
+				get.CalledTimes = 1
 			})
 			It("should call `Get` and not call `Create`", func() {
 				//Act
@@ -251,9 +240,8 @@ var _ = Describe("Adder", func() {
 		When("the resource(service) is Not Found", func() {
 			// Arrange
 			BeforeEach(func() {
-				getCalledTimes = 1
-				getErrorResponse = consterror.NotFoundErr
-				createCalledTimes = 1
+				get = helper.NotFoundErrorHappensOnce()
+				create.CalledTimes = 1
 			})
 			It("should call `Get` successfully and `Create` the resource(service)", func() {
 				//Act
@@ -265,31 +253,27 @@ var _ = Describe("Adder", func() {
 		When("the resource(service) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getCalledTimes = 1
-				getErrorResponse = consterror.CustomError
+				get = helper.CustomErrorHappensOnce()
 			})
 			It("should return the error and not call `Create`", func() {
 				//Act
 				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
 				//Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(getErrorResponse))
+				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
 		When("the resource(service) Create fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getCalledTimes = 1
-				getErrorResponse = consterror.NotFoundErr
-				createCalledTimes = 1
-				createErrorResponse = consterror.CustomError
+				get = helper.NotFoundErrorHappensOnce()
+				create = helper.CustomErrorHappensOnce()
 			})
 			It("should call `Get` Successfully and call `Create` but return the error", func() {
 				//Act
 				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
 				//Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(createErrorResponse))
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
@@ -313,8 +297,7 @@ var _ = Describe("Adder", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorAdderClient = mockClient
-				updateCalledTimes = 1
-				updateErrorResponse = consterror.CustomError
+				update = helper.CustomErrorHappensOnce()
 				routeMonitorFinalizers = nil
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 					RouteURL: "fake-route-url",
@@ -332,7 +315,7 @@ var _ = Describe("Adder", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorAdderClient = mockClient
-				updateCalledTimes = 1
+				update.CalledTimes = 1
 				routeMonitorFinalizers = nil
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 					RouteURL: "fake-route-url",

@@ -22,6 +22,7 @@ import (
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
+	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -39,40 +40,20 @@ var _ = Describe("Routemonitor", func() {
 		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
 		ctx                          context.Context
 
-		updateCalledTimes   int
-		updateErrorResponse error
+		update                                 helper.MockHelper
+		delete                                 helper.MockHelper
+		get                                    helper.MockHelper
+		create                                 helper.MockHelper
+		ensureServiceMonitorResourceAbsent     helper.MockHelper
+		shouldDeleteBlackBoxExporterResources  helper.MockHelper //blackbox.ShouldDeleteBlackBoxExporter
+		ensureBlackBoxExporterServiceAbsent    helper.MockHelper
+		ensureBlackBoxExporterDeploymentAbsent helper.MockHelper
+		ensureBlackBoxExporterDeploymentExists helper.MockHelper
+		ensureBlackBoxExporterServiceExists    helper.MockHelper
+		ensureFinalizerAbsent                  helper.MockHelper // utilreconcile.Result
 
-		deleteCalledTimes   int
-		deleteErrorResponse error
-
-		getCalledTimes   int
-		getErrorResponse error
-
-		createCalledTimes   int
-		createErrorResponse error
-
-		ensureServiceMonitorResourceAbsentCalledTimes   int
-		ensureServiceMonitorResourceAbsentErrorResponse error
-
-		shouldDeleteBlackBoxExporterResourcesCalledTimes   int
-		shouldDeleteBlackBoxExporterResourcesResponse      blackbox.ShouldDeleteBlackBoxExporter
-		shouldDeleteBlackBoxExporterResourcesErrorResponse error
-
-		ensureBlackBoxExporterServiceAbsentCalledTimes   int
-		ensureBlackBoxExporterServiceAbsentErrorResponse error
-
-		ensureBlackBoxExporterDeploymentAbsentCalledTimes   int
-		ensureBlackBoxExporterDeploymentAbsentErrorResponse error
-
-		ensureBlackBoxExporterDeploymentExistsCalledTimes   int
-		ensureBlackBoxExporterDeploymentExistsErrorResponse error
-
-		ensureBlackBoxExporterServiceExistsCalledTimes   int
-		ensureBlackBoxExporterServiceExistsErrorResponse error
-
-		ensureFinalizerAbsentCalledTimes   int
-		ensureFinalizerAbsentErrorResponse error
-		ensureFinalizerAbsentResponse      utilreconcile.Result
+		shouldDeleteBlackBoxExporterResourcesResponse blackbox.ShouldDeleteBlackBoxExporter
+		ensureFinalizerAbsentResponse                 utilreconcile.Result
 
 		routeMonitor                  v1alpha1.RouteMonitor
 		routeMonitorFinalizers        []string
@@ -93,84 +74,68 @@ var _ = Describe("Routemonitor", func() {
 
 		ctx = constinit.Context
 
-		updateCalledTimes = 0
-		updateErrorResponse = nil
-		deleteCalledTimes = 0
-		deleteErrorResponse = nil
-		getCalledTimes = 0
-		getErrorResponse = nil
-		createCalledTimes = 0
-		createErrorResponse = nil
-
-		ensureServiceMonitorResourceAbsentCalledTimes = 0
-		ensureServiceMonitorResourceAbsentErrorResponse = nil
-		shouldDeleteBlackBoxExporterResourcesCalledTimes = 0
-		// KeepBlackBoxExporter is the false value for this bool type
+		update = helper.MockHelper{}
+		delete = helper.MockHelper{}
+		get = helper.MockHelper{}
+		create = helper.MockHelper{}
+		ensureServiceMonitorResourceAbsent = helper.MockHelper{}
+		shouldDeleteBlackBoxExporterResources = helper.MockHelper{}
+		ensureBlackBoxExporterServiceAbsent = helper.MockHelper{}
+		ensureBlackBoxExporterDeploymentAbsent = helper.MockHelper{}
+		ensureBlackBoxExporterDeploymentExists = helper.MockHelper{}
+		ensureBlackBoxExporterServiceExists = helper.MockHelper{}
+		ensureFinalizerAbsent = helper.MockHelper{}
 		shouldDeleteBlackBoxExporterResourcesResponse = blackbox.KeepBlackBoxExporter
-		shouldDeleteBlackBoxExporterResourcesErrorResponse = nil
-		ensureBlackBoxExporterServiceAbsentCalledTimes = 0
-		ensureBlackBoxExporterServiceAbsentErrorResponse = nil
-		ensureBlackBoxExporterDeploymentAbsentCalledTimes = 0
-		ensureBlackBoxExporterDeploymentAbsentErrorResponse = nil
 
-		ensureBlackBoxExporterDeploymentExistsCalledTimes = 0
-		ensureBlackBoxExporterDeploymentExistsErrorResponse = nil
-		ensureBlackBoxExporterServiceExistsCalledTimes = 0
-		ensureBlackBoxExporterServiceExistsErrorResponse = nil
-
-		ensureFinalizerAbsentCalledTimes = 0
-		ensureFinalizerAbsentErrorResponse = nil
 		ensureFinalizerAbsentResponse = utilreconcile.Result{}
 
 	})
 	JustBeforeEach(func() {
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(getErrorResponse).
-			Times(getCalledTimes)
+			Return(get.ErrorResponse).
+			Times(get.CalledTimes)
 
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(updateErrorResponse).
-			Times(updateCalledTimes)
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(deleteErrorResponse).
-			Times(deleteCalledTimes)
+			Return(delete.ErrorResponse).
+			Times(delete.CalledTimes)
 
-		if createCalledTimes != 0 {
-			mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-				Return(createErrorResponse).
-				Times(createCalledTimes)
-		}
+		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
+			Return(create.ErrorResponse).
+			Times(create.CalledTimes)
 
 		mockDeleter.EXPECT().EnsureServiceMonitorResourceAbsent(gomock.Any(), gomock.Any()).
-			Return(ensureServiceMonitorResourceAbsentErrorResponse).
-			Times(ensureServiceMonitorResourceAbsentCalledTimes)
+			Return(ensureServiceMonitorResourceAbsent.ErrorResponse).
+			Times(ensureServiceMonitorResourceAbsent.CalledTimes)
 
 		mockDeleter.EXPECT().ShouldDeleteBlackBoxExporterResources(gomock.Any(), gomock.Any()).
-			Times(shouldDeleteBlackBoxExporterResourcesCalledTimes).
-			Return(shouldDeleteBlackBoxExporterResourcesResponse, shouldDeleteBlackBoxExporterResourcesErrorResponse)
+			Times(shouldDeleteBlackBoxExporterResources.CalledTimes).
+			Return(shouldDeleteBlackBoxExporterResourcesResponse, shouldDeleteBlackBoxExporterResources.ErrorResponse)
 
 		gomock.InOrder(
 			mockDeleter.EXPECT().EnsureBlackBoxExporterServiceAbsent(gomock.Any()).
-				Times(ensureBlackBoxExporterServiceAbsentCalledTimes).
-				Return(ensureBlackBoxExporterServiceAbsentErrorResponse),
+				Times(ensureBlackBoxExporterServiceAbsent.CalledTimes).
+				Return(ensureBlackBoxExporterServiceAbsent.ErrorResponse),
 			mockDeleter.EXPECT().EnsureBlackBoxExporterDeploymentAbsent(gomock.Any()).
-				Times(ensureBlackBoxExporterDeploymentAbsentCalledTimes).
-				Return(ensureBlackBoxExporterDeploymentAbsentErrorResponse),
+				Times(ensureBlackBoxExporterDeploymentAbsent.CalledTimes).
+				Return(ensureBlackBoxExporterDeploymentAbsent.ErrorResponse),
 		)
 
 		gomock.InOrder(
 			mockAdder.EXPECT().EnsureBlackBoxExporterDeploymentExists(gomock.Any()).
-				Times(ensureBlackBoxExporterDeploymentExistsCalledTimes).
-				Return(ensureBlackBoxExporterDeploymentExistsErrorResponse),
+				Times(ensureBlackBoxExporterDeploymentExists.CalledTimes).
+				Return(ensureBlackBoxExporterDeploymentExists.ErrorResponse),
 			mockAdder.EXPECT().EnsureBlackBoxExporterServiceExists(gomock.Any()).
-				Times(ensureBlackBoxExporterServiceExistsCalledTimes).
-				Return(ensureBlackBoxExporterServiceExistsErrorResponse),
+				Times(ensureBlackBoxExporterServiceExists.CalledTimes).
+				Return(ensureBlackBoxExporterServiceExists.ErrorResponse),
 		)
 
 		mockSupplement.EXPECT().EnsureFinalizerAbsent(gomock.Any(), gomock.Any()).
-			Times(ensureFinalizerAbsentCalledTimes).
-			Return(ensureFinalizerAbsentResponse, ensureFinalizerAbsentErrorResponse)
+			Times(ensureFinalizerAbsent.CalledTimes).
+			Return(ensureFinalizerAbsentResponse, ensureFinalizerAbsent.ErrorResponse)
 
 		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
 			Log:                    constinit.Logger,
@@ -197,12 +162,12 @@ var _ = Describe("Routemonitor", func() {
 		BeforeEach(func() {
 			// Arrange
 			routeMonitorReconcilerClient = mockClient
-			shouldDeleteBlackBoxExporterResourcesCalledTimes = 1
+			shouldDeleteBlackBoxExporterResources.CalledTimes = 1
 		})
 		When("func ShouldDeleteBlackBoxExporterResources fails unexpectedly", func() {
 			BeforeEach(func() {
 				// Arrange
-				shouldDeleteBlackBoxExporterResourcesErrorResponse = consterror.CustomError
+				shouldDeleteBlackBoxExporterResources.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble up the error", func() {
 				// Act
@@ -216,13 +181,14 @@ var _ = Describe("Routemonitor", func() {
 			BeforeEach(func() {
 				// Arrange
 				shouldDeleteBlackBoxExporterResourcesResponse = blackbox.DeleteBlackBoxExporter
+				ensureBlackBoxExporterServiceAbsent.CalledTimes = 1
+
 			})
 
 			When("func EnsureBlackBoxExporterServiceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
 					// Arrange
-					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
-					ensureBlackBoxExporterServiceAbsentErrorResponse = consterror.CustomError
+					ensureBlackBoxExporterServiceAbsent.ErrorResponse = consterror.CustomError
 				})
 				It("should bubble up the error", func() {
 					// Act
@@ -234,9 +200,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("func EnsureBlackBoxExporterDeploymentAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
-					ensureBlackBoxExporterDeploymentAbsentCalledTimes = 1
-					ensureBlackBoxExporterDeploymentAbsentErrorResponse = consterror.CustomError
+					ensureBlackBoxExporterDeploymentAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
 					// Act
@@ -248,10 +212,8 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("func EnsureServiceMonitorResourceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
-					ensureBlackBoxExporterDeploymentAbsentCalledTimes = 1
-					ensureServiceMonitorResourceAbsentCalledTimes = 1
-					ensureServiceMonitorResourceAbsentErrorResponse = consterror.CustomError
+					ensureBlackBoxExporterDeploymentAbsent.CalledTimes = 1
+					ensureServiceMonitorResourceAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
 					// Act
@@ -263,11 +225,10 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("func EnsureFinalizerAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
-					ensureBlackBoxExporterDeploymentAbsentCalledTimes = 1
-					ensureServiceMonitorResourceAbsentCalledTimes = 1
-					ensureFinalizerAbsentCalledTimes = 1
-					ensureFinalizerAbsentErrorResponse = consterror.CustomError
+					ensureBlackBoxExporterServiceAbsent.CalledTimes = 1
+					ensureBlackBoxExporterDeploymentAbsent.CalledTimes = 1
+					ensureServiceMonitorResourceAbsent.CalledTimes = 1
+					ensureFinalizerAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
 					// Act
@@ -279,10 +240,9 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("all deletions happened successfully", func() {
 				BeforeEach(func() {
-					ensureBlackBoxExporterServiceAbsentCalledTimes = 1
-					ensureBlackBoxExporterDeploymentAbsentCalledTimes = 1
-					ensureServiceMonitorResourceAbsentCalledTimes = 1
-					ensureFinalizerAbsentCalledTimes = 1
+					ensureBlackBoxExporterDeploymentAbsent.CalledTimes = 1
+					ensureServiceMonitorResourceAbsent.CalledTimes = 1
+					ensureFinalizerAbsent.CalledTimes = 1
 				})
 				It("should reconcile", func() {
 					// Act
@@ -297,12 +257,12 @@ var _ = Describe("Routemonitor", func() {
 			BeforeEach(func() {
 				// Arrange
 				shouldDeleteBlackBoxExporterResourcesResponse = blackbox.KeepBlackBoxExporter
-				ensureServiceMonitorResourceAbsentCalledTimes = 1
+				ensureServiceMonitorResourceAbsent.CalledTimes = 1
 			})
 			When("func EnsureServiceMonitorResourceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
 					// Arrange
-					ensureServiceMonitorResourceAbsentErrorResponse = consterror.CustomError
+					ensureServiceMonitorResourceAbsent.ErrorResponse = consterror.CustomError
 				})
 				It("should bubble up the error", func() {
 					// Act
@@ -316,9 +276,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the resource has a finalizer but 'Update' failed", func() {
 				// Arrange
 				BeforeEach(func() {
-					ensureFinalizerAbsentCalledTimes = 1
-					ensureFinalizerAbsentErrorResponse = consterror.CustomError
-
+					ensureFinalizerAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("Should bubble up the failure", func() {
 					// Act
@@ -331,7 +289,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the resource has a finalizer but 'Update' succeeds", func() {
 				// Arrange
 				BeforeEach(func() {
-					ensureFinalizerAbsentCalledTimes = 1
+					ensureFinalizerAbsent.CalledTimes = 1
 				})
 				It("Should succeed and call for a requeue", func() {
 					// Act
@@ -346,13 +304,13 @@ var _ = Describe("Routemonitor", func() {
 				BeforeEach(func() {
 					routeMonitorFinalizers = []string{}
 					routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-					deleteCalledTimes = 1
+					delete.CalledTimes = 1
 				})
 				When("no deletion was requested", func() {
 					BeforeEach(func() {
 						routeMonitorDeletionTimestamp = nil
-						deleteCalledTimes = 0
-						ensureFinalizerAbsentCalledTimes = 1
+						delete.CalledTimes = 0
+						ensureFinalizerAbsent.CalledTimes = 1
 					})
 					It("should skip next steps and stop processing", func() {
 						// Act
@@ -365,7 +323,7 @@ var _ = Describe("Routemonitor", func() {
 				When("func 'Delete' fails unexpectedly", func() {
 					// Arrange
 					BeforeEach(func() {
-						deleteErrorResponse = consterror.CustomError
+						delete.ErrorResponse = consterror.CustomError
 					})
 					It("Should bubble up the failure", func() {
 						// Act
@@ -377,7 +335,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				When("when the 'Delete' succeeds", func() {
 					BeforeEach(func() {
-						ensureFinalizerAbsentCalledTimes = 1
+						ensureFinalizerAbsent.CalledTimes = 1
 					})
 					// Arrange
 					It("should succeed and stop processing", func() {
@@ -396,12 +354,12 @@ var _ = Describe("Routemonitor", func() {
 	Describe("EnsureBlackBoxExporterResourcesExists", func() {
 		BeforeEach(func() {
 			// Arrange
-			ensureBlackBoxExporterDeploymentExistsCalledTimes = 1
+			ensureBlackBoxExporterDeploymentExists.CalledTimes = 1
 		})
 		When("func EnsureBlackBoxExporterDeploymentExists fails unexpectedly", func() {
 			BeforeEach(func() {
 				// Arrange
-				ensureBlackBoxExporterDeploymentExistsErrorResponse = consterror.CustomError
+				ensureBlackBoxExporterDeploymentExists.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble up the error", func() {
 				// Act
@@ -414,9 +372,7 @@ var _ = Describe("Routemonitor", func() {
 		When("func EnsureBlackBoxExporterServiceExists fails unexpectedly", func() {
 			BeforeEach(func() {
 				// Arrange
-				ensureBlackBoxExporterServiceExistsErrorResponse = consterror.CustomError
-
-				ensureBlackBoxExporterServiceExistsCalledTimes = 1
+				ensureBlackBoxExporterServiceExists = helper.CustomErrorHappensOnce()
 			})
 			It("should bubble up the error", func() {
 				// Act
@@ -429,7 +385,7 @@ var _ = Describe("Routemonitor", func() {
 		When("func EnsureBlackBoxExporterServiceExists fails unexpectedly", func() {
 			BeforeEach(func() {
 				// Arrange
-				ensureBlackBoxExporterServiceExistsCalledTimes = 1
+				ensureBlackBoxExporterServiceExists.CalledTimes = 1
 			})
 			It("should succeed with no error", func() {
 				// Act

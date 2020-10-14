@@ -26,6 +26,7 @@ import (
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 
 var _ = Describe("Routemonitor", func() {
@@ -52,21 +53,11 @@ var _ = Describe("Routemonitor", func() {
 		mockStatusWriter *clientmocks.MockStatusWriter
 		mockCtrl         *gomock.Controller
 
-		// createCalledTimes is a toggle for the 'mockClient.EXPECT.Create()'. If set to 0 then ignored
-		createCalledTimes   int
-		createErrorResponse error
-		// getCalledTimes is a toggle for the 'mockClient.EXPECT.Get()'. If set to 0 then ignored
-		getCalledTimes   int
-		getErrorResponse error
-		// listCalledTimes is a toggle for the 'mockClient.EXPECT.List()'. If set to 0 then ignored
-		listCalledTimes   int
-		listErrorResponse error
-		// updateCalledTimes is a toggle for the 'mockClient.EXPECT.Update()'. If set to 0 then ignored
-		updateCalledTimes   int
-		updateErrorResponse error
-		// delete is a toggle for the 'mockClient.EXPECT.Delete()'. If set to 0 then ignored
-		deleteCalledTimes   int
-		deleteErrorResponse error
+		create helper.MockHelper
+		get    helper.MockHelper
+		list   helper.MockHelper
+		update helper.MockHelper
+		delete helper.MockHelper
 	)
 	const (
 		routeMonitorRouteURLDefault = "fake-route-url"
@@ -93,16 +84,11 @@ var _ = Describe("Routemonitor", func() {
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 
-		createCalledTimes = 0
-		createErrorResponse = nil
-		getCalledTimes = 0
-		getErrorResponse = nil
-		listCalledTimes = 0
-		listErrorResponse = nil
-		updateCalledTimes = 0
-		updateErrorResponse = nil
-		deleteCalledTimes = 0
-		deleteErrorResponse = nil
+		create = helper.MockHelper{}
+		get = helper.MockHelper{}
+		list = helper.MockHelper{}
+		update = helper.MockHelper{}
+		delete = helper.MockHelper{}
 	})
 
 	JustBeforeEach(func() {
@@ -132,29 +118,25 @@ var _ = Describe("Routemonitor", func() {
 			},
 		}
 
-		if createCalledTimes != 0 {
-			mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-				Return(createErrorResponse).
-				Times(createCalledTimes)
-		}
+		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
+			Return(create.ErrorResponse).
+			Times(create.CalledTimes)
 
-		if updateCalledTimes != 0 {
-			mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
-				Return(updateErrorResponse).
-				Times(updateCalledTimes)
-		}
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(getErrorResponse).
-			Times(getCalledTimes)
+			Return(get.ErrorResponse).
+			Times(get.CalledTimes)
 
 		mockClient.EXPECT().List(gomock.Any(), gomock.Any()).
-			Return(listErrorResponse).
-			Times(listCalledTimes)
+			Return(list.ErrorResponse).
+			Times(list.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(deleteErrorResponse).
-			Times(deleteCalledTimes)
+			Return(delete.ErrorResponse).
+			Times(delete.CalledTimes)
 
 	})
 
@@ -165,8 +147,7 @@ var _ = Describe("Routemonitor", func() {
 		When("func Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				getCalledTimes = 1
-				getErrorResponse = consterror.CustomError
+				get = helper.CustomErrorHappensOnce()
 				routeMonitorSupplementClient = mockClient
 			})
 			It("should stop requeue", func() {
@@ -456,8 +437,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 		When("RouteMonitor has finalizer but Update fails unexpectidly", func() {
 			BeforeEach(func() {
-				updateCalledTimes = 1
-				updateErrorResponse = consterror.CustomError
+				update = helper.CustomErrorHappensOnce()
 			})
 			It("should bubble the error up", func() {
 				// Act
