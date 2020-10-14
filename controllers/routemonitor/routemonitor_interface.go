@@ -11,7 +11,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 )
 
-//go:generate mockgen -source $GOFILE -destination ../../pkg/util/tests/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter,RouteMonitorAdder
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter,RouteMonitorAdder
 
 type RouteMonitorSupplement interface {
 	GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error)

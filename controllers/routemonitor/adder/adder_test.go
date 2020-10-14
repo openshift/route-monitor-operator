@@ -18,7 +18,7 @@ import (
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
+	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

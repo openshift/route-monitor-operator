@@ -20,8 +20,8 @@ import (
 	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
-	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/routemonitor"
+	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

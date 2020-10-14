@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/const/blackbox"
 	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/tests/generated/mocks/client"
+	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
