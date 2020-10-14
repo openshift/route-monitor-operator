@@ -7,6 +7,7 @@ import (
 
 	"context"
 
+	// tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/adder"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"

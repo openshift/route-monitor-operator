@@ -83,6 +83,7 @@ func (r *RouteMonitorSupplement) GetRoute(ctx context.Context, routeMonitor v1al
 	return res, nil
 }
 
+// EnsureRouteURLExists verifies that the .spec.RouteURL has the Route URL inside
 func (r *RouteMonitorSupplement) EnsureRouteURLExists(ctx context.Context, route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	amountOfIngress := len(route.Status.Ingress)
 	if amountOfIngress == 0 {

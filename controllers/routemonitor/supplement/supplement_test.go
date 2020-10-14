@@ -6,24 +6,26 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	// tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
-	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
 
-	consts "github.com/openshift/route-monitor-operator/pkg/const"
-	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
+	consts "github.com/openshift/route-monitor-operator/pkg/const"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
 	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
