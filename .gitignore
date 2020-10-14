@@ -21,3 +21,6 @@ bin/manager
 *.swp
 
 gomock_reflect*
+
+# side effect of asciidoctor
+README.html
