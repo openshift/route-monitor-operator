@@ -27,7 +27,7 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
-	log.V(2).Info("Tested ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
+	log.V(2).Info("Response of ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
 
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")

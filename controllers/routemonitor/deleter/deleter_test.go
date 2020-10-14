@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	//"reflect"
+	// tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"

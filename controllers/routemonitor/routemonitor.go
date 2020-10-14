@@ -61,7 +61,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// Handle deletion of RouteMonitor Resource
 	shouldDelete := routeMonitor.WasDeleteRequested()
-	log.V(2).Info("Tested WasDeleteRequested", "shouldDelete", shouldDelete)
+	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
 		res, err := r.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
