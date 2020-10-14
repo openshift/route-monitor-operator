@@ -4,10 +4,7 @@ import (
 	"context"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-
-	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
 )
 
 func (r *RouteMonitorReconciler) EnsureBlackBoxExporterResourcesExists(ctx context.Context) error {
@@ -50,7 +47,7 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 	}
 
 	log.V(2).Info("Entering ensureRouteMonitorAbsent")
-	res, err := r.ensureServiceMonitorAbsent(ctx, routeMonitor)
+	res, err := r.ensureServiceMonitoRelatedResourcesrAbsent(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -59,7 +56,8 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 	}
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")
-	res, err = r.ensureFinalizerAbsent(ctx, routeMonitor)
+	// only the last command can throw the result (as no matter what happens it will stop)
+	_, err = r.EnsureFinalizerAbsent(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -78,21 +76,8 @@ func (r *RouteMonitorReconciler) ensureBlackBoxExporterResourcesAbsent(ctx conte
 	return utilreconcile.ContinueReconcile()
 }
 
-func (r *RouteMonitorReconciler) ensureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	if routeMonitor.HasFinalizer() {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
-		utilfinalizer.Remove(&routeMonitor, routemonitorconst.FinalizerKey)
-		if err := r.Update(ctx, &routeMonitor); err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		// After any modification we need to requeue to prevent two threads working on the same code
-		return utilreconcile.StopReconcile()
-	}
-	return utilreconcile.ContinueReconcile()
-}
-
-// ensureServiceMonitorAbsent assumes that the ServiceMonitor that is related was deleted
-func (r *RouteMonitorReconciler) ensureServiceMonitorAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+// ensureServiceMonitoRelatedResourcesrAbsent assumes that the ServiceMonitor that is related was deleted
+func (r *RouteMonitorReconciler) ensureServiceMonitoRelatedResourcesrAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	// if the monitor is not deleting no action is needed
 	if !routeMonitor.WasDeleteRequested() {
 		return utilreconcile.ContinueReconcile()

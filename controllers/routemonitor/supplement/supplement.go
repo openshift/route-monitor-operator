@@ -17,7 +17,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
+	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
+
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -111,4 +114,17 @@ func (r *RouteMonitorSupplement) EnsureRouteURLExists(ctx context.Context, route
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	return utilreconcile.StopReconcile()
+}
+
+func (r *RouteMonitorSupplement) EnsureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	if routeMonitor.HasFinalizer() {
+		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
+		utilfinalizer.Remove(&routeMonitor, routemonitorconst.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		// After any modification we need to requeue to prevent two threads working on the same code
+		return utilreconcile.StopReconcile()
+	}
+	return utilreconcile.ContinueReconcile()
 }

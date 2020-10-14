@@ -17,6 +17,7 @@ type RouteMonitorSupplement interface {
 	GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error)
 	GetRoute(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (routev1.Route, error)
 	EnsureRouteURLExists(ctx context.Context, route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
+	EnsureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 }
 
 type RouteMonitorDeleter interface {

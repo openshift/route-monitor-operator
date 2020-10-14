@@ -84,6 +84,21 @@ func (mr *MockRouteMonitorSupplementMockRecorder) EnsureRouteURLExists(ctx, rout
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureRouteURLExists", reflect.TypeOf((*MockRouteMonitorSupplement)(nil).EnsureRouteURLExists), ctx, route, routeMonitor)
 }
 
+// EnsureFinalizerAbsent mocks base method
+func (m *MockRouteMonitorSupplement) EnsureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureFinalizerAbsent", ctx, routeMonitor)
+	ret0, _ := ret[0].(reconcile.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnsureFinalizerAbsent indicates an expected call of EnsureFinalizerAbsent
+func (mr *MockRouteMonitorSupplementMockRecorder) EnsureFinalizerAbsent(ctx, routeMonitor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureFinalizerAbsent", reflect.TypeOf((*MockRouteMonitorSupplement)(nil).EnsureFinalizerAbsent), ctx, routeMonitor)
+}
+
 // MockRouteMonitorDeleter is a mock of RouteMonitorDeleter interface
 type MockRouteMonitorDeleter struct {
 	ctrl     *gomock.Controller

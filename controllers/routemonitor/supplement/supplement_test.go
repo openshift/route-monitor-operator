@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
 
+	consts "github.com/openshift/route-monitor-operator/pkg/const"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -438,6 +439,60 @@ var _ = Describe("Routemonitor", func() {
 			})
 		})
 	})
+	Describe("EnsureFinalizerAbsent", func() {
+		BeforeEach(func() {
+			routeMonitorSupplementClient = mockClient
+		})
+		When("RouteMonitor has no finalizer", func() {
+			BeforeEach(func() {
+				routeMonitorFinalizers = []string{}
+			})
+			It("should return continue", func() {
+				res, err := routeMonitorSupplement.EnsureFinalizerAbsent(ctx, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+		When("RouteMonitor has finalizer but Update fails unexpectidly", func() {
+			BeforeEach(func() {
+				updateCalledTimes = 1
+				updateErrorResponse = consterror.CustomError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				_, err := routeMonitorSupplement.EnsureFinalizerAbsent(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
+		When("RouteMonitor has multiple finalizer and Update succeeds", func() {
+			const secondFinalizer = "a"
+			BeforeEach(func() {
+				routeMonitorFinalizers = []string{consts.FinalizerKey, secondFinalizer}
+			})
+			JustBeforeEach(func() {
+				secondRouteMonitor := routeMonitor
+				secondRouteMonitor.Finalizers = []string{secondFinalizer}
+				mockClient.EXPECT().
+					Update(
+						gomock.Any(),
+						// this checks that the finalizer was deleted
+						gomock.Eq(&secondRouteMonitor),
+					).
+					Times(1).
+					Return(nil)
+			})
+			It("stop proccesing and remove the neccesary finalizer", func() {
+				res, err := routeMonitorSupplement.EnsureFinalizerAbsent(ctx, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+	})
+
 	Describe("New", func() {
 		When("func New is called", func() {
 			It("should return a new Deleter object", func() {
