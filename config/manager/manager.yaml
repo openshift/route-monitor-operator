@@ -31,12 +31,13 @@ spec:
       - command:
         - /manager
         args:
+        - --metrics-addr=127.0.0.1:8080
         - --enable-leader-election
         - --zap-log-level=$(LOG_LEVEL)
         env:
         - name: LOG_LEVEL
           # level 1 is debug, so when we want to raise the level we can
-          value: 1
+          value: "1"
         image: controller:latest
         name: manager
         resources:
