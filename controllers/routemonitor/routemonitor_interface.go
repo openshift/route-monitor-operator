@@ -3,7 +3,6 @@ package routemonitor
 import (
 	"context"
 
-	"github.com/openshift/route-monitor-operator/pkg/const/blackbox"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -21,14 +20,9 @@ type RouteMonitorSupplement interface {
 }
 
 type RouteMonitorDeleter interface {
-	ShouldDeleteBlackBoxExporterResources(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (blackbox.ShouldDeleteBlackBoxExporter, error)
-	EnsureBlackBoxExporterDeploymentAbsent(ctx context.Context) error
-	EnsureBlackBoxExporterServiceAbsent(ctx context.Context) error
 	EnsureServiceMonitorResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error
 }
 
 type RouteMonitorAdder interface {
-	EnsureBlackBoxExporterDeploymentExists(ctx context.Context) error
-	EnsureBlackBoxExporterServiceExists(ctx context.Context) error
 	EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 }

@@ -14,9 +14,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
-	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/const/test/init"
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
+	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
+	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
@@ -161,123 +161,6 @@ var _ = Describe("Adder", func() {
 			})
 		})
 
-	})
-	Describe("CreateBlackBoxExporterDeployment", func() {
-		BeforeEach(func() {
-			routeMonitorAdderClient = mockClient
-			// Arrange
-			get.CalledTimes = 1
-
-		})
-
-		When("the resource(deployment) Exists", func() {
-			It("should call `Get` and not call `Create`", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-
-			})
-		})
-		When("the resource(deployment) is Not Found", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create.CalledTimes = 1
-			})
-			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the resource(deployment) Get fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should return the error and not call `Create`", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-		When("the resource(deployment) Create fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create = helper.CustomErrorHappensOnce()
-			})
-			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterDeploymentExists(ctx)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-	})
-	Describe("CreateBlackBoxExporterService", func() {
-		BeforeEach(func() {
-			routeMonitorAdderClient = mockClient
-		})
-
-		When("the resource(service) Exists", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.CalledTimes = 1
-			})
-			It("should call `Get` and not call `Create`", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-
-			})
-		})
-		When("the resource(service) is Not Found", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.NotFoundErrorHappensOnce()
-				create.CalledTimes = 1
-			})
-			It("should call `Get` successfully and `Create` the resource(service)", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the resource(service) Get fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.CustomErrorHappensOnce()
-			})
-			It("should return the error and not call `Create`", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-		When("the resource(service) Create fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.NotFoundErrorHappensOnce()
-				create = helper.CustomErrorHappensOnce()
-			})
-			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				//Act
-				err := routeMonitorAdder.EnsureBlackBoxExporterServiceExists(ctx)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
 	})
 	Describe("CreateServiceMonitorResource", func() {
 		When("the RouteMonitor has no Host", func() {
