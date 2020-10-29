@@ -63,7 +63,7 @@ vet:
 	go vet ./...
 
 # Generate code
-generate: controller-gen
+generate: controller-gen mockgen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./...
 
@@ -90,6 +90,21 @@ ifeq (, $(shell which controller-gen))
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+mockgen:
+ifeq (, $(shell which mockgen))
+	@{ \
+	set -e ;\
+	MOCKGEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$MOCKGEN_TMP_DIR ;\
+	go mod init tmp ;\
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4 ;\
+	rm -rf $$MOCKGEN_TMP_DIR ;\
+	}
+MOCKGEN=$(GOBIN)/mockgen
+else
+MOCKGEN=$(shell which mockgen)
 endif
 
 kustomize:
