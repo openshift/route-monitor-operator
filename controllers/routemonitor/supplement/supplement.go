@@ -16,11 +16,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/openshift/route-monitor-operator/pkg/consts"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
+	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
-	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/const"
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -118,7 +120,7 @@ func (r *RouteMonitorSupplement) EnsureRouteURLExists(ctx context.Context, route
 }
 
 func (r *RouteMonitorSupplement) EnsureFinalizerAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	if routeMonitor.HasFinalizer() {
+	if finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
 		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
 		utilfinalizer.Remove(&routeMonitor, routemonitorconst.FinalizerKey)
 		if err := r.Update(ctx, &routeMonitor); err != nil {

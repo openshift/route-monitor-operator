@@ -1,11 +1,18 @@
 package finalizer_test
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/pkg/consts"
+	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
+	. "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
+	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = Describe("Finalizer", func() {
@@ -14,8 +21,83 @@ var _ = Describe("Finalizer", func() {
 		secondKey = "second-fake-key"
 	)
 	var (
-		list []string
+		list                          []string
+		routeMonitor                  v1alpha1.RouteMonitor
+		routeMonitorFinalizers        []string
+		routeMonitorDeletionTimestamp *metav1.Time
 	)
+	BeforeEach(func() {
+		routeMonitorFinalizers = routemonitorconst.FinalizerList
+		routeMonitorDeletionTimestamp = nil
+	})
+	JustBeforeEach(func() {
+		routeMonitor = v1alpha1.RouteMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Finalizers:        routeMonitorFinalizers,
+				DeletionTimestamp: routeMonitorDeletionTimestamp,
+			},
+		}
+	})
+
+	Describe("HasFinalizer", func() {
+		When("'FinalizerKey' is NOT in the 'Finalizers' list", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorFinalizers = []string{}
+			})
+
+			It("should return false", func() {
+				// Act
+				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				// Assert
+				Expect(res).To(BeFalse())
+			})
+		})
+		When("'FinalizerKey' is in the 'Finalizers' list", func() {
+			It("should return true", func() {
+				// Act
+				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				// Assert
+				Expect(res).To(BeTrue())
+			})
+		})
+	})
+	Describe("WasDeleteRequested", func() {
+		When("a user Requests a Deletion", func() {
+			//Arrange
+			BeforeEach(func() {
+				routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
+			})
+			It("should return 'true'", func() {
+				// Act
+				res := WasDeleteRequested(&routeMonitor)
+				// Assert
+				Expect(res).To(BeTrue())
+			})
+		})
+		When("a user does nothing", func() {
+			// Arrange
+			It("should return 'false'", func() {
+				// Act
+				res := WasDeleteRequested(&routeMonitor)
+				// Assert
+				Expect(res).To(BeFalse())
+			})
+		})
+	})
+	Describe("TemplateForServiceMonitorName", func() {
+		When("names are set", func() {
+			It("should return a combined name", func() {
+				// Act
+				res := templates.TemplateForServiceMonitorName("dolf", "olf")
+				// Assert
+				Expect(res).To(Equal(types.NamespacedName{
+					Name:      "olf-dolf",
+					Namespace: "openshift-monitoring",
+				}))
+			})
+		})
+	})
 
 	Describe("Contains", func() {
 		When("list is empty and key is defined", func() {
@@ -25,7 +107,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return false for a key", func() {
 				// Act
-				res := finalizer.Contains(list, key)
+				res := Contains(list, key)
 				// Asset
 				Expect(res).To(BeFalse())
 			})
@@ -37,7 +119,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return false for a key isn't in the list", func() {
 				// Act
-				res := finalizer.Contains(list, key)
+				res := Contains(list, key)
 				// Asset
 				Expect(res).To(BeFalse())
 			})
@@ -49,7 +131,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return true for a key is actually there", func() {
 				// Act
-				res := finalizer.Contains(list, key)
+				res := Contains(list, key)
 				// Asset
 				Expect(res).To(BeTrue())
 			})
@@ -62,7 +144,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{}}
 				// Act
-				finalizer.Remove(&obj, key)
+				Remove(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
@@ -73,7 +155,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{secondKey}}
 				// Act
-				finalizer.Remove(&obj, key)
+				Remove(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{secondKey}))
 			})
@@ -84,7 +166,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{key}}
 				// Act
-				finalizer.Remove(&obj, key)
+				Remove(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
@@ -96,7 +178,7 @@ var _ = Describe("Finalizer", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{}
 				// Act
-				finalizer.Add(&obj, key)
+				Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})
@@ -107,7 +189,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{}}
 				// Act
-				finalizer.Add(&obj, key)
+				Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})
@@ -118,7 +200,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{secondKey}}
 				// Act
-				finalizer.Add(&obj, key)
+				Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key, secondKey}))
 			})
@@ -129,7 +211,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{key}}
 				// Act
-				finalizer.Add(&obj, key)
+				Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})

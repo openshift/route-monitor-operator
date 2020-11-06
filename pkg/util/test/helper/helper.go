@@ -1,7 +1,7 @@
 package helper
 
 import (
-	consterror "github.com/openshift/route-monitor-operator/pkg/const/test/error"
+	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 )
 
 type MockHelper struct {

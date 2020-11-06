@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -27,12 +28,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
+	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/adder"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
@@ -51,6 +55,7 @@ func init() {
 	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
 
 	utilruntime.Must(monitoringopenshiftiov1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
@@ -91,12 +96,21 @@ func main() {
 	routeMonitorReconciler.RouteMonitorSupplement = supplement.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorDeleter = deleter.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler)
+	routeMonitorReconciler.BlackboxExporter = blackboxexporter.New(routeMonitorReconciler.Client, routeMonitorReconciler.Log, context.Background())
 
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
 
+	if err = (&clusterurlmonitor.ClusterUrlMonitorReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterUrlMonitor")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.V(2).Info("starting manager")

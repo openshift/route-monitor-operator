@@ -1,0 +1,20 @@
+# permissions for end users to view clusterurlmonitors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterurlmonitor-viewer-role
+rules:
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors/status
+  verbs:
+  - get

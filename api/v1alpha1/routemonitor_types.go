@@ -29,6 +29,14 @@ type RouteMonitorSpec struct {
 	Route RouteMonitorRouteSpec `json:"route,omitempty"`
 }
 
+// RouteMonitorSpec references the obsered Route resource
+type RouteMonitorRouteSpec struct {
+	// Name is the name of the Route
+	Name string `json:"name,omitempty"`
+	// Namespace is the namespace of the Route
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // RouteMonitorStatus defines the observed state of RouteMonitor
 type RouteMonitorStatus struct {
 	// RouteURL is the url extracted from the Route resource
