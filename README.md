@@ -19,6 +19,20 @@ The operator watches all namespaces for `routeMonitors`.
 They are used to define what route to probe.
 `RouteMonitors` are namespace scoped and need to exist in the same namespaces as the `Route` they're used for.
 
+### ClusterUrlMonitors
+
+The operator watches all namespaces for `ClusterUrlMonitors`.
+
+They are used to define what URL to probe, based on the cluster domain to allow monitoring of URLs of applications deployed to the cluster,
+which do not make use of a `Route`. A `ClusterUrlMonitor` consists of a `prefix`, a `port`, and a `suffix` which make up the probed URL as follows:
+
+```
+<prefix><cluster-domain>:<port><suffix>
+```
+
+Getting prefix and suffix right is in the users' responsibility.
+In most cases the `prefix` will end with a `.` while the suffix will start with a `/` but this is not checked or fixed by the controller.
+`ClusterUrlMonitors` are namespace scoped.
 
 ## Caveats
 Currently the blackbox exporter deployment is only using the default config file which only allows a limit set of probes.
