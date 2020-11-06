@@ -55,6 +55,17 @@ The [makefile](./Makefile) has a command to run the operator locally:
 make run
 ```
 
+### Running integration tests
+
+The integration test suite is located in `int/`. You can execute the test suite against a cluster you are currently logged into.
+It will expose the registry of that cluster, push the operator to it and execute a suite of tests to ensure the operator does it's work.
+Tested with running crc locally and being logged in as `kubeadmin`. If you want to run the tests as a different user,
+set the `KUBEUSER` environment variable before executing the tests, and make sure you're logged in as that user to the cluster.
+
+```
+make test-integration
+```
+
 ## ToDo
 
 * [ ] add option to specify which probes to use
