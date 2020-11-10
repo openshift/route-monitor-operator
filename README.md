@@ -24,7 +24,7 @@ They are used to define what route to probe.
 The operator watches all namespaces for `ClusterUrlMonitors`.
 
 They are used to define what URL to probe, based on the cluster domain to allow monitoring of URLs of applications deployed to the cluster,
-which do not make use of a `Route`. A `ClusterUrlMonitor` consists of a `prefix`, a `port`, and a `suffix` which make up the probed URL as follows:
+which do not make use of a `Route` (i.e. the api server). A `ClusterUrlMonitor` consists of a `prefix`, a `port`, and a `suffix` which make up the probed URL as follows:
 
 ```
 <prefix><cluster-domain>:<port><suffix>
