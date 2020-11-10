@@ -72,7 +72,8 @@ var _ = Describe("Integrationtests", func() {
 				clusterConfig := configv1.Ingress{}
 				err = i.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, &clusterConfig)
 				Expect(err).NotTo(HaveOccurred())
-				expectedUrl := clusterUrlMonitor.Spec.Prefix + clusterConfig.Spec.Domain + ":" + clusterUrlMonitor.Spec.Port + clusterUrlMonitor.Spec.Suffix
+				spec := clusterUrlMonitor.Spec
+				expectedUrl := spec.Prefix + clusterConfig.Spec.Domain + ":" + spec.Port + spec.Suffix
 				Expect(len(serviceMonitor.Spec.Endpoints)).To(Equal(1))
 				Expect(len(serviceMonitor.Spec.Endpoints[0].Params["target"])).To(Equal(1))
 				Expect(serviceMonitor.Spec.Endpoints[0].Params["target"][0]).To(Equal(expectedUrl))
