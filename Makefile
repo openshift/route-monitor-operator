@@ -86,7 +86,7 @@ podman-push:
 
 test-integration: podman-build
 	hack/test-integration-setup.sh
-	go test ./int
+	go test ./int -count=1 #disable result cache
 
 
 # find or download controller-gen
