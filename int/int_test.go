@@ -37,10 +37,10 @@ var _ = Describe("Integrationtests", func() {
 		)
 		BeforeEach(func() {
 			err := i.RemoveClusterUrlMonitor(clusterUrlMonitorNamespace, clusterUrlMonitorName)
+			Expect(err).NotTo(HaveOccurred())
 			clusterUrlMonitorName = "fake-url-monitor"
 			clusterUrlMonitorNamespace = "default"
 			expectedServiceMonitorName = templates.TemplateForServiceMonitorName(clusterUrlMonitorNamespace, clusterUrlMonitorName)
-			Expect(err).NotTo(HaveOccurred())
 			clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: clusterUrlMonitorNamespace,

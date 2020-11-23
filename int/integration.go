@@ -48,7 +48,6 @@ func NewIntegration() (*Integration, error) {
 	client := mgr.GetClient()
 	i := Integration{client, make(chan struct{}), mgr}
 	go func(x chan struct{}) {
-		//err := mgr.Start(i.clientChan)
 		err := mgr.GetCache().Start(x)
 		if err != nil {
 			panic(err)
