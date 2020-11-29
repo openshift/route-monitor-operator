@@ -1,3 +1,5 @@
+include boilerplate/generated-includes.mk
+
 # Current Operator version
 VERSION ?= 0.0.1
 # Default bundle image tag
@@ -131,3 +133,7 @@ bundle: manifests
 # Build the bundle image.
 bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+.PHONY: boilerplate-update
+boilerplate-update:
+	@boilerplate/update
