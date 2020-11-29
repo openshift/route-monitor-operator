@@ -12,6 +12,7 @@ rules:
   - services
   verbs:
   - create
+  - delete
   - get
   - list
   - watch
@@ -21,6 +22,7 @@ rules:
   - deployments
   verbs:
   - create
+  - delete
   - get
   - list
   - watch
