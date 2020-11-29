@@ -35,8 +35,9 @@ import (
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
 type ClusterUrlMonitorReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	BlackBoxImage string
 }
 
 const (
@@ -60,7 +61,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return utilreconcile.Stop()
 	}
 
-	blackboxExporter := blackboxexporter.New(r.Client, log, ctx)
+	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxImage)
 	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter)
 
 	return ProcessRequest(blackboxExporter, sup)

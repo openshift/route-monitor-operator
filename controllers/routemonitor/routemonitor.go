@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
@@ -66,8 +65,6 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	shouldDelete := finalizer.WasDeleteRequested(&routeMonitor)
 	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
 
-	blackboxExporter := blackboxexporter.New(r.Client, log, ctx)
-
 	if shouldDelete {
 		res, err := r.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
 		if err != nil {
@@ -82,7 +79,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.V(2).Info("Entering CreateBlackBoxExporterResources")
 	// Should happen once but cannot input in main.go
-	err = blackboxExporter.EnsureBlackBoxExporterResourcesExist()
+	err = r.BlackboxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}

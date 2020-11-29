@@ -19,13 +19,14 @@ import (
 )
 
 type BlackboxExporter struct {
-	Client client.Client
-	Log    logr.Logger
-	Ctx    context.Context
+	Client        client.Client
+	Log           logr.Logger
+	Ctx           context.Context
+	BlackBoxImage string
 }
 
-func New(client client.Client, log logr.Logger, ctx context.Context) *BlackboxExporter {
-	return &BlackboxExporter{client, log, ctx}
+func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string) *BlackboxExporter {
+	return &BlackboxExporter{client, log, ctx, blackBoxImage}
 }
 
 func (b *BlackboxExporter) ShouldDeleteBlackBoxExporterResources() (blackbox.ShouldDeleteBlackBoxExporter, error) {
@@ -57,7 +58,7 @@ func (b *BlackboxExporter) ShouldDeleteBlackBoxExporterResources() (blackbox.Sho
 
 func (b *BlackboxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
-	populationFunc := templateForBlackBoxExporterDeployment
+	populationFunc := func() appsv1.Deployment { return templateForBlackBoxExporterDeployment(b.BlackBoxImage) }
 
 	// Does the resource already exist?
 	err := b.Client.Get(b.Ctx, blackbox.BlackBoxNamespacedName, &resource)
@@ -100,7 +101,7 @@ func (b *BlackboxExporter) EnsureBlackBoxExporterServiceExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func templateForBlackBoxExporterDeployment() appsv1.Deployment {
+func templateForBlackBoxExporterDeployment(blackBoxImage string) appsv1.Deployment {
 	labels := blackbox.GenerateBlackBoxLables()
 	labelSelectors := metav1.LabelSelector{
 		MatchLabels: labels}
@@ -123,7 +124,7 @@ func templateForBlackBoxExporterDeployment() appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "quay.io/app-sre/prom-blackbox-exporter:master",
+						Image: blackBoxImage,
 						Name:  "blackbox-exporter",
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: blackbox.BlackBoxPortNumber,
