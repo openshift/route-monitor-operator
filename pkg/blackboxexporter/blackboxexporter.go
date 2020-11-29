@@ -123,7 +123,7 @@ func templateForBlackBoxExporterDeployment() appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "prom/blackbox-exporter:master",
+						Image: "quay.io/app-sre/prom-blackbox-exporter:master",
 						Name:  "blackbox-exporter",
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: blackbox.BlackBoxPortNumber,
