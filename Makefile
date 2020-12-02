@@ -25,9 +25,10 @@ endif
 
 all: manager
 
+TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
 # Run tests
 test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out
+	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -75,9 +76,18 @@ generate: controller-gen mockgen
 docker-build: test
 	docker build . -t ${IMG}
 
-# Push the docker image
-docker-push:
-	docker push ${IMG}
+# Build the image with podman
+podman-build: test
+	podman build . -t ${IMG}
+
+# Push the image with podman
+podman-push:
+	podman push ${IMG} --tls-verify=false
+
+test-integration: podman-build
+	hack/test-integration-setup.sh
+	go test ./int -count=1 #disable result cache
+
 
 # find or download controller-gen
 # download controller-gen if necessary
