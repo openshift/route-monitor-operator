@@ -69,13 +69,16 @@ generate: controller-gen mockgen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./...
 
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-
-# Push the docker image
-docker-push:
-	docker push ${IMG}
+# covered by boilerplate XD
+# if they come back in the next version please check how to work around the issue
+#
+## Build the docker image
+#docker-build: test
+#	docker build . -t ${IMG}
+#
+## Push the docker image
+#docker-push:
+#	docker push ${IMG}
 
 # find or download controller-gen
 # download controller-gen if necessary
