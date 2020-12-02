@@ -140,3 +140,7 @@ bundle-build:
 .PHONY: boilerplate-update
 boilerplate-update:
 	@boilerplate/update
+
+# supress running the op-generate command
+op-generate: ;
+
