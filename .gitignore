@@ -21,3 +21,6 @@ bin/manager
 *.swp
 
 gomock_reflect*
+
+# where boilerplate saves the binary
+build/_output/
