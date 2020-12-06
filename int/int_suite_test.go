@@ -1,4 +1,4 @@
-package v1alpha1_test
+package int_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestV1alpha1(t *testing.T) {
+func TestInt(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "V1alpha1 Suite")
+	RunSpecs(t, "Int Suite")
 }

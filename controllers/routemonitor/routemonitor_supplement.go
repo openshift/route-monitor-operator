@@ -4,26 +4,22 @@ import (
 	"context"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
-func (r *RouteMonitorReconciler) EnsureBlackBoxExporterResourcesExists(ctx context.Context) error {
-	if err := r.EnsureBlackBoxExporterDeploymentExists(ctx); err != nil {
-		return err
-	}
-	// Creating Service after because:
-	//
-	// A Service should not point to an empty target (Deployment)
-	if err := r.EnsureBlackBoxExporterServiceExists(ctx); err != nil {
-		return err
-	}
-	return nil
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/blackboxexporter.go -package $GOPACKAGE BlackboxExporter
+type BlackboxExporter interface {
+	EnsureBlackBoxExporterResourcesExist() error
+	EnsureBlackBoxExporterResourcesAbsent() error
+	ShouldDeleteBlackBoxExporterResources() (blackbox.ShouldDeleteBlackBoxExporter, error)
 }
 
 func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
-	shouldDeleteBlackBoxResources, err := r.ShouldDeleteBlackBoxExporterResources(ctx, routeMonitor)
+	shouldDeleteBlackBoxResources, err := r.BlackboxExporter.ShouldDeleteBlackBoxExporterResources()
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -31,12 +27,9 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")
-		res, err := r.ensureBlackBoxExporterResourcesAbsent(ctx, routeMonitor)
+		err := r.BlackboxExporter.EnsureBlackBoxExporterResourcesAbsent()
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
-		}
-		if res.ShouldStop() {
-			return utilreconcile.StopReconcile()
 		}
 	}
 
@@ -64,22 +57,10 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 	return utilreconcile.StopReconcile()
 }
 
-func (r *RouteMonitorReconciler) ensureBlackBoxExporterResourcesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	r.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
-	if err := r.EnsureBlackBoxExporterServiceAbsent(ctx); err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	r.Log.V(2).Info("Entering EnsureBlackBoxExporterDeploymentAbsent")
-	if err := r.EnsureBlackBoxExporterDeploymentAbsent(ctx); err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	return utilreconcile.ContinueReconcile()
-}
-
 // ensureServiceMonitoRelatedResourcesrAbsent assumes that the ServiceMonitor that is related was deleted
 func (r *RouteMonitorReconciler) ensureServiceMonitoRelatedResourcesrAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	// if the monitor is not deleting no action is needed
-	if !routeMonitor.WasDeleteRequested() {
+	if !finalizer.WasDeleteRequested(&routeMonitor) {
 		return utilreconcile.ContinueReconcile()
 	}
 	err := r.Delete(ctx, &routeMonitor)

@@ -19,6 +19,20 @@ The operator watches all namespaces for `routeMonitors`.
 They are used to define what route to probe.
 `RouteMonitors` are namespace scoped and need to exist in the same namespaces as the `Route` they're used for.
 
+### ClusterUrlMonitors
+
+The operator watches all namespaces for `ClusterUrlMonitors`.
+
+They are used to define what URL to probe, based on the cluster domain to allow monitoring of URLs of applications deployed to the cluster,
+which do not make use of a `Route` (i.e. the api server). A `ClusterUrlMonitor` consists of a `prefix`, a `port`, and a `suffix` which make up the probed URL as follows:
+
+```
+<prefix><cluster-domain>:<port><suffix>
+```
+
+Getting prefix and suffix right is in the users' responsibility.
+In most cases the `prefix` will end with a `.` while the suffix will start with a `/` but this is not checked or fixed by the controller.
+`ClusterUrlMonitors` are namespace scoped.
 
 ## Caveats
 Currently the blackbox exporter deployment is only using the default config file which only allows a limit set of probes.
@@ -53,6 +67,17 @@ The [makefile](./Makefile) has a command to run the operator locally:
 
 ```
 make run
+```
+
+### Running integration tests
+
+The integration test suite is located in `int/`. You can execute the test suite against a cluster you are currently logged into.
+It will expose the registry of that cluster, push the operator to it and execute a suite of tests to ensure the operator does it's work.
+Tested with running crc locally and being logged in as `kubeadmin`. If you want to run the tests as a different user,
+set the `KUBEUSER` environment variable before executing the tests, and make sure you're logged in as that user to the cluster.
+
+```
+make test-integration
 ```
 
 ## ToDo

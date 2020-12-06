@@ -1,0 +1,24 @@
+# permissions for end users to edit clusterurlmonitors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterurlmonitor-editor-role
+rules:
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors/status
+  verbs:
+  - get

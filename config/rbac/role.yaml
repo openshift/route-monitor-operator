@@ -12,6 +12,7 @@ rules:
   - services
   verbs:
   - create
+  - delete
   - get
   - list
   - watch
@@ -21,9 +22,17 @@ rules:
   - deployments
   verbs:
   - create
+  - delete
   - get
   - list
   - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -34,6 +43,26 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - monitoring.openshift.io
   resources:
