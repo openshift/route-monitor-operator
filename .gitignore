@@ -15,9 +15,11 @@
 # vendor/
 
 # binary for the operator
-bin/manager
+build/_output/bin/route-monitor-operator
 
 # vim tmp files
 *.swp
 
 gomock_reflect*
+
+

@@ -1,5 +1,10 @@
 include boilerplate/generated-includes.mk
 
+# format of full image is in ./boilerplate/openshift/golang-osd-operator/standard.mk
+#IMAGE_REPOSITORY=app-interface
+
+OPERATOR_NAME=route-monitor-operator
+
 # Current Operator version
 VERSION ?= 0.0.1
 # Default bundle image tag
@@ -27,10 +32,11 @@ endif
 
 all: manager
 
-TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+TESTTARGETS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+
 # Run tests
 test: generate fmt vet manifests
-	go test $(TESTS) -coverprofile cover.out
+	go test $(TESTTARGETS) -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -74,19 +80,14 @@ generate: controller-gen mockgen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 	go generate ./...
 
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-
 # Build the image with podman
 podman-build: test
 	podman build . -t ${IMG}
 
-# Push the image with podman
-podman-push:
-	podman push ${IMG} --tls-verify=false
+# podman push was deleted for docker build/push are agnostic to the engine you are using
+# also left podman build because it's used by test integration
 
-test-integration: podman-build
+test-integration: podman-build 
 	hack/test-integration-setup.sh
 	go test ./int -count=1 #disable result cache
 
@@ -143,6 +144,11 @@ bundle: manifests
 	operator-sdk generate kustomize manifests -q
 	kustomize build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
+
+# supress running the op-generate command
+# as it's not the same in operator-sdk >= 1
+op-generate: ;
+
 
 # Build the bundle image.
 bundle-build:
