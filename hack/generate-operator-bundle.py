@@ -9,6 +9,8 @@
 # Commit count can be obtained with: git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --count
 # This is the first hive commit, if we tag a release we can then switch to using that tag and bump the base version.
 
+import subprocess
+import tempfile
 import datetime
 import os
 import sys
@@ -21,7 +23,8 @@ import shutil
 VERSION_BASE = "0.1"
 
 if len(sys.argv) != 6:
-    print("USAGE: %s OUTPUT_DIR PREVIOUS_VERSION GIT_NUM_COMMITS GIT_HASH HIVE_IMAGE" % sys.argv[0])
+    print("USAGE: %s OUTPUT_DIR PREVIOUS_VERSION GIT_NUM_COMMITS GIT_HASH HIVE_IMAGE" %
+          sys.argv[0])
     sys.exit(1)
 
 outdir = sys.argv[1]
@@ -33,7 +36,7 @@ route-monitor-operator_image = sys.argv[5]
 full_version = "%s.%s-%s" % (VERSION_BASE, git_num_commits, git_hash)
 print("Generating CSV for version: %s" % full_version)
 
-with open('config/templates/route-monitor-operator-csv-template.yaml', 'r') as stream:
+with open('bundle/manifests/route-monitor-operator.clusterserviceversion.yaml', 'r') as stream:
     csv = yaml.load(stream)
 
 if not os.path.exists(outdir):
@@ -47,15 +50,10 @@ if not os.path.exists(version_dir):
 csv['spec']['customresourcedefinitions']['owned'] = []
 
 # Copy all CSV files over to the bundle output dir:
-# Copy all CRD files over to the bundle output dir:
-crd_files = [ f for f in os.listdir('deploy/crds') if f.endswith('_crd.yaml') ]
-for file_name in crd_files:
-    full_path = os.path.join('deploy/crds', file_name)
-    if (os.path.isfile(os.path.join('deploy/crds', file_name))):
-        shutil.copy(full_path, os.path.join(version_dir, file_name))
-    # Load CRD so we can use attributes from it
-    with open("deploy/crds/{}".format(file_name), "r") as stream:
-        crd = yaml.load(stream)
+kustomize_output = subprocess.run(
+    ["kustomize", "build", "config/crd"], stdout=subprocess.PIPE).stdout
+for crd in yaml.safe_load_all(kustomize_output):
+    crd = yaml.load(stream)
     # Update CSV template customresourcedefinitions key
     csv['spec']['customresourcedefinitions']['owned'].append(
         {
@@ -68,12 +66,16 @@ for file_name in crd_files:
     )
 
 # Copy all prometheus yaml files over to the bundle output dir:
-prom_files = [ f for f in os.listdir('deploy/prometheus') if f.endswith('.yaml') ]
-for file_name in prom_files:
-    full_path = os.path.join('deploy/prometheus', file_name)
-    if (os.path.isfile(os.path.join('deploy/prometheus', file_name))):
-        shutil.copy(full_path, os.path.join(version_dir, file_name))
 
+kustomize_yamls = subprocess.run(
+    ["kustomize", "build", "config/prometheus"], stdout=subprocess.PIPE)
+
+for extracted_yaml in yaml.safe_load_all(kustomize_yamls.stdout):
+    with tempfile.NamedTemporaryFile(mode="w+t",
+                                     prefix='prometheus_', suffix='.yaml',
+                                     dir=version_dir,
+                                     delete=False) as temp_file:
+        yaml.dump(extracted_yaml, temp_file, default_flow_style=False)
 
 csv['spec']['install']['spec']['clusterPermissions'] = []
 
@@ -115,7 +117,8 @@ csv['spec']['replaces'] = "route-monitor-operator.v%s" % prev_version
 
 # Set the CSV createdAt annotation:
 now = datetime.datetime.now()
-csv['metadata']['annotations']['createdAt'] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+csv['metadata']['annotations']['createdAt'] = now.strftime(
+    "%Y-%m-%dT%H:%M:%SZ")
 
 # Write the CSV to disk:
 csv_filename = "route-monitor-operator.v%s.clusterserviceversion.yaml" % full_version
@@ -123,4 +126,3 @@ csv_file = os.path.join(version_dir, csv_filename)
 with open(csv_file, 'w') as outfile:
     yaml.dump(csv, outfile, default_flow_style=False)
 print("Wrote ClusterServiceVersion: %s" % csv_file)
-
