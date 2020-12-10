@@ -69,6 +69,9 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
+	var blackBoxImage string
+	flag.StringVar(&blackBoxImage, "blackbox-image", "quay.io/app-sre/prom-blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -96,7 +99,7 @@ func main() {
 	routeMonitorReconciler.RouteMonitorSupplement = supplement.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorDeleter = deleter.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler)
-	routeMonitorReconciler.BlackboxExporter = blackboxexporter.New(routeMonitorReconciler.Client, routeMonitorReconciler.Log, context.Background())
+	routeMonitorReconciler.BlackboxExporter = blackboxexporter.New(routeMonitorReconciler.Client, routeMonitorReconciler.Log, context.Background(), blackBoxImage)
 
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
@@ -104,9 +107,10 @@ func main() {
 	}
 
 	if err = (&clusterurlmonitor.ClusterUrlMonitorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
+		Scheme:        mgr.GetScheme(),
+		BlackBoxImage: blackBoxImage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterUrlMonitor")
 		os.Exit(1)

@@ -34,10 +34,15 @@ spec:
         - --metrics-addr=127.0.0.1:8080
         - --enable-leader-election
         - --zap-log-level=$(LOG_LEVEL)
+        - --blackbox-image=$(BLACKBOX_IMAGE)
         env:
         - name: LOG_LEVEL
           # level 1 is debug, so when we want to raise the level we can
           value: "1"
+        - name: BLACKBOX_IMAGE
+          # override so you can pull any blackbox-exporter image you fancy
+          # this value is the default value
+          value: "quay.io/app-sre/prom-blackbox-exporter:master"
         image: controller:latest
         name: manager
         resources:
