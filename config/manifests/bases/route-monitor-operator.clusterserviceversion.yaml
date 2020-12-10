@@ -1,0 +1,63 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    operators.operatorframework.io/builder: operator-sdk-v1.2.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v2
+  name: route-monitor-operator.vX.Y.Z
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: RouteMonitor is the Schema for the routemonitors API
+      displayName: Route Monitor
+      kind: RouteMonitor
+      name: routemonitors.monitoring.openshift.io
+      version: v1alpha1
+    - description: ClusterUrlMonitor is the Schema for the clusterurlmonitors API
+      displayName: Cluster Url Monitor
+      kind: ClusterUrlMonitor
+      name: clusterurlmonitors.monitoring.openshift.io
+      version: v1alpha1
+  description: Automatically enables blackbox probes for routes on OpenShift clusters to be consumed by the Cluster Monitoring Operator or any vanilla Prometheus Operator
+  displayName: Route Monitor Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - operator-sdk
+  - golang
+  - monitoring
+  - sre
+  - openshift-dedicated
+  - openshift
+  - redhat
+  links:
+  - name: Route Monitor Operator
+    url: https://route-monitor-operator.domain
+  maintainers:
+  - email: rrackow@redhat.com
+    name: RiRa12621
+  - email: 11993626+georgettica@users.noreply.github.com
+    name: georgettica
+  maturity: alpha
+  provider:
+    name: Red Hat
+    url: https://www.redhat.com
+  version: 0.0.0
