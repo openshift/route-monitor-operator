@@ -39,7 +39,7 @@ spec:
   - redhat
   links:
   - name: Route Monitor Operator
-    url: https://route-monitor-operator.domain
+    url: https://github.com/openshift/route-monitor-operator/
   maintainers:
   - email: rrackow@redhat.com
     name: RiRa12621
