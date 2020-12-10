@@ -31,7 +31,7 @@ outdir = sys.argv[1]
 prev_version = sys.argv[2]
 git_num_commits = sys.argv[3]
 git_hash = sys.argv[4]
-route-monitor-operator_image = sys.argv[5]
+route_monitor_operator_image = sys.argv[5]
 
 full_version = "%s.%s-%s" % (VERSION_BASE, git_num_commits, git_hash)
 print("Generating CSV for version: %s" % full_version)
@@ -80,35 +80,52 @@ for extracted_yaml in yaml.safe_load_all(kustomize_yamls.stdout):
 csv['spec']['install']['spec']['clusterPermissions'] = []
 
 # Add route-monitor-operator role to the CSV:
-with open('deploy/cluster_role.yaml', 'r') as stream:
-    operator_role = yaml.load(stream)
+kustomize_yamls = subprocess.run(
+    ["kustomize", "build", "config/rbac"], stdout=subprocess.PIPE)
+only_cluster_role_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["kind"] == "ClusterRole"]
+for operator_role in only_cluster_role_yamls:
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': operator_role['rules'],
+            # TODO: for some reason, the SA is hardcoded here, might be an issue but dismissing for now
             'serviceAccountName': 'route-monitor-operator',
         })
 
-# Add route-monitor-operator-client role to the CSV:
-with open('deploy/uhc_cluster_role.yaml', 'r') as stream:
-    operator_role = yaml.load(stream)
-    csv['spec']['install']['spec']['clusterPermissions'].append(
+csv['spec']['install']['spec']['permissions'] = []
+only_role_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["Kind"] == "Role"]
+for operator_role in only_role_yamls:
+    csv['spec']['install']['spec']['permissions'].append(
         {
             'rules': operator_role['rules'],
-            'serviceAccountName': 'route-monitor-operator-client',
+            # TODO: for some reason, the SA is hardcoded here, might be an issue but dismissing for now
+            'serviceAccountName': 'route-monitor-operator',
         })
 
+# this is a hack until https://github.com/kubernetes-sigs/kubebuilder/issues/1894 is merged
+only_service_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["Kind"] == "Service"]
+for operator_service in only_service_yamls:
+    with tempfile.NamedTemporaryFile(mode="w+t",
+                                     prefix='service_', suffix='.yaml',
+                                     dir=version_dir,
+                                     delete=False) as temp_file:
+        yaml.dump(extracted_yaml, temp_file, default_flow_style=False)
+
 # Add our deployment spec for the hive operator:
-with open('deploy/operator.yaml', 'r') as stream:
-    operator_components = []
-    operator = yaml.load_all(stream)
-    for doc in operator:
-        operator_components.append(doc)
-    # There is only one yaml document in the operator deployment
-    operator_deployment = operator_components[0]
-    csv['spec']['install']['spec']['deployments'][0]['spec'] = operator_deployment['spec']
+kustomize_yamls = subprocess.run(
+    ["kustomize", "build", "config/manager"], stdout=subprocess.PIPE)
+possibly_only_deployment = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["kind"] == "Deployment"]
+amount_of_deployments = len(possibly_only_deployment)
+if amount_of_deployments != 1:
+    print("'kustomize build config/manager' returned an unexpected result, failing early")
+    print("expected one Deployment, got", amount_of_deployments)
+    sys.exit(1)
+
+# There is only one yaml document in the operator deployment
+operator_deployment = possibly_only_deployment[0]
+csv['spec']['install']['spec']['deployments'][0]['spec'] = operator_deployment['spec']
 
 # Update the deployment to use the defined image:
-csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['containers'][0]['image'] = route-monitor-operator_image
+csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['containers'][0]['image'] = route_monitor_operator_image
 
 # Update the versions to include git hash:
 csv['metadata']['name'] = "route-monitor-operator.v%s" % full_version
