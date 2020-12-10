@@ -4,7 +4,7 @@ set -exv
 
 # prefix var with _ so we don't clober the var used during the Make build
 # it probably doesn't matter but we can change it later.
-_OPERATOR_NAME="aws-account-operator"
+_OPERATOR_NAME="route-monitor-operator"
 
 BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
@@ -13,14 +13,14 @@ GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
 
 # clone bundle repo
-SAAS_OPERATOR_DIR="saas-aws-account-operator-bundle"
-BUNDLE_DIR="$SAAS_OPERATOR_DIR/aws-account-operator/"
+SAAS_OPERATOR_DIR="saas-route-monitor-operator-bundle"
+BUNDLE_DIR="$SAAS_OPERATOR_DIR/route-monitor-operator/"
 
 rm -rf "$SAAS_OPERATOR_DIR"
 
 git clone \
     --branch "$BRANCH_CHANNEL" \
-    https://app:"${APP_SRE_BOT_PUSH_TOKEN}"@gitlab.cee.redhat.com/service/saas-aws-account-operator-bundle.git \
+    https://app:"${APP_SRE_BOT_PUSH_TOKEN}"@gitlab.cee.redhat.com/service/saas-route-monitor-operator-bundle.git \
     "$SAAS_OPERATOR_DIR"
 
 # remove any versions more recent than deployed hash
@@ -68,11 +68,11 @@ if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
 fi
 
 # create package yaml
-cat <<EOF > $BUNDLE_DIR/aws-account-operator.package.yaml
-packageName: aws-account-operator
+cat <<EOF > $BUNDLE_DIR/route-monitor-operator.package.yaml
+packageName: route-monitor-operator
 channels:
 - name: $BRANCH_CHANNEL
-  currentCSV: aws-account-operator.v${NEW_VERSION}
+  currentCSV: route-monitor-operator.v${NEW_VERSION}
 EOF
 
 # add, commit & push
@@ -91,7 +91,7 @@ git push origin "$BRANCH_CHANNEL"
 popd
 
 # build the registry image
-REGISTRY_IMG="quay.io/app-sre/aws-account-operator-registry"
+REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 DOCKERFILE_REGISTRY="Dockerfile.olm-registry"
 
 cat <<EOF > $DOCKERFILE_REGISTRY

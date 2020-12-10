@@ -6,7 +6,7 @@ set -exv
 
 CURRENT_DIR=$(dirname "$0")
 
-BASE_IMG="aws-account-operator"
+BASE_IMG="route-monitor-operator"
 QUAY_IMAGE="quay.io/app-sre/${BASE_IMG}"
 IMG="${BASE_IMG}:latest"
 
