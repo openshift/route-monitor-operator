@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Generate an operator bundle for publishing to OLM. Copies appropriate files
 # into a directory, and composes the ClusterServiceVersion which needs bits and
@@ -37,7 +37,7 @@ full_version = "%s.%s-%s" % (VERSION_BASE, git_num_commits, git_hash)
 print("Generating CSV for version: %s" % full_version)
 
 with open('bundle/manifests/route-monitor-operator.clusterserviceversion.yaml', 'r') as stream:
-    csv = yaml.load(stream)
+    csv = yaml.safe_load(stream)
 
 if not os.path.exists(outdir):
     os.mkdir(outdir)
@@ -53,7 +53,6 @@ csv['spec']['customresourcedefinitions']['owned'] = []
 kustomize_output = subprocess.run(
     ["kustomize", "build", "config/crd"], stdout=subprocess.PIPE).stdout
 for crd in yaml.safe_load_all(kustomize_output):
-    crd = yaml.load(stream)
     # Update CSV template customresourcedefinitions key
     csv['spec']['customresourcedefinitions']['owned'].append(
         {
@@ -82,7 +81,8 @@ csv['spec']['install']['spec']['clusterPermissions'] = []
 # Add route-monitor-operator role to the CSV:
 kustomize_yamls = subprocess.run(
     ["kustomize", "build", "config/rbac"], stdout=subprocess.PIPE)
-only_cluster_role_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["kind"] == "ClusterRole"]
+only_cluster_role_yamls = [y for y in yaml.safe_load_all(
+    kustomize_yamls.stdout) if y["kind"] == "ClusterRole"]
 for operator_role in only_cluster_role_yamls:
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
@@ -92,7 +92,8 @@ for operator_role in only_cluster_role_yamls:
         })
 
 csv['spec']['install']['spec']['permissions'] = []
-only_role_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["Kind"] == "Role"]
+only_role_yamls = [y for y in yaml.safe_load_all(
+    kustomize_yamls.stdout) if y["kind"] == "Role"]
 for operator_role in only_role_yamls:
     csv['spec']['install']['spec']['permissions'].append(
         {
@@ -102,7 +103,8 @@ for operator_role in only_role_yamls:
         })
 
 # this is a hack until https://github.com/kubernetes-sigs/kubebuilder/issues/1894 is merged
-only_service_yamls = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["Kind"] == "Service"]
+only_service_yamls = [y for y in yaml.safe_load_all(
+    kustomize_yamls.stdout) if y["kind"] == "Service"]
 for operator_service in only_service_yamls:
     with tempfile.NamedTemporaryFile(mode="w+t",
                                      prefix='service_', suffix='.yaml',
@@ -113,7 +115,8 @@ for operator_service in only_service_yamls:
 # Add our deployment spec for the hive operator:
 kustomize_yamls = subprocess.run(
     ["kustomize", "build", "config/manager"], stdout=subprocess.PIPE)
-possibly_only_deployment = [ y for y in yaml.safe_load_all(kustomize_yamls.stdout) if y["kind"] == "Deployment"]
+possibly_only_deployment = [y for y in yaml.safe_load_all(
+    kustomize_yamls.stdout) if y["kind"] == "Deployment"]
 amount_of_deployments = len(possibly_only_deployment)
 if amount_of_deployments != 1:
     print("'kustomize build config/manager' returned an unexpected result, failing early")
@@ -122,8 +125,9 @@ if amount_of_deployments != 1:
 
 # There is only one yaml document in the operator deployment
 operator_deployment = possibly_only_deployment[0]
+csv['spec']['install']['spec']['deployments'] = []
+csv['spec']['install']['spec']['deployments'].append({})
 csv['spec']['install']['spec']['deployments'][0]['spec'] = operator_deployment['spec']
-
 # Update the deployment to use the defined image:
 csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['containers'][0]['image'] = route_monitor_operator_image
 
