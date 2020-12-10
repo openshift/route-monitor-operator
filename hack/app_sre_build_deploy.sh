@@ -15,6 +15,9 @@ GIT_HASH=$(git rev-parse --short=7 HEAD)
 # build the image
 BUILD_CMD="docker build" IMG="$IMG" make docker-build
 
+# generate the bundle folder
+make bundle
+
 # push the image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
     "docker-daemon:${IMG}" \
