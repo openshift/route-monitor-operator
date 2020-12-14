@@ -20,4 +20,6 @@ bin/manager
 # vim tmp files
 *.swp
 
+bundle
+
 gomock_reflect*

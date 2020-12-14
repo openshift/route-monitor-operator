@@ -1,5 +1,11 @@
 # Current Operator version
-VERSION ?= 0.0.1
+VERSION_MAJOR=0
+VERSION_MINOR=1
+COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$$"`..HEAD --count)
+CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
+OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
+
+VERSION ?= $(OPERATOR_VERSION)
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
