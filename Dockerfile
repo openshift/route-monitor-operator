@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM quay.io/app-sre/ubi8-go-toolset:latest AS builder
+FROM quay.io/app-sre/ubi8-go-toolset:1.13.4-32 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
