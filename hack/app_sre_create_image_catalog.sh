@@ -9,6 +9,9 @@ _OPERATOR_NAME="route-monitor-operator"
 BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
 
+# generate the bundle folder
+make bundle
+
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
 
