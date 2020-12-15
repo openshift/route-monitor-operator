@@ -37,7 +37,7 @@ full_version = "%s.%s-%s" % (VERSION_BASE, git_num_commits, git_hash)
 print("Generating CSV for version: %s" % full_version)
 
 BUNDLE_BASE_PATH = 'bundle/manifests'
-with open(f"{BUNDLE_BASE_PATH}/route-monitor-operator.clusterserviceversion.yaml", 'r') as stream:
+with open("{}/route-monitor-operator.clusterserviceversion.yaml".format(BUNDLE_BASE_PATH), 'r') as stream:
     csv = yaml.safe_load(stream)
 
 if not os.path.exists(outdir):
