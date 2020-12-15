@@ -9,8 +9,11 @@ _OPERATOR_NAME="route-monitor-operator"
 BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
 
+# Build an image locally that has all tools we need
+docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
+
 # generate the bundle folder
-make bundle OPERATOR_SDK_COMMAND="docker run --rm -w /root/tmp -i -v $(pwd):/root/tmp quay.io/operator-framework/operator-sdk:v1.2.0"
+make bundle OPERATOR_SDK_COMMAND="docker run --rm -w /root/tmp -i -v $(pwd):/root/tmp pipelinebuilder:latest"
 
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
