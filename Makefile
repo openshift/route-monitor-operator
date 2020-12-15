@@ -29,6 +29,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+OPERATOR_SDK_COMMAND ?= operator-sdk
+
 all: manager
 
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
@@ -146,9 +148,9 @@ endif
 
 # Generate bundle manifests and metadata, then validate generated files.
 bundle: manifests
-	operator-sdk generate kustomize manifests -q
-	kustomize build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
+	$(OPERATOR_SDK_COMMAND) generate kustomize manifests -q
+	kustomize build config/manifests | $(OPERATOR_SDK_COMMAND) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(OPERATOR_SDK_COMMAND) bundle validate ./bundle
 
 # Build the bundle image.
 bundle-build:
