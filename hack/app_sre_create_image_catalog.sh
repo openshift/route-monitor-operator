@@ -10,7 +10,7 @@ BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
 
 # generate the bundle folder
-make bundle OPERATOR_SDK_COMMAND="docker run --rm -w /root/tmp -i -v $(pwd):/root/tmp quay.io/operator-framework/operator-sdk:v1.2.0"
+make bundle
 
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
