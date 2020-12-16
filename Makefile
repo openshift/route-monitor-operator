@@ -146,7 +146,7 @@ else
 KUSTOMIZE=$(shell which kustomize)
 endif
 
-YAML_DIRECTORY?=bundle/manifests/
+YAML_DIRECTORY?=bundle/manifests
 SELECTOR_SYNC_SET_TEMPLATE_DIR?=hack/templates/
 GIT_ROOT?=$(shell git rev-parse --show-toplevel 2>&1)
 
