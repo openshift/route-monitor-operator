@@ -132,6 +132,7 @@ MOCKGEN=$(shell which mockgen)
 endif
 
 kustomize:
+ifndef KUSTOMIZE
 ifeq (, $(shell which kustomize))
 	@{ \
 	set -e ;\
@@ -144,6 +145,7 @@ ifeq (, $(shell which kustomize))
 KUSTOMIZE=$(GOBIN)/kustomize
 else
 KUSTOMIZE=$(shell which kustomize)
+endif
 endif
 
 # Generate bundle manifests and metadata, then validate generated files.
