@@ -1,0 +1,46 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  name: cloud-ingress-operator-0.0.1
+  namespace: placeholder
+  annotations:
+    categories: A list of comma separated categories that your operator falls under.
+    certified: "false"
+    description: Operator to Manage Cloud Ingress for OpenShift Clusters.
+    containerImage: quay.io/app-sre/cloud-ingress-operator:latest
+    createdAt: "2019-04-10T17:34:33Z"
+    support: Red Hat SRE
+spec:
+  displayName: cloud-ingress`-operator
+  description: Operator to Manage Rbac Permissions for OpenShift Clusters.
+  keywords:
+  - kubernetes
+  - ingress
+  - openshift
+  - multi-cluster
+  - cluster
+  version: 0.0.1
+  provider:
+    name: Red Hat, Inc
+  maturity: alpha
+  installModes:
+  - type: OwnNamespace
+    supported: true
+  - type: SingleNamespace
+    supported: true
+  - type: MultiNamespace
+    supported: false
+  - type: AllNamespaces
+    supported: false
+  install:
+    strategy: deployment
+    spec:
+      clusterPermissions:
+      - serviceAccountName: cloud-ingress-operator
+        # Rules will be added here by the generate-csv.py script.
+      deployments:
+      - name: cloud-ingress-operator
+        # Deployment spec will be added here by the generate-csv.py script.
+  customresourcedefinitions:
+    owned:
+    # CRD's will be added here by the generate-operator-bundle.py

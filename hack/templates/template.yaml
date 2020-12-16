@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Template
+parameters:
+- name: REGISTRY_IMG
+  required: true
+- name: CHANNEL
+  required: true
+- name: IMAGE_TAG
+  required: true
+- name: REPO_NAME
+  value: REPLACED_BY_SCRIPT
+  required: true
+metadata:
+  name: selectorsyncset-template
+objects: []
