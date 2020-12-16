@@ -205,7 +205,7 @@ objects:
           capabilities: Basic Install
           operators.operatorframework.io/builder: operator-sdk-v1.2.0
           operators.operatorframework.io/project_layout: go.kubebuilder.io/v2
-        name: route-monitor-operator.v0.1.126-c3bf622
+        name: route-monitor-operator.v0.1.127-9f4bf86
         namespace: placeholder
       spec:
         apiservicedefinitions: {}
@@ -443,5 +443,5 @@ objects:
         provider:
           name: Red Hat
           url: https://www.redhat.com
-        replaces: route-monitor-operator.v0.1.126-f78c5ca
-        version: 0.1.126-c3bf622
+        replaces: route-monitor-operator.v0.1.126-c3bf622
+        version: 0.1.127-9f4bf86

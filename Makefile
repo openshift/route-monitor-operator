@@ -159,7 +159,7 @@ GEN_SYNCSET=hack/generate_template.py --template-dir ${SELECTOR_SYNC_SET_TEMPLAT
 .PHONY: generate-syncset
 generate-syncset: bundle
 	if [ "${IN_CONTAINER}" == "true" ]; then \
-		$(CONTAINER_ENGINE) run --rm -v `pwd -P`:`pwd -P` quay.io/bitnami/python:2.7.18 /bin/sh -c "cd `pwd`; pip install oyaml; `pwd`/${GEN_SYNCSET}"; \
+		$(CONTAINER_ENGINE) run --rm -v $$(pwd -P):$$(pwd -P) quay.io/bitnami/python:2.7.18 /bin/sh -c "cd $$(pwd); pip install oyaml; $$(pwd)/${GEN_SYNCSET}"; \
 	else \
 		${GEN_SYNCSET}; \
 	fi
