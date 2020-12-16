@@ -13,7 +13,11 @@ QUAY_IMAGE="$2"
 docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
 
 # generate the bundle folder
-make bundle OPERATOR_SDK_COMMAND="docker run --rm -w /root/tmp -i -v $(pwd):/root/tmp pipelinebuilder:latest"
+#vol=$(generate_mac_mount $(pwd) /root/tmp)
+base_command="docker run --rm --workdir /root/tmp --interactive --volume $(pwd):/root/tmp"
+
+make bundle KUSTOMIZE="${base_command} --entrypoint kustomize pipelinebuilder:latest" OPERATOR_SDK_COMMAND="${base_command} pipelinebuilder:latest"
+chown -R $(id -u) bundle
 
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)

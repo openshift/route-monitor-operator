@@ -1,10 +1,7 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest AS kustomize-builder
 
 RUN microdnf install -y golang make which
 RUN microdnf install -y git
-
-ARG BIN=operator-sdk
-COPY $BIN /usr/local/bin/operator-sdk
 
 # install kustomize
 RUN git clone https://github.com/kubernetes-sigs/kustomize.git
@@ -13,4 +10,8 @@ RUN cd kustomize && \
     go install .
 RUN ~/go/bin/kustomize version
 
-ENTRYPOINT ["/usr/local/bin/operator-sdk"]
+FROM quay.io/operator-framework/operator-sdk:latest
+
+RUN rm -rf /.cache
+COPY --from=kustomize-builder /root/go/bin/kustomize /usr/local/bin/kustomize
+
