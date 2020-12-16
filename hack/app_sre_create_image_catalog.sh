@@ -17,7 +17,7 @@ docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
 base_command="docker run --rm --workdir /root/tmp --interactive --volume $(pwd):/root/tmp"
 
 make bundle KUSTOMIZE="${base_command} --entrypoint kustomize pipelinebuilder:latest" OPERATOR_SDK="${base_command} pipelinebuilder:latest"
-chown -R $(id -u) bundle
+$base_command --entrypoint bash pipelinebuilder:latest chown -R $(id -u) bundle
 
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
