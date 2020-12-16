@@ -146,7 +146,7 @@ else
 KUSTOMIZE=$(shell which kustomize)
 endif
 
-YAML_DIRECTORY?=deploy
+YAML_DIRECTORY?=bundle/manifests/
 SELECTOR_SYNC_SET_TEMPLATE_DIR?=hack/templates/
 GIT_ROOT?=$(shell git rev-parse --show-toplevel 2>&1)
 
@@ -155,11 +155,11 @@ REPO_NAME?=$(shell basename $$((git config --get-regex remote\.*\.url 2>/dev/nul
 
 SELECTOR_SYNC_SET_DESTINATION?=${GIT_ROOT}/hack/olm-registry/olm-artifacts-template.yaml
 
-GEN_SYNCSET=hack/generate_template.py -t ${SELECTOR_SYNC_SET_TEMPLATE_DIR} -y ${YAML_DIRECTORY} -d ${SELECTOR_SYNC_SET_DESTINATION} -r ${REPO_NAME}
+GEN_SYNCSET=hack/generate_template.py --template-dir ${SELECTOR_SYNC_SET_TEMPLATE_DIR} --yaml-directory ${YAML_DIRECTORY} --destination ${SELECTOR_SYNC_SET_DESTINATION} --repo-name ${REPO_NAME}
 .PHONY: generate-syncset
-generate-syncset:
+generate-syncset: bundle
 	if [ "${IN_CONTAINER}" == "true" ]; then \
-		$(CONTAINER_ENGINE) run --rm -v `pwd -P`:`pwd -P` quay.io/app-sre/python:2.7.15 /bin/sh -c "cd `pwd`; pip install oyaml; `pwd`/${GEN_SYNCSET}"; \
+		$(CONTAINER_ENGINE) run --rm -v `pwd -P`:`pwd -P` quay.io/bitnami/python:2.7.18 /bin/sh -c "cd `pwd`; pip install oyaml; `pwd`/${GEN_SYNCSET}"; \
 	else \
 		${GEN_SYNCSET}; \
 	fi
