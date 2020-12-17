@@ -20,6 +20,13 @@ bin/manager
 # vim tmp files
 *.swp
 
+# the location the 'make bundle' command saves it's files
 bundle
 
+# to exclude any saas folder in the local repo
+saas*
+
 gomock_reflect*
+
+# generated file, do not commit
+hack/olm-base-resources

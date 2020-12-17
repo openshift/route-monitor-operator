@@ -1,0 +1,5 @@
+resources:
+- ../prometheus
+- catalogsource.yaml
+- operatorgroup.yaml
+- subscription.yaml

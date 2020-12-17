@@ -1,0 +1,28 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  labels:
+    opsrc-datastore: 'true'
+    opsrc-provider: redhat
+  name: ${REPO_NAME}-registry
+  namespace: ${NAMESPACE}
+spec:
+  image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - preference:
+          matchExpressions:
+          - key: node-role.kubernetes.io/infra
+            operator: Exists
+        weight: 1
+  tolerations:
+  - operator: Exists
+    key: node-role.kubernetes.io/infra
+    effect: NoSchedule
+  displayName: ${REPO_NAME}
+  icon:
+    base64data: ''
+    mediatype: ''
+  publisher: Red Hat
+  sourceType: grpc

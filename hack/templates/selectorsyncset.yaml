@@ -1,0 +1,13 @@
+apiVersion: hive.openshift.io/v1
+kind: SelectorSyncSet
+metadata:
+  labels:
+    managed.openshift.io/gitHash: ${IMAGE_TAG}
+    managed.openshift.io/gitRepoName: ${REPO_NAME}
+    managed.openshift.io/osd: 'true'
+  name: REPLACED_BY_SCRIPT
+spec:
+  clusterDeploymentSelector:
+    matchLabels:
+      api.openshift.com/managed: "true"
+  resourceApplyMode: Sync
