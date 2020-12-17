@@ -171,7 +171,7 @@ generate-syncset: kustomize
 # Generate bundle manifests and metadata, then validate generated files.
 bundle: manifests kustomize
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	$ $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 # Build the bundle image.
