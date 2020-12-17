@@ -12,6 +12,8 @@ parameters:
   value: route-monitor-operator
 - name: REGISTRY_IMG
   required: true
+- name: NAMESPACE
+  value: openshift-monitoring
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -30,7 +32,7 @@ objects:
     name: ${OPERATOR_NAME}-og
   spec:
     targetNamespaces:
-    - ${OPERATOR_NAME}
+    - ${NAMESPACE}
 
 - apiVersion: operators.coreos.com/v1alpha1
   kind: Subscription
@@ -40,4 +42,4 @@ objects:
     channel: ${CHANNEL}
     name: ${OPERATOR_NAME}
     source: ${OPERATOR_NAME}-catalog
-    sourceNamespace: ${OPERATOR_NAME}
+    sourceNamespace: ${NAMESPACE}
