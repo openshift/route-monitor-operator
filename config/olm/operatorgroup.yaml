@@ -4,6 +4,6 @@ metadata:
   name: ${REPO_NAME}
   namespace: ${NAMESPACE}
 spec:
-  targetNamespaces:
+  targetNamespaces: 
   - ${NAMESPACE}
 

@@ -5,7 +5,7 @@ metadata:
     opsrc-datastore: 'true'
     opsrc-provider: redhat
   name: ${REPO_NAME}-registry
-  namespace: {NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
   affinity:

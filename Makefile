@@ -146,7 +146,7 @@ else
 KUSTOMIZE=$(shell which kustomize)
 endif
 
-YAML_DIRECTORY?=bundle/manifests
+YAML_DIRECTORY?=hack/olm-base-resources
 SELECTOR_SYNC_SET_TEMPLATE_DIR?=hack/templates/
 GIT_ROOT?=$(shell git rev-parse --show-toplevel 2>&1)
 
@@ -155,9 +155,11 @@ REPO_NAME?=$(shell basename $$((git config --get-regex remote\.*\.url 2>/dev/nul
 
 SELECTOR_SYNC_SET_DESTINATION?=${GIT_ROOT}/hack/olm-registry/olm-artifacts-template.yaml
 
+ADD_KUSTOMIZE_DATA=mkdir ${YAML_DIRECTORY} || ${KUSTOMIZE} build config/olm/ > ${YAML_DIRECTORY}/00_olm-resources_generated.yaml
 GEN_SYNCSET=hack/generate_template.py --template-dir ${SELECTOR_SYNC_SET_TEMPLATE_DIR} --yaml-directory ${YAML_DIRECTORY} --destination ${SELECTOR_SYNC_SET_DESTINATION} --repo-name ${REPO_NAME}
 .PHONY: generate-syncset
-generate-syncset: bundle
+generate-syncset: kustomize
+	${ADD_KUSTOMIZE_DATA}; \
 	if [ "${IN_CONTAINER}" == "true" ]; then \
 		$(CONTAINER_ENGINE) run --rm -v $$(pwd -P):$$(pwd -P) quay.io/bitnami/python:2.7.18 /bin/sh -c "cd $$(pwd); pip install oyaml; $$(pwd)/${GEN_SYNCSET}"; \
 	else \
@@ -167,7 +169,7 @@ generate-syncset: bundle
 # Generate bundle manifests and metadata, then validate generated files.
 bundle: manifests kustomize
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$ $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
 # Build the bundle image.
