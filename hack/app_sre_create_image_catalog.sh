@@ -71,7 +71,6 @@ PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
     "$GIT_HASH" \
     "$QUAY_IMAGE:$GIT_HASH"
 
-$base_command --entrypoint bash pipelinebuilder:latest chown -R $(id -u) bundle
 
 NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
