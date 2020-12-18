@@ -14,11 +14,15 @@ docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
 
 # generate the bundle folder
 #vol=$(generate_mac_mount $(pwd) /root/tmp)
-base_command="docker run --rm --workdir /root/tmp --interactive --volume $(pwd):/root/tmp"
+#base_command="docker run --rm --workdir /root/tmp --interactive --volume $(pwd):/root/tmp"
 
-make bundle KUSTOMIZE="${base_command} --entrypoint kustomize pipelinebuilder:latest" OPERATOR_SDK="${base_command} pipelinebuilder:latest"
-$base_command --entrypoint bash pipelinebuilder:latest chown -R $(id -u) bundle
+docker run --name route-monitor-operator-pipeline pipelinebuilder:latest
 
+#make bundle KUSTOMIZE="${base_command} --entrypoint kustomize pipelinebuilder:latest" OPERATOR_SDK="${base_command} pipelinebuilder:latest"
+#$base_command --entrypoint bash pipelinebuilder:latest chown -R $(id -u) bundle
+
+docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/bundle .
+docker rm route-monitor-operator-pipeline
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
 
