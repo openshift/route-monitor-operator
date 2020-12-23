@@ -63,6 +63,14 @@ deploy: manifests kustomize
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
+# Install CRDs into a cluster
+sample-install: manifests kustomize
+	$(KUSTOMIZE) build config/samples | kubectl apply -f -
+#
+# Install CRDs into a cluster
+sample-uninstall: manifests kustomize
+	$(KUSTOMIZE) build config/samples | kubectl delete -f -
+
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
