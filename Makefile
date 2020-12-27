@@ -67,7 +67,7 @@ deploy: manifests kustomize
 sample-install: manifests kustomize
 	$(KUSTOMIZE) build config/samples | kubectl apply -f -
 #
-# Install CRDs into a cluster
+# Uninstall CRDs into a cluster
 sample-uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/samples | kubectl delete -f -
 
