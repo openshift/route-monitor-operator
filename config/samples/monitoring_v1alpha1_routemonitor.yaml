@@ -4,5 +4,5 @@ metadata:
   name: routemonitor-sample
 spec:
   route:
-    namespace: routenamespace
-    name: routename
+    namespace: openshift-console
+    name: console
