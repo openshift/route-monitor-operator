@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 set -euo pipefail
 
@@ -6,7 +6,7 @@ set -euo pipefail
 SET_X=${SET_X:-false}
 [[ "$SET_X" != "false" ]] && set -x
 
-DRY_RUN=${DRY_RUN:-false}
+DRY_RUN=${DRY_RUN:-true}
 DELETE_TEMP_DIR=${DELETE_TEMP_DIR:-true}
 NO_LOG=${NO_LOG:-false}
 OLM_BUNDLE_VERSIONS_REPO=${OLM_BUNDLE_VERSIONS_REPO:-gitlab.cee.redhat.com/service/saas-operator-versions.git}
@@ -312,7 +312,7 @@ function main() {
     local saas_root_dir="$temp_dir/saas-operator-versions"
     clone_olm_bundle_versions_repo "$saas_root_dir"
 
-    local bundle_versions_file="$saas_root_dir/$OPERATOR_NAME/${OPERATOR_NAME}-versions.txt"
+    local bundle_versions_file="/tmp/saas-operator-versions/$OPERATOR_NAME/${OPERATOR_NAME}-versions.txt"
     local versions
     # shellcheck disable=SC2207
     versions=($(get_prev_operator_version "$bundle_versions_file"))
@@ -337,7 +337,7 @@ function main() {
                                                    "${skip_versions[*]:-}")
 
     log "Pushing bundle image $bundle_image_current_commit"
-    $engine_cmd push "$bundle_image_current_commit"
+    [[ "$DRY_RUN" == "false" ]] && $engine_cmd push "$bundle_image_current_commit"
 
     # Make sure this is run after pushing the image
     log "Validating bundle $bundle_image_current_commit"

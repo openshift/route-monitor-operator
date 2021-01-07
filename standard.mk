@@ -36,9 +36,8 @@ OLM_CHANNEL ?= alpha
 
 REGISTRY_USER ?=
 REGISTRY_TOKEN ?=
-CONTAINER_ENGINE_CONFIG_DIR = .docker
+CONTAINER_ENGINE_CONFIG_DIR = /home/jamesh/.docker
 
-BINFILE=build/_output/bin/$(OPERATOR_NAME)
 MAINPACKAGE=./cmd/manager
 
 GOOS?=$(shell go env GOOS)
@@ -65,18 +64,6 @@ ALLOW_DIRTY_CHECKOUT?=false
 
 # TODO: Figure out how to discover this dynamically
 CONVENTION_DIR := boilerplate/openshift/golang-osd-operator
-
-# Set the default goal in a way that works for older & newer versions of `make`:
-# Older versions (<=3.8.0) will pay attention to the `default` target.
-# Newer versions pay attention to .DEFAULT_GOAL, where uunsetting it makes the next defined target the default:
-# https://www.gnu.org/software/make/manual/make.html#index-_002eDEFAULT_005fGOAL-_0028define-default-goal_0029
-.DEFAULT_GOAL :=
-.PHONY: default
-default: go-check go-test go-build
-
-.PHONY: clean
-clean:
-	rm -rf ./build/_output
 
 .PHONY: isclean
 isclean:
@@ -123,12 +110,6 @@ op-generate:
 
 .PHONY: generate
 generate: op-generate go-generate
-
-.PHONY: go-build
-go-build: ## Build binary
-	# Force GOOS=linux as we may want to build containers in other *nix-like systems (ie darwin).
-	# This is temporary until a better container build method is developed
-	${GOENV} GOOS=linux go build ${GOBUILDFLAGS} -o ${BINFILE} ${MAINPACKAGE}
 
 .PHONY: go-test
 go-test:
@@ -196,7 +177,8 @@ build-push:
 	hack/app_sre_build_deploy.sh
 
 .PHONY: opm-build-push
-opm-build-push: docker-push
+#opm-build-push: docker-push
+opm-build-push:
 	OLM_BUNDLE_IMAGE="${OLM_BUNDLE_IMAGE}" \
 	OLM_CATALOG_IMAGE="${OLM_CATALOG_IMAGE}" \
 	CONTAINER_ENGINE="${CONTAINER_ENGINE}" \
@@ -207,4 +189,4 @@ opm-build-push: docker-push
 	OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
 	OPERATOR_IMAGE_TAG="${OPERATOR_IMAGE_TAG}" \
 	OLM_CHANNEL="${OLM_CHANNEL}" \
-	${CONVENTION_DIR}/build-opm-catalog.sh
+	hack/build-opm-catalog.sh

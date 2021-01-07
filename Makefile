@@ -1,3 +1,7 @@
+# Include make files
+include project.mk
+include standard.mk
+
 # Current Operator version
 VERSION_MAJOR=0
 VERSION_MINOR=1
