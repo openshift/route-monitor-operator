@@ -31,3 +31,4 @@ gomock_reflect*
 # generated file, do not commit
 hack/olm-base-resources
 bundle/
+packagemanifests/

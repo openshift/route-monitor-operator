@@ -58,9 +58,11 @@ install: manifests kustomize
 uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
+pre-deploy: kustomize 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: pre-deploy manifests kustomize
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # Install CRDs into a cluster
@@ -186,10 +188,10 @@ bundle: manifests kustomize
 bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 	
-packagemanifest: manifests kustomize
+packagemanifests: manifests kustomize pre-deploy
 	$(OPERATOR_SDK) generate kustomize manifests -q
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests  -q --channel staging --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
-bundle-build:
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+packagemanifests-build: packagemanifest
+	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) .
