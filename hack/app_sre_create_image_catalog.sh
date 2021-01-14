@@ -102,7 +102,6 @@ pushd $SAAS_OPERATOR_DIR
   git push origin "$BRANCH_CHANNEL"
 popd
 
-# add, commit & push
 
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
