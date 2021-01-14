@@ -107,6 +107,10 @@ function clone_olm_bundle_versions_repo() {
 
     log "Cloning $OLM_BUNDLE_VERSIONS_REPO into $saas_root_dir"
     git clone --branch "$OLM_BUNDLE_VERSIONS_REPO_BRANCH" "$bundle_versions_repo_url" "$saas_root_dir"
+    if [ $? != 0 ]; then
+        log "Failed to clone $OLM_BUNDLE_VERSIONS_REPO"
+        exit 1
+    fi
 }
 
 function get_prev_operator_version() {
@@ -312,7 +316,7 @@ function main() {
     local saas_root_dir="$temp_dir/saas-operator-versions"
     clone_olm_bundle_versions_repo "$saas_root_dir"
 
-    local bundle_versions_file="/tmp/saas-operator-versions/$OPERATOR_NAME/${OPERATOR_NAME}-versions.txt"
+    local bundle_versions_file="$saas_root_dir/$OPERATOR_NAME/${OPERATOR_NAME}-versions.txt"
     local versions
     # shellcheck disable=SC2207
     versions=($(get_prev_operator_version "$bundle_versions_file"))
