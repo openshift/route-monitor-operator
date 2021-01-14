@@ -23,8 +23,7 @@ COPY --from=kustomize-builder /root/go/bin/kustomize /usr/local/bin/kustomize
 # Set workdir so we have a known location to copy files from
 RUN mkdir /pipeline
 WORKDIR /pipeline
-# Clone base repo into container
-COPY bundler.sh .
+COPY ./ route-monitor-operator
 
 # Make all the things
-ENTRYPOINT ["./bundler.sh"]
+ENTRYPOINT ["./route-monitor-operator/hack/bundler.sh"]

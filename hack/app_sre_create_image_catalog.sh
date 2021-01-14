@@ -9,17 +9,6 @@ _OPERATOR_NAME="route-monitor-operator"
 BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
 
-# Build an image locally that has all tools we need
-docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
-
-# Generate the bundle folder
-# Run the builder container 
-docker run --name route-monitor-operator-pipeline pipelinebuilder:latest
-# Copy the `bundle` folder to host
-docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/bundle .
-# Clean up after ourselves
-docker rm route-monitor-operator-pipeline
-
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
 
@@ -63,24 +52,26 @@ fi
 
 # generate bundle
 PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
-NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
-
-if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
-    # stopping script as that version was already built, so no need to rebuild it
-    exit 0
-fi
 
 # build the registry image
 REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 
-TARGET_DIR=$BUNDLE_DIR \
-  CHANNELS=$BRANCH_CHANNEL \
-  PREV_VERSION=$PREV_VERSION \
-  BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
-  IMG=$QUAY_IMAGE:$GIT_HASH \
-  make packagemanifests-build
+# Build an image locally that has all tools we need
+docker rm route-monitor-operator-pipeline || true
+docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest .
+docker run  \
+-e CHANNELS=$BRANCH_CHANNEL \
+-e PREV_VERSION=$PREV_VERSION \
+-e IMG=$QUAY_IMAGE:$GIT_HASH \
+--name route-monitor-operator-pipeline \
+pipelinebuilder:latest
+docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/packagemanifests .
+docker rm route-monitor-operator-pipeline
+rsync -a packagemanifests/* $BUNDLE_DIR/
+rm -rf packagemanifests
 
-# add, commit & push
+BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" make packagemanifests-build
+
 pushd $SAAS_OPERATOR_DIR
 
 git add .
@@ -91,8 +82,21 @@ replaces $PREV_VERSION
 removed versions: $REMOVED_VERSIONS"
 
 git commit -m "$MESSAGE"
-git push origin "$BRANCH_CHANNEL"
 popd
+
+NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
+
+if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
+    # stopping script as that version was already built, so no need to rebuild it
+    exit 0
+fi
+
+
+pushd $SAAS_OPERATOR_DIR
+  git push origin "$BRANCH_CHANNEL"
+popd
+
+# add, commit & push
 
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
