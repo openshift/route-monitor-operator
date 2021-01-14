@@ -188,10 +188,13 @@ bundle: manifests kustomize
 # Build the bundle image.
 bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-	
+
 packagemanifests: manifests kustomize pre-deploy
 	$(OPERATOR_SDK) generate kustomize manifests -q
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests -q --channel $(CHANNELS) --version $(VERSION) --from-version $(PREV_VERSION)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests -q \
+		--channel $(CHANNELS) \
+		--version $(VERSION) \
+		--from-version $(PREV_VERSION)
 
 packagemanifests-build:
 	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .

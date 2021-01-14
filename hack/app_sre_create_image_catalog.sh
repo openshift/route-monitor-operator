@@ -57,12 +57,18 @@ PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 
 # Build an image locally that has all tools we need
+#
+# TODO: This section is done as running stuff on the jenkins slave
+#       the doesn't have `operator-sdk >=1` and `kustomize` to resort
+#       to building a container that we do all operations in
+#
+# what this section do in general is `make packagemanifests`
 docker rm route-monitor-operator-pipeline || true
 docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest .
 docker run  \
 -e CHANNELS=$BRANCH_CHANNEL \
--e PREV_VERSION=$PREV_VERSION \
 -e IMG=$QUAY_IMAGE:$GIT_HASH \
+-e PREV_VERSION=$PREV_VERSION \
 --name route-monitor-operator-pipeline \
 pipelinebuilder:latest
 docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/packagemanifests .
