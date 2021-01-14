@@ -48,10 +48,13 @@ var _ = Describe("Adder", func() {
 		delete testhelper.MockHelper
 		create testhelper.MockHelper
 		update testhelper.MockHelper
+
+		mockStatusWriter *clientmocks.MockStatusWriter
 	)
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
+		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 
 		routeMonitorAdderClient = mockClient
 
@@ -108,13 +111,22 @@ var _ = Describe("Adder", func() {
 			// Arrange
 			get = helper.NotFoundErrorHappensOnce()
 			create.CalledTimes = 1
+
 		})
 		When("the resource Exists", func() {
 			BeforeEach(func() {
 				// Arrange
 				get.ErrorResponse = nil
 				create.CalledTimes = 0
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
 			})
+
+			JustBeforeEach(func() {
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+			})
+
 			It("should call `Get` and not call `Create`", func() {
 				//Act
 				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
@@ -128,6 +140,7 @@ var _ = Describe("Adder", func() {
 				get.ErrorResponse = consterror.CustomError
 				create.CalledTimes = 0
 			})
+
 			It("should return the error and not call `Create`", func() {
 				//Act
 				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
@@ -138,6 +151,17 @@ var _ = Describe("Adder", func() {
 		})
 
 		When("the resource is Not Found", func() {
+			BeforeEach(func() {
+				// Arrange
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+			})
+
+			JustBeforeEach(func() {
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+			})
+
 			// Arrange
 			It("should call `Get` successfully and `Create` the resource", func() {
 				//Act

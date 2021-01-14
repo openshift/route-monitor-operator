@@ -142,6 +142,8 @@ var _ = Describe("Integrationtests", func() {
 
 				Expect(serviceMonitor.Name).To(Equal(expectedServiceMonitorName.Name))
 				Expect(serviceMonitor.Namespace).To(Equal(expectedServiceMonitorName.Namespace))
+				Expect(routeMonitor.Status.ServiceMonitorRef.Name).To(Equal(serviceMonitor.Name))
+				Expect(routeMonitor.Status.ServiceMonitorRef.Namespace).To(Equal(serviceMonitor.Namespace))
 			})
 		})
 

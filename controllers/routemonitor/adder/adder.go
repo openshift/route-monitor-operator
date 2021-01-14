@@ -78,5 +78,13 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 		}
 	}
 
+	//Update status with serviceMonitorRef
+	routeMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
+	routeMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
+	err := r.Status().Update(ctx, &routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+
 	return utilreconcile.ContinueReconcile()
 }

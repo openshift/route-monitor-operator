@@ -54,6 +54,17 @@ spec:
             routeURL:
               description: RouteURL is the url extracted from the Route resource
               type: string
+            serviceMonitorRef:
+              description: NamespacedName contains the name of a object and its namespace
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
+              required:
+              - name
+              - namespace
+              type: object
           type: object
       type: object
   version: v1alpha1
