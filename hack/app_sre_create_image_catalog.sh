@@ -9,17 +9,6 @@ _OPERATOR_NAME="route-monitor-operator"
 BRANCH_CHANNEL="$1"
 QUAY_IMAGE="$2"
 
-# Build an image locally that has all tools we need
-docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest ./hack/
-
-# Generate the bundle folder
-# Run the builder container 
-docker run --name route-monitor-operator-pipeline pipelinebuilder:latest
-# Copy the `bundle` folder to host
-docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/bundle .
-# Clean up after ourselves
-docker rm route-monitor-operator-pipeline
-
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_COMMIT_COUNT=$(git rev-list $(git rev-list --max-parents=0 HEAD)..HEAD --count)
 
@@ -64,30 +53,25 @@ fi
 # generate bundle
 PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
-./hack/generate-operator-bundle.py \
-    "$BUNDLE_DIR" \
-    "$PREV_VERSION" \
-    "$GIT_COMMIT_COUNT" \
-    "$GIT_HASH" \
-    "$QUAY_IMAGE:$GIT_HASH"
+# build the registry image
+REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 
+# Build an image locally that has all tools we need
+docker rm route-monitor-operator-pipeline || true
+docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest .
+docker run  \
+-e CHANNELS=$BRANCH_CHANNEL \
+-e PREV_VERSION=$PREV_VERSION \
+-e IMG=$QUAY_IMAGE:$GIT_HASH \
+--name route-monitor-operator-pipeline \
+pipelinebuilder:latest
+docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/packagemanifests .
+docker rm route-monitor-operator-pipeline
+rsync -a packagemanifests/* $BUNDLE_DIR/
+rm -rf packagemanifests
 
-NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
+BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" make packagemanifests-build
 
-if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
-    # stopping script as that version was already built, so no need to rebuild it
-    exit 0
-fi
-
-# create package yaml
-cat <<EOF > $BUNDLE_DIR/route-monitor-operator.package.yaml
-packageName: route-monitor-operator
-channels:
-- name: $BRANCH_CHANNEL
-  currentCSV: route-monitor-operator.v${NEW_VERSION}
-EOF
-
-# add, commit & push
 pushd $SAAS_OPERATOR_DIR
 
 git add .
@@ -98,24 +82,21 @@ replaces $PREV_VERSION
 removed versions: $REMOVED_VERSIONS"
 
 git commit -m "$MESSAGE"
-git push origin "$BRANCH_CHANNEL"
-
 popd
 
-# build the registry image
-REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
-DOCKERFILE_REGISTRY="Dockerfile.olm-registry"
+NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
-cat <<EOF > $DOCKERFILE_REGISTRY
-FROM quay.io/openshift/origin-operator-registry:4.5
+if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
+    # stopping script as that version was already built, so no need to rebuild it
+    exit 0
+fi
 
-COPY $SAAS_OPERATOR_DIR manifests
-RUN initializer --permissive
 
-CMD ["registry-server", "-t", "/tmp/terminate.log"]
-EOF
+pushd $SAAS_OPERATOR_DIR
+  git push origin "$BRANCH_CHANNEL"
+popd
 
-docker build -f $DOCKERFILE_REGISTRY --tag "${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" .
+# add, commit & push
 
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \

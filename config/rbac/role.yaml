@@ -33,6 +33,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:

@@ -1,5 +1,5 @@
 #!/bin/bash
-git clone https://github.com/openshift/route-monitor-operator.git
+set -euxo pipefail
 cd route-monitor-operator
-make bundle
-chmod 777 -R bundle/
+make packagemanifests
+chmod 775 -R packagemanifests
