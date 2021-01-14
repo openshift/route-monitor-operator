@@ -6,6 +6,7 @@ CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 
 VERSION ?= $(OPERATOR_VERSION)
+PREV_VERSION ?= $(VERSION)
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
@@ -189,9 +190,9 @@ bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 	
 packagemanifests: manifests kustomize pre-deploy
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests  -q --channel staging --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(OPERATOR_SDK) generate kustomize manifests -q --output-dir $(TARGET_DIR)
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests  -q --channel $(CHANNELS) --version $(VERSION) $(BUNDLE_METADATA_OPTS) --from-version $(PREV_VERSION)
 	$(OPERATOR_SDK) bundle validate ./bundle
 
-packagemanifests-build: packagemanifest
+packagemanifests-build: packagemanifests
 	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) .

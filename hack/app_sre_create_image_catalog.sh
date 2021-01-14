@@ -63,15 +63,6 @@ fi
 
 # generate bundle
 PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
-
-./hack/generate-operator-bundle.py \
-    "$BUNDLE_DIR" \
-    "$PREV_VERSION" \
-    "$GIT_COMMIT_COUNT" \
-    "$GIT_HASH" \
-    "$QUAY_IMAGE:$GIT_HASH"
-
-
 NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
 if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
@@ -79,13 +70,15 @@ if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
     exit 0
 fi
 
-# create package yaml
-cat <<EOF > $BUNDLE_DIR/route-monitor-operator.package.yaml
-packageName: route-monitor-operator
-channels:
-- name: $BRANCH_CHANNEL
-  currentCSV: route-monitor-operator.v${NEW_VERSION}
-EOF
+# build the registry image
+REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
+
+TARGET_DIR=$BUNDLE_DIR \
+  CHANNELS=$BRANCH_CHANNEL \
+  PREV_VERSION=$PREV_VERSION \
+  BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
+  IMG=$QUAY_IMAGE:$GIT_HASH \
+  make packagemanifests-build
 
 # add, commit & push
 pushd $SAAS_OPERATOR_DIR
@@ -99,23 +92,7 @@ removed versions: $REMOVED_VERSIONS"
 
 git commit -m "$MESSAGE"
 git push origin "$BRANCH_CHANNEL"
-
 popd
-
-# build the registry image
-REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
-DOCKERFILE_REGISTRY="Dockerfile.olm-registry"
-
-cat <<EOF > $DOCKERFILE_REGISTRY
-FROM quay.io/openshift/origin-operator-registry:4.5
-
-COPY $SAAS_OPERATOR_DIR manifests
-RUN initializer --permissive
-
-CMD ["registry-server", "-t", "/tmp/terminate.log"]
-EOF
-
-docker build -f $DOCKERFILE_REGISTRY --tag "${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" .
 
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
