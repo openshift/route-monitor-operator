@@ -6,6 +6,7 @@ CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 
 VERSION ?= $(OPERATOR_VERSION)
+PREV_VERSION ?= $(VERSION)
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
@@ -58,9 +59,11 @@ install: manifests kustomize
 uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
+pre-deploy: kustomize 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: pre-deploy manifests kustomize
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # Install CRDs into a cluster
@@ -185,3 +188,13 @@ bundle: manifests kustomize
 # Build the bundle image.
 bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+packagemanifests: manifests kustomize pre-deploy
+	$(OPERATOR_SDK) generate kustomize manifests -q
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests -q \
+		--channel $(CHANNELS) \
+		--version $(VERSION) \
+		--from-version $(PREV_VERSION)
+
+packagemanifests-build:
+	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
