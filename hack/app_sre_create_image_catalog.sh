@@ -58,11 +58,11 @@ REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 
 # Build an image locally that has all tools we need
 #
-# TODO: This section is done as running stuff on the jenkins slave
-#       the doesn't have `operator-sdk >=1` and `kustomize` to resort
-#       to building a container that we do all operations in
+# TODO: This section is done as in the pipeline stuff is running on the Jenkins slave
+#       that doesn't have `operator-sdk >=1` and `kustomize`
+#       so we build a container with those tools and run all operations inside
 #
-# what this section do in general is `make packagemanifests`
+# what this section does in general is `make packagemanifests`
 docker rm route-monitor-operator-pipeline || true
 docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest .
 docker run  \
