@@ -6,7 +6,7 @@ parameters:
 - name: IMAGE_TAG
   required: true
 - name: NAMESPACE
-  value: openshift-monitoring
+  value: openshift-route-monitor-operator
 - name: REGISTRY_IMG
   required: true
 - name: REPO_NAME
