@@ -168,11 +168,14 @@ REPO_NAME?=$(shell basename $$((git config --get-regex remote\.*\.url 2>/dev/nul
 
 SELECTOR_SYNC_SET_DESTINATION?=${GIT_ROOT}/hack/olm-registry/olm-artifacts-template.yaml
 
-ADD_KUSTOMIZE_DATA=mkdir ${YAML_DIRECTORY} || ${KUSTOMIZE} build config/olm/ > ${YAML_DIRECTORY}/00_olm-resources_generated.yaml
+add-kustomize-data: kustomize
+	    rm -rf $(YAML_DIRECTORY)
+	    mkdir $(YAML_DIRECTORY)
+	    $(KUSTOMIZE) build config/olm/ > $(YAML_DIRECTORY)/00_olm-resources_generated.yaml
+
 GEN_SYNCSET=hack/generate_template.py --template-dir ${SELECTOR_SYNC_SET_TEMPLATE_DIR} --yaml-directory ${YAML_DIRECTORY} --destination ${SELECTOR_SYNC_SET_DESTINATION} --repo-name ${REPO_NAME}
 .PHONY: generate-syncset
-generate-syncset: kustomize
-	${ADD_KUSTOMIZE_DATA}; \
+generate-syncset: kustomize add-kustomize-data
 	if [ "${IN_CONTAINER}" == "true" ]; then \
 		$(CONTAINER_ENGINE) run --rm -v $$(pwd -P):$$(pwd -P) quay.io/bitnami/python:2.7.18 /bin/sh -c "cd $$(pwd); pip install oyaml; $$(pwd)/${GEN_SYNCSET}"; \
 	else \

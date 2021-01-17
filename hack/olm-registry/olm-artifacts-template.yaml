@@ -29,13 +29,19 @@ objects:
         api.openshift.com/managed: 'true'
     resourceApplyMode: Sync
     resources:
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        labels:
+          openshift.io/cluster-monitoring: 'true'
+        name: ${NAMESPACE}
     - apiVersion: monitoring.coreos.com/v1
       kind: ServiceMonitor
       metadata:
         labels:
           control-plane: controller-manager
         name: controller-manager-metrics-monitor
-        namespace: openshift-monitoring
+        namespace: ${NAMESPACE}
       spec:
         endpoints:
         - path: /metrics
@@ -81,3 +87,9 @@ objects:
         name: ${REPO_NAME}
         source: ${REPO_NAME}-registry
         sourceNamespace: ${NAMESPACE}
+    - apiVersion: operators.coreos.com/v1alpha2
+      kind: OperatorGroup
+      metadata:
+        name: route-monitor-operator
+        namespace: ${NAMESPACE}
+      spec: {}
