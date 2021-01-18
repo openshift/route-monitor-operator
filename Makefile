@@ -95,7 +95,7 @@ docker-build: test
 	docker build . -t ${IMG}
 
 # Build the image with podman
-podman-build: test
+podman-build:
 	podman build . -t ${IMG}
 
 # Push the image with podman
