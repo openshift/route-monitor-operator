@@ -142,8 +142,12 @@ var _ = Describe("Integrationtests", func() {
 
 				Expect(serviceMonitor.Name).To(Equal(expectedServiceMonitorName.Name))
 				Expect(serviceMonitor.Namespace).To(Equal(expectedServiceMonitorName.Namespace))
-				Expect(routeMonitor.Status.ServiceMonitorRef.Name).To(Equal(serviceMonitor.Name))
-				Expect(routeMonitor.Status.ServiceMonitorRef.Namespace).To(Equal(serviceMonitor.Namespace))
+
+				updatedRouteMonitor := v1alpha1.RouteMonitor{}
+				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: routeMonitorNamespace, Name: routeMonitorName}, &updatedRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedRouteMonitor.Status.ServiceMonitorRef.Name).To(Equal(serviceMonitor.Name))
+				Expect(updatedRouteMonitor.Status.ServiceMonitorRef.Namespace).To(Equal(serviceMonitor.Namespace))
 			})
 		})
 
