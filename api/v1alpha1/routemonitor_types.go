@@ -40,7 +40,8 @@ type RouteMonitorRouteSpec struct {
 // RouteMonitorStatus defines the observed state of RouteMonitor
 type RouteMonitorStatus struct {
 	// RouteURL is the url extracted from the Route resource
-	RouteURL string `json:"routeURL,omitempty"`
+	RouteURL          string         `json:"routeURL,omitempty"`
+	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true
