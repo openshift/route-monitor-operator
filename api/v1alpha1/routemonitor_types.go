@@ -25,8 +25,8 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	// Route is the resource that holds the name and Namespace of the Route to monitor
 	Route RouteMonitorRouteSpec `json:"route,omitempty"`
+	Sla   SlaSpec               `json:"sla,omitempty"`
 }
 
 // RouteMonitorSpec references the obsered Route resource

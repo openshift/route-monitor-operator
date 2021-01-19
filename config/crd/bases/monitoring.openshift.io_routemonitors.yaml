@@ -37,8 +37,7 @@ spec:
           description: RouteMonitorSpec defines the desired state of RouteMonitor
           properties:
             route:
-              description: Route is the resource that holds the name and Namespace
-                of the Route to monitor
+              description: RouteMonitorSpec references the obsered Route resource
               properties:
                 name:
                   description: Name is the name of the Route
@@ -46,6 +45,20 @@ spec:
                 namespace:
                   description: Namespace is the namespace of the Route
                   type: string
+              type: object
+            sla:
+              description: SlaSpec defines what is the percentage
+              properties:
+                percentile:
+                  description: Percentile is the fraction of the time that resource
+                    needs to be availble at
+                  type: integer
+                precision:
+                  description: Precision is the precision the percentile will be (default
+                    to the length of the percentile + 1)
+                  type: integer
+              required:
+              - percentile
               type: object
           type: object
         status:
