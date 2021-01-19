@@ -8,7 +8,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	. "github.com/openshift/route-monitor-operator/int"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +39,7 @@ var _ = Describe("Integrationtests", func() {
 			Expect(err).NotTo(HaveOccurred())
 			clusterUrlMonitorName = "fake-url-monitor"
 			clusterUrlMonitorNamespace = "default"
-			expectedServiceMonitorName = templates.TemplateForServiceMonitorName(clusterUrlMonitorNamespace, clusterUrlMonitorName)
+			expectedServiceMonitorName = types.NamespacedName{Name: clusterUrlMonitorName, Namespace: clusterUrlMonitorNamespace}
 			clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: clusterUrlMonitorNamespace,
@@ -112,7 +111,7 @@ var _ = Describe("Integrationtests", func() {
 			err := i.RemoveRouteMonitor(routeMonitorNamespace, routeMonitorName)
 			routeMonitorName = "fake-route-monitor"
 			routeMonitorNamespace = "default"
-			expectedServiceMonitorName = templates.TemplateForServiceMonitorName(routeMonitorNamespace, routeMonitorName)
+			expectedServiceMonitorName = types.NamespacedName{Name: routeMonitorName, Namespace: routeMonitorNamespace}
 			Expect(err).NotTo(HaveOccurred())
 			routeMonitor = v1alpha1.RouteMonitor{
 				ObjectMeta: metav1.ObjectMeta{
@@ -133,7 +132,7 @@ var _ = Describe("Integrationtests", func() {
 		})
 
 		When("the RouteMonitor does not exist", func() {
-			It("creates a RouteMonitor within 20 seconds", func() {
+			It("creates a ServiceMonitor within 20 seconds", func() {
 				err := i.Client.Create(context.TODO(), &routeMonitor)
 				Expect(err).NotTo(HaveOccurred())
 
