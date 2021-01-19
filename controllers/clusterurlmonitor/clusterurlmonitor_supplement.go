@@ -48,7 +48,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error
 
 func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
-	namespacedName := templates.TemplateForServiceMonitorName(s.ClusterUrlMonitor.Namespace, s.ClusterUrlMonitor.Name)
+	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
 	exists, err := s.doesServiceMonitorExist(namespacedName)
 	if exists || err != nil {
 		return err
@@ -61,7 +61,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, namespacedName.Name)
+	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, namespacedName)
 	err = s.Client.Create(s.Ctx, &serviceMonitor)
 	return err
 }
@@ -81,7 +81,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Resul
 		return reconcile.ContinueReconcile()
 	}
 
-	namespacedName := templates.TemplateForServiceMonitorName(s.ClusterUrlMonitor.Namespace, s.ClusterUrlMonitor.Name)
+	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
 	serviceMonitor, err := s.getServiceMonitor(namespacedName)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return reconcile.RequeueReconcileWith(err)

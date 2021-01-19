@@ -10,9 +10,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/consts"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
 	. "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = Describe("Finalizer", func() {
@@ -85,20 +83,6 @@ var _ = Describe("Finalizer", func() {
 			})
 		})
 	})
-	Describe("TemplateForServiceMonitorName", func() {
-		When("names are set", func() {
-			It("should return a combined name", func() {
-				// Act
-				res := templates.TemplateForServiceMonitorName("dolf", "olf")
-				// Assert
-				Expect(res).To(Equal(types.NamespacedName{
-					Name:      "olf-dolf",
-					Namespace: "openshift-monitoring",
-				}))
-			})
-		})
-	})
-
 	Describe("Contains", func() {
 		When("list is empty and key is defined", func() {
 			// Arrange
