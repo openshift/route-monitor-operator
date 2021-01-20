@@ -1,26 +1,16 @@
 package templates
 
 import (
-	"fmt"
-
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// TemplateForServiceMonitorName return the generated name from the RouteMonitor.
-// The name is joined by the name and the namespace to create a unique ServiceMonitor for each RouteMonitor
-func TemplateForServiceMonitorName(namespace string, name string) types.NamespacedName {
-	serviceMonitorName := fmt.Sprintf("%s-%s", name, namespace)
-	return types.NamespacedName{Name: serviceMonitorName, Namespace: blackbox.BlackBoxNamespace}
-}
-
 // TemplateForServiceMonitorResource returns a ServiceMonitor
-func TemplateForServiceMonitorResource(url, name string) monitoringv1.ServiceMonitor {
+func TemplateForServiceMonitorResource(url string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
 
 	routeURL := url
-	serviceMonitorName := name
 
 	routeMonitorLabels := blackbox.GenerateBlackBoxLables()
 
@@ -37,12 +27,11 @@ func TemplateForServiceMonitorResource(url, name string) monitoringv1.ServiceMon
 
 	serviceMonitor := monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceMonitorName,
-			// ServiceMonitors need to be in `openshift-monitoring` to be picked up by cluster-monitoring-operator
-			Namespace: blackbox.BlackBoxNamespace,
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
-			JobLabel: serviceMonitorName,
+			JobLabel: namespacedName.Name,
 			Endpoints: []monitoringv1.Endpoint{
 				{
 					Port: blackbox.BlackBoxPortName,

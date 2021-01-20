@@ -8,6 +8,7 @@ import (
 	// k8s packages
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	//api's used
@@ -55,11 +56,10 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 		return utilreconcile.StopReconcile()
 	}
 
-	namespacedName := templates.TemplateForServiceMonitorName(routeMonitor.Namespace, routeMonitor.Name)
-
+	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
 	populationFunc := func() monitoringv1.ServiceMonitor {
-		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, namespacedName.Name)
+		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, namespacedName)
 	}
 
 	// Does the resource already exist?
