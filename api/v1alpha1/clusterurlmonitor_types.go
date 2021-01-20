@@ -38,6 +38,7 @@ type ClusterUrlMonitorSpec struct {
 type ClusterUrlMonitorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true
