@@ -112,6 +112,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Update(gomock.Any(), clusterUrlMonitorMatcher).Times(1)
 			})
 			It("adds the finalizer to the CR", func() {
+				Expect(true).To(BeFalse())
 				res, err := sup.EnsureFinalizer()
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).To(Equal(reconcile.StopOperation()))
