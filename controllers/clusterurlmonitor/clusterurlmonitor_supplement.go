@@ -63,6 +63,13 @@ func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
 	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, namespacedName)
 	err = s.Client.Create(s.Ctx, &serviceMonitor)
+	if err != nil {
+		return err
+	}
+
+	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
+	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
+	err = s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
 	return err
 }
 

@@ -68,6 +68,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		sup                      ClusterUrlMonitorSupplement
 		mockClient               *clientmocks.MockClient
 		mockBlackboxExporter     *routemonitormocks.MockBlackboxExporter
+		mockStatusWriter         *clientmocks.MockStatusWriter
 		mockCtrl                 *gomock.Controller
 		clusterUrlMonitorMatcher *ClusterUrlMonitorMatcher
 		serviceMonitorMatcher    *ServiceMonitorMatcher
@@ -83,7 +84,13 @@ var _ = Describe("Clusterurlmonitor", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockBlackboxExporter = routemonitormocks.NewMockBlackboxExporter(mockCtrl)
-		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{}
+		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fake-clusterurlmonitor",
+				Namespace: "fake-namespace",
+			},
+		}
 		clusterUrlMonitorMatcher = &ClusterUrlMonitorMatcher{}
 		serviceMonitorMatcher = &ServiceMonitorMatcher{}
 		fakeNotFound = k8serrors.NewNotFound(schema.GroupResource{}, "fake-error")
@@ -154,6 +161,8 @@ var _ = Describe("Clusterurlmonitor", func() {
 					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress),
 				)
 				mockClient.EXPECT().Create(gomock.Any(), serviceMonitorMatcher).Times(1)
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				mockStatusWriter.EXPECT().Update(gomock.Any(), clusterUrlMonitorMatcher).Times(1).Return(nil)
 			})
 
 			It("creates a ServiceMonitor with the service URL", func() {
@@ -161,6 +170,8 @@ var _ = Describe("Clusterurlmonitor", func() {
 				expectedUrl := prefix + clusterDomain + ":" + port + suffix
 				Expect(err).NotTo(HaveOccurred())
 				Expect(serviceMonitorMatcher.Actual.Spec.Endpoints[0].Params["target"][0]).To(Equal(expectedUrl))
+				Expect(clusterUrlMonitorMatcher.Actual.Status.ServiceMonitorRef.Name).To(Equal(serviceMonitorMatcher.Actual.Name))
+				Expect(clusterUrlMonitorMatcher.Actual.Status.ServiceMonitorRef.Namespace).To(Equal(serviceMonitorMatcher.Actual.Namespace))
 			})
 		})
 		When("the ServiceMonitor exists already", func() {
@@ -169,6 +180,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
 					SetArg(2, serviceMonitor)
 			})
+
 			It("doesn't update the ServiceMonitor", func() {
 				err := sup.EnsureServiceMonitorExists()
 				Expect(err).NotTo(HaveOccurred())

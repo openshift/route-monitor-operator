@@ -76,6 +76,12 @@ var _ = Describe("Integrationtests", func() {
 				Expect(len(serviceMonitor.Spec.Endpoints)).To(Equal(1))
 				Expect(len(serviceMonitor.Spec.Endpoints[0].Params["target"])).To(Equal(1))
 				Expect(serviceMonitor.Spec.Endpoints[0].Params["target"][0]).To(Equal(expectedUrl))
+
+				updatedClusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
+				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: clusterUrlMonitorNamespace, Name: clusterUrlMonitorName}, &updatedClusterUrlMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedClusterUrlMonitor.Status.ServiceMonitorRef.Name).To(Equal(serviceMonitor.Name))
+				Expect(updatedClusterUrlMonitor.Status.ServiceMonitorRef.Namespace).To(Equal(serviceMonitor.Namespace))
 			})
 		})
 
