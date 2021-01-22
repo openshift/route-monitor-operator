@@ -59,6 +59,7 @@ var _ = Describe("Integrationtests", func() {
 
 		When("the ClusterUrlMonitor does not exist", func() {
 			It("creates a ServiceMonitor within 20 seconds", func() {
+				Expect(False).To(BeTrue())
 				err := i.Client.Create(context.TODO(), &clusterUrlMonitor)
 				Expect(err).NotTo(HaveOccurred())
 
