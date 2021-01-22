@@ -106,8 +106,7 @@ podman-push:
 	podman push ${IMG} --tls-verify=false
 
 test-integration:
-	hack/test-integration-setup.sh
-	go test ./int -count=1 #disable result cache
+	hack/test-integration.sh
 
 
 # find or download controller-gen
