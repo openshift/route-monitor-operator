@@ -88,3 +88,17 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 
 	return utilreconcile.ContinueReconcile()
 }
+func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	// Was the RouteURL populated by a previous step?
+	if routeMonitor.Status.RouteURL == "" {
+		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+	}
+
+	// Is the SlaSpec configured on this CR?
+	tst := v1alpha1.SloSpec{}
+	if routeMonitor.Spec.Slo == tst {
+		return utilreconcile.ContinueReconcile()
+	}
+
+	return utilreconcile.ContinueReconcile()
+}

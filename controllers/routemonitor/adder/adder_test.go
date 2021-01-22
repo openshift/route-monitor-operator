@@ -239,6 +239,39 @@ var _ = Describe("Adder", func() {
 			})
 		})
 	})
+	Describe("EnsurePrometheusRuleResourceExists", func() {
+		When("the RouteMonitor has no Host", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = fake.NewFakeClientWithScheme(scheme)
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
+			})
+			It("should return No Host error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.NoHost))
+			})
+		})
+		When("the RouteMonitor has no sla spec", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+			})
+			It("should skip processing and continue", func() {
+				// Act
+				res, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+	})
 
 	Describe("New", func() {
 		When("func New is called", func() {

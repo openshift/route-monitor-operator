@@ -6,10 +6,15 @@ type NamespacedName struct {
 	Namespace string `json:"namespace"`
 }
 
-// SlaSpec defines what is the percentage
-type SlaSpec struct {
-	// Percentile is the fraction of the time that resource needs to be availble at
-	Percentile int `json:"percentile"`
-	// Precision is the precision the percentile will be (default to the length of the percentile + 1)
-	Precision int `json:"precision,omitempty"`
+// RawSloSpec defines the number form of the percent, and is derrived from the 'inf' package
+type RawSloSpec struct {
+	// Value defines the whole number being used
+	// +kubebuilder:validation:Minimum=10
+	Value int `json:"value"`
+}
+
+// SloSpec defines what is the percentage
+type SloSpec struct {
+	// Raw defines the raw value (value and shiftDirection) needed to express smaller percents
+	Raw RawSloSpec `json:"raw"`
 }

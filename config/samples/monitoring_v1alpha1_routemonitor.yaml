@@ -6,5 +6,6 @@ spec:
   route:
     namespace: openshift-console
     name: console
-  sla:
-    percentile: 99
+  slo:
+    raw:
+      value: 995
