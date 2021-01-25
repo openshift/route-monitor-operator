@@ -4,6 +4,7 @@ VERSION_MINOR=1
 COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$$"`..HEAD --count)
 CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
+KUBECTL ?= kubectl
 
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
@@ -53,26 +54,26 @@ run-verbose: generate fmt vet manifests
 
 # Install CRDs into a cluster
 install: manifests kustomize
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
 
 # Uninstall CRDs from a cluster
 uninstall: manifests kustomize
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete -f -
 
 pre-deploy: kustomize 
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: pre-deploy manifests kustomize
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 # Install CRDs into a cluster
 sample-install: manifests kustomize
-	$(KUSTOMIZE) build config/samples | kubectl apply -f -
+	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f -
 #
 # Uninstall CRDs into a cluster
 sample-uninstall: manifests kustomize
-	$(KUSTOMIZE) build config/samples | kubectl delete -f -
+	$(KUSTOMIZE) build config/samples | $(KUBECTL) delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
@@ -106,8 +107,7 @@ podman-push:
 	podman push ${IMG} --tls-verify=false
 
 test-integration:
-	hack/test-integration-setup.sh
-	go test ./int -count=1 #disable result cache
+	hack/test-integration.sh
 
 
 # find or download controller-gen
