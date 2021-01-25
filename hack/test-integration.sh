@@ -3,8 +3,9 @@
 set -euo pipefail
 
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
-export NAMESPACE=${NAMESPACE:-openshift-route-monitor-operator}
+export NAMESPACE=openshift-route-monitor-operator
 export IMAGE_NAME=route-monitor-operator
+alias kubectl=oc
 SKIP=${1:-""}
 
 function buildImage {
