@@ -3,7 +3,7 @@
 set -euo pipefail
 
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
-export NAMESPACE=openshift-route-monitor-operator
+export NAMESPACE=${NAMESPACE:-openshift-route-monitor-operator}
 export IMAGE_NAME=route-monitor-operator
 alias kubectl=oc
 SKIP=${1:-""}
@@ -19,6 +19,11 @@ function buildImage {
 function deployOperator {
   echo -e "\n\nDEPLOYING OPERATOR\n\n"
   oc delete deployment "route-monitor-operator-controller-manager" -n "$NAMESPACE" || true
+
+  # Override namespace in all objects
+  cp -r config{,.bak}
+  find config -type f | xargs sed -i "s/openshift-route-monitor-operator/$NAMESPACE/g"
+ 
   IMG=$IMAGE_NAME make deploy
 }
 
@@ -52,6 +57,11 @@ function runTests {
 function cleanup {
   echo -e "\n\nCLEANING UP\n\n"
   oc delete namespace "$NAMESPACE" || true
+  if [[ -d config.bak ]]; then
+    rsync -av config{.bak/*,}
+    rm -r config.bak
+  fi
+
 }
 
 trap cleanup EXIT
