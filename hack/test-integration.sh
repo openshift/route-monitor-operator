@@ -5,7 +5,8 @@ set -euo pipefail
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
 export NAMESPACE=${NAMESPACE:-openshift-route-monitor-operator}
 export IMAGE_NAME=route-monitor-operator
-alias kubectl=oc
+export KUBECTL=oc
+
 SKIP=${1:-""}
 
 function buildImage {
@@ -58,7 +59,7 @@ function cleanup {
   echo -e "\n\nCLEANING UP\n\n"
   oc delete namespace "$NAMESPACE" || true
   if [[ -d config.bak ]]; then
-    rsync -av config{.bak/*,}
+    rsync -v config{.bak/*,}
     rm -r config.bak
   fi
 
