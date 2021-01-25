@@ -42,6 +42,7 @@ type RouteMonitorStatus struct {
 	// RouteURL is the url extracted from the Route resource
 	RouteURL          string         `json:"routeURL,omitempty"`
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
+	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true

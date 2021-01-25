@@ -9,8 +9,7 @@ type NamespacedName struct {
 // RawSloSpec defines the number form of the percent, and is derrived from the 'inf' package
 type RawSloSpec struct {
 	// Value defines the whole number being used
-	// +kubebuilder:validation:Minimum=10
-	Value int `json:"value"`
+	Value string `json:"value"`
 }
 
 // SloSpec defines what is the percentage

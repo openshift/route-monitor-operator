@@ -55,6 +55,7 @@ spec:
                   properties:
                     value:
                       description: Value defines the whole number being used
+                      format: int64
                       minimum: 10
                       type: integer
                   required:
@@ -67,6 +68,17 @@ spec:
         status:
           description: RouteMonitorStatus defines the observed state of RouteMonitor
           properties:
+            prometheusRuleRef:
+              description: NamespacedName contains the name of a object and its namespace
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
+              required:
+              - name
+              - namespace
+              type: object
             routeURL:
               description: RouteURL is the url extracted from the Route resource
               type: string

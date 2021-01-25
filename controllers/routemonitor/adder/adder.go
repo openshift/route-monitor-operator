@@ -5,6 +5,8 @@ import (
 
 	"context"
 
+	"gopkg.in/inf.v0"
+
 	// k8s packages
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -95,10 +97,73 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	// Is the SlaSpec configured on this CR?
-	tst := v1alpha1.SloSpec{}
-	if routeMonitor.Spec.Slo == tst {
+	tstSlo := v1alpha1.SloSpec{}
+	tstRaw := v1alpha1.RawSloSpec{}
+	if routeMonitor.Spec.Slo == tstSlo || routeMonitor.Spec.Slo.Raw == tstRaw {
 		return utilreconcile.ContinueReconcile()
 	}
 
+	if !isSloValid(routeMonitor.Spec.Slo.Raw.Value) {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
+	}
+
+	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// If the routeMonitor doesn't have a finalizer, add it
+		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	namespacedName := templates.TemplateForServiceMonitorName(routeMonitor.Namespace, routeMonitor.Name)
+
+	resource := &monitoringv1.ServiceMonitor{}
+	populationFunc := func() monitoringv1.ServiceMonitor {
+		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, namespacedName.Name)
+	}
+
+	// Does the resource already exist?
+	if err := r.Get(ctx, namespacedName, resource); err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		// populate the resource with the template
+		resource := populationFunc()
+		// and create it
+		err = r.Create(ctx, &resource)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+	}
+
+	//Update status with serviceMonitorRef
+	routeMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
+	routeMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
+	err := r.Status().Update(ctx, &routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
 	return utilreconcile.ContinueReconcile()
+}
+
+func isSloValid(slo string) bool {
+	d, sucess := new(inf.Dec).SetString(slo)
+	if !sucess {
+		return false
+	}
+
+	// Is SLO a negative number
+	if d.Sign() <= 0 {
+		return false
+	}
+
+	// Is SLO higher that 100% availability
+	maxValue := inf.NewDec(100, 0)
+	diff := d.Sub(maxValue, d)
+	if diff.Sign() >= 0 {
+		return false
+	}
 }
