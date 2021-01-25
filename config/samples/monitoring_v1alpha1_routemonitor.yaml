@@ -7,7 +7,5 @@ spec:
     namespace: openshift-console
     name: console
   slo:
-    raw:
-      value: "99.5"
-      type: "percent"
-
+    value: "99.5"
+    type: "percent"

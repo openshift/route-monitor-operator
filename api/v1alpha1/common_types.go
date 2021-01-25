@@ -15,7 +15,7 @@ type SloSpec struct {
 	SloType SloType `json:"type"`
 }
 
-// +kubebuilder:validation:Enum=percent;percentile
+// +kubebuilder:validation:Enum="";percent;percentile
 type SloType string
 
 const (
@@ -30,6 +30,7 @@ func (s SloSpec) NormalizeValue() (string, bool) {
 		if !sucess {
 			return "", false
 		}
+		// divide d by 100
 		percentile := d.Mul(inf.NewDec(1, -2), d)
 		return percentile.String(), true
 	case Percentile:

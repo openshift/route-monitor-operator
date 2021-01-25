@@ -49,8 +49,9 @@ spec:
             slo:
               description: SloSpec defines what is the percentage
               properties:
-                sloType:
+                type:
                   enum:
+                  - ""
                   - percent
                   - percentile
                   type: string
@@ -58,7 +59,7 @@ spec:
                   description: Value defines the whole number being used
                   type: string
               required:
-              - sloType
+              - type
               - value
               type: object
           type: object

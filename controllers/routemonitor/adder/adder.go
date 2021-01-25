@@ -94,7 +94,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
 	}
 
-	// Is the SlaSpec configured on this CR?
+	// Is the SloSpec configured on this CR?
 	tstSlo := v1alpha1.SloSpec{}
 	if routeMonitor.Spec.Slo == tstSlo {
 		return utilreconcile.ContinueReconcile()
@@ -119,7 +119,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
 	}
 
-	resource := &monitoringv1.ServiceMonitor{}
+	resource := &monitoringv1.PrometheusRule{}
 	populationFunc := func() monitoringv1.PrometheusRule {
 		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, namespacedName.Name, normalizedPercent)
 	}
@@ -140,14 +140,19 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		}
 	}
 
-	// Update status with PrometheusRuleRef
-	routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
+	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
 		Name:      namespacedName.Name,
 		Namespace: namespacedName.Namespace,
 	}
-	err := r.Status().Update(ctx, &routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
+
+	if routeMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
+		// Update status with PrometheusRuleRef
+		routeMonitor.Status.PrometheusRuleRef = desiredPrometheusRuleRef
+		err := r.Status().Update(ctx, &routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
 	}
 	return utilreconcile.ContinueReconcile()
 }
