@@ -5,8 +5,6 @@ import (
 
 	"context"
 
-	"gopkg.in/inf.v0"
-
 	// k8s packages
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -98,12 +96,11 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 
 	// Is the SlaSpec configured on this CR?
 	tstSlo := v1alpha1.SloSpec{}
-	tstRaw := v1alpha1.RawSloSpec{}
-	if routeMonitor.Spec.Slo == tstSlo || routeMonitor.Spec.Slo.Raw == tstRaw {
+	if routeMonitor.Spec.Slo == tstSlo {
 		return utilreconcile.ContinueReconcile()
 	}
 
-	if !isSloValid(routeMonitor.Spec.Slo.Raw.Value) {
+	if !routeMonitor.Spec.Slo.IsValid() {
 		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
 	}
 
@@ -116,11 +113,15 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		return utilreconcile.StopReconcile()
 	}
 
-	namespacedName := templates.TemplateForServiceMonitorName(routeMonitor.Namespace, routeMonitor.Name)
+	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+	normalizedPercent, succeed := routeMonitor.Spec.Slo.NormalizeValue()
+	if !succeed {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
+	}
 
 	resource := &monitoringv1.ServiceMonitor{}
-	populationFunc := func() monitoringv1.ServiceMonitor {
-		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, namespacedName.Name)
+	populationFunc := func() monitoringv1.PrometheusRule {
+		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, namespacedName.Name, normalizedPercent)
 	}
 
 	// Does the resource already exist?
@@ -139,31 +140,14 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		}
 	}
 
-	//Update status with serviceMonitorRef
-	routeMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
-	routeMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
+	// Update status with PrometheusRuleRef
+	routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
+		Name:      namespacedName.Name,
+		Namespace: namespacedName.Namespace,
+	}
 	err := r.Status().Update(ctx, &routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	return utilreconcile.ContinueReconcile()
-}
-
-func isSloValid(slo string) bool {
-	d, sucess := new(inf.Dec).SetString(slo)
-	if !sucess {
-		return false
-	}
-
-	// Is SLO a negative number
-	if d.Sign() <= 0 {
-		return false
-	}
-
-	// Is SLO higher that 100% availability
-	maxValue := inf.NewDec(100, 0)
-	diff := d.Sub(maxValue, d)
-	if diff.Sign() >= 0 {
-		return false
-	}
 }

@@ -49,20 +49,17 @@ spec:
             slo:
               description: SloSpec defines what is the percentage
               properties:
-                raw:
-                  description: Raw defines the raw value (value and shiftDirection)
-                    needed to express smaller percents
-                  properties:
-                    value:
-                      description: Value defines the whole number being used
-                      format: int64
-                      minimum: 10
-                      type: integer
-                  required:
-                  - value
-                  type: object
+                sloType:
+                  enum:
+                  - percent
+                  - percentile
+                  type: string
+                value:
+                  description: Value defines the whole number being used
+                  type: string
               required:
-              - raw
+              - sloType
+              - value
               type: object
           type: object
         status:

@@ -8,4 +8,6 @@ spec:
     name: console
   slo:
     raw:
-      value: 995
+      value: "99.5"
+      type: "percent"
+

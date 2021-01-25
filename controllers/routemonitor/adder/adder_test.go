@@ -41,6 +41,7 @@ var _ = Describe("Adder", func() {
 		ctx context.Context
 
 		routeMonitor           v1alpha1.RouteMonitor
+		routeMonitorSlo        v1alpha1.SloSpec
 		routeMonitorStatus     v1alpha1.RouteMonitorStatus
 		routeMonitorFinalizers []string
 
@@ -66,6 +67,7 @@ var _ = Describe("Adder", func() {
 		update = testhelper.MockHelper{}
 
 		routeMonitorAdderClient = mockClient
+		routeMonitorSlo = v1alpha1.SloSpec{}
 		routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 			RouteURL: "fake-route-url",
 		}
@@ -98,6 +100,9 @@ var _ = Describe("Adder", func() {
 		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Finalizers: routeMonitorFinalizers,
+			},
+			Spec: v1alpha1.RouteMonitorSpec{
+				Slo: routeMonitorSlo,
 			},
 			Status: routeMonitorStatus,
 		}
@@ -271,11 +276,95 @@ var _ = Describe("Adder", func() {
 				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
 			})
 		})
+		When("the RouteMonitor has a sla spec but percent is too low", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					Value:   "-10",
+					SloType: v1alpha1.Percent,
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the RouteMonitor has a sla spec but percent is too high", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					Value:   "101",
+					SloType: v1alpha1.Percent,
+				}
+			})
+			FIt("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the RouteMonitor has a sla spec but percent is Unsupported", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					SloType: v1alpha1.Percentile,
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the RouteMonitor has a sla spec but percent is Unsupported", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					SloType: v1alpha1.Percent,
+					Value:   "99.95",
+				}
+				update.CalledTimes = 1
+				routeMonitorFinalizers = nil
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
 	})
 
 	Describe("New", func() {
 		When("func New is called", func() {
-			It("should return a new Deleter object", func() {
+			It("should return a new Adder object", func() {
 				// Arrange
 				r := routemonitor.RouteMonitorReconciler{
 					Client: routeMonitorAdderClient,

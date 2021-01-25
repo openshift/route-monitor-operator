@@ -1,9 +1,10 @@
 package templates
 
 import (
+	"fmt"
+
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	"gopkg.in/inf.v0"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -59,7 +60,7 @@ func TemplateForServiceMonitorResource(url string, namespacedName types.Namespac
 }
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
-func TemplateForPrometheusRuleResource(url, name string, percent inf.Dec) monitoringv1.PrometheusRule {
+func TemplateForPrometheusRuleResource(url, name string, percent string) monitoringv1.PrometheusRule {
 
 	/*
 	   groups:
@@ -160,24 +161,9 @@ func TemplateForPrometheusRuleResource(url, name string, percent inf.Dec) monito
 	       record: http_requests_total:burnrate6h
 	*/
 
-	/*- alert: ErrorBudgetBurn
-	      annotations:
-	         message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-		 /
-	*/
-
 	routeURL := url
 	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, routeURL)
 	rules := []monitoringv1.Rule{}
-	const alertTemplate string = ` 
-	         sum(http_requests_total:burnrate%[3]s{%[1]s}) > (14.40 * (1-%[2]s))
-	         and
-	         sum(http_requests_total:burnrate%[4]s{%[1]s}) > (14.40 * (1-%[2]s))
-		 `
-	const recordingRuleTemplate string = `
-        	sum(rate(http_requests_total{%[1]s,code=~"5.."}[%[2]s]))
-        	/
-        	sum(rate(http_requests_total{%[1]s}[%[2]s])) `
 
 	for _, thunderStruct := range []struct {
 		duration  string
@@ -210,12 +196,32 @@ func TemplateForPrometheusRuleResource(url, name string, percent inf.Dec) monito
 			timeShort: "6h",
 		},
 	} {
+		// Create all the alerts
+		// Sample resource
+		/*
+		   - alert: ErrorBudgetBurn
+		     annotations:
+		       message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
+		     expr: |
+		       sum(http_requests_total:burnrate5m{targeturl="getmeright"}) > (14.40 * (1-0.95000))
+		       and
+		       sum(http_requests_total:burnrate1h{targeturl="getmeright"}) > (14.40 * (1-0.95000))
+		     for: 2m
+		     labels:
+		       severity: critical
+		       targeturl: getmeright
+		*/
 
+		const alertTemplate string = ` 
+	        	 sum(http_requests_total:burnrate%[3]s{%[1]s}) > (14.40 * (1-%[2]s))
+	        	 and
+	        	 sum(http_requests_total:burnrate%[4]s{%[1]s}) > (14.40 * (1-%[2]s))
+			 `
 		rules = append(rules, monitoringv1.Rule{
 			Alert: "ErrorBudgetBurn",
 			Expr: intstr.FromString(fmt.Sprintf(alertTemplate,
 				routeURLLabel,
-				percent.String(),
+				percent,
 				thunderStruct.timeShort,
 				thunderStruct.timeLong)),
 			Labels: sampleTemplateLabelsWithSev(routeURL, thunderStruct.severity),
@@ -227,6 +233,20 @@ func TemplateForPrometheusRuleResource(url, name string, percent inf.Dec) monito
 	}
 
 	// Create all the recording rules
+	// Sample resource
+	/*
+	   - expr: |
+	       sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[6h]))
+	       /
+	       sum(rate(http_requests_total{targeturl="getmeright"}[6h]))
+	     labels:
+	       targeturl: getmeright
+	     record: http_requests_total:burnrate6h
+	*/
+	const recordingRuleTemplate string = `
+        	sum(rate(http_requests_total{%[1]s,code=~"5.."}[%[2]s]))
+        	/
+        	sum(rate(http_requests_total{%[1]s}[%[2]s])) `
 	for _, timePeriod := range []string{"5m", "30m", "1h", "2h", "6h", "1d", "3d"} {
 		rules = append(rules, monitoringv1.Rule{
 			Expr:   intstr.FromString(fmt.Sprintf(recordingRuleTemplate, routeURLLabel, timePeriod)),
