@@ -139,6 +139,7 @@ var _ = Describe("Integrationtests", func() {
 
 		When("the RouteMonitor does not exist", func() {
 			It("creates a ServiceMonitor within 20 seconds", func() {
+				Expect(true).To(BeFalse())
 				err := i.Client.Create(context.TODO(), &routeMonitor)
 				Expect(err).NotTo(HaveOccurred())
 
