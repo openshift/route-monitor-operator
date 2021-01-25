@@ -37,18 +37,6 @@ In most cases the `prefix` will end with a `.` while the suffix will start with 
 ## Caveats
 Currently the blackbox exporter deployment is only using the default config file which only allows a limit set of probes.
 
-## Contributing
-Folow a simple workflow:
-* Create Issue to explain what is wrong or missing
-* Fork this repository
-* Create a Pull Request referencing the issue you're adressing
-
-This operator is build using the [operator-sdk](https://sdk.operatorframework.io)
-However we automated away the need for you to run `make`.
-On every Pull Request a GitHub action will trigger `make` to check if everything works as expected.
-
-Once your PR is merged, an additional action will run make and check those changes in.
-
 ## Development
 
 In order to develop the repo follow these steps to get an env started:
