@@ -198,3 +198,15 @@ packagemanifests: manifests kustomize pre-deploy
 
 packagemanifests-build:
 	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
+
+# Taken from https://www.cmcrossroads.com/article/dumping-every-makefile-variable
+.PHONY: printvars
+printvars:
+	$(foreach V, \
+	     $(sort $(.VARIABLES)), \
+	     $(if  \
+	         $(filter-out environment% default automatic, \
+	             $(origin $V)), \
+	         $(warning $V=$($V) ($(value $V))) \
+	      ) \
+	)

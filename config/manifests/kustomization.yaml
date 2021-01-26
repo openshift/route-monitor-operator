@@ -3,3 +3,4 @@ resources:
 #- ../samples
 #- ../scorecard
 - ../prometheus
+- ../prom-k8s
