@@ -60,106 +60,7 @@ func TemplateForServiceMonitorResource(url string, namespacedName types.Namespac
 }
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
-func TemplateForPrometheusRuleResource(url, name string, percent string) monitoringv1.PrometheusRule {
-
-	/*
-	   groups:
-	   - name: SLOs-http_requests_total
-	     rules:
-	     - alert: ErrorBudgetBurn
-	       annotations:
-	         message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-	       expr: |
-	         sum(http_requests_total:burnrate5m{targeturl="getmeright"}) > (14.40 * (1-0.95000))
-	         and
-	         sum(http_requests_total:burnrate1h{targeturl="getmeright"}) > (14.40 * (1-0.95000))
-	       for: 2m
-	       labels:
-	         severity: critical
-	         targeturl: getmeright
-	     - alert: ErrorBudgetBurn
-	       annotations:
-	         message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-	       expr: |
-	         sum(http_requests_total:burnrate30m{targeturl="getmeright"}) > (6.00 * (1-0.95000))
-	         and
-	         sum(http_requests_total:burnrate6h{targeturl="getmeright"}) > (6.00 * (1-0.95000))
-	       for: 15m
-	       labels:
-	         severity: critical
-	         targeturl: getmeright
-	     - alert: ErrorBudgetBurn
-	       annotations:
-	         message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-	       expr: |
-	         sum(http_requests_total:burnrate2h{targeturl="getmeright"}) > (3.00 * (1-0.95000))
-	         and
-	         sum(http_requests_total:burnrate1d{targeturl="getmeright"}) > (3.00 * (1-0.95000))
-	       for: 1h
-	       labels:
-	         severity: warning
-	         targeturl: getmeright
-	     - alert: ErrorBudgetBurn
-	       annotations:
-	         message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-	       expr: |
-	         sum(http_requests_total:burnrate6h{targeturl="getmeright"}) > (1.00 * (1-0.95000))
-	         and
-	         sum(http_requests_total:burnrate3d{targeturl="getmeright"}) > (1.00 * (1-0.95000))
-	       for: 3h
-	       labels:
-	         severity: warning
-	         targeturl: getmeright
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[1d]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[1d]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate1d
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[1h]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[1h]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate1h
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[2h]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[2h]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate2h
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[30m]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[30m]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate30m
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[3d]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[3d]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate3d
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[5m]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[5m]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate5m
-	     - expr: |
-	         sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[6h]))
-	         /
-	         sum(rate(http_requests_total{targeturl="getmeright"}[6h]))
-	       labels:
-	         targeturl: getmeright
-	       record: http_requests_total:burnrate6h
-	*/
+func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
 
 	routeURL := url
 	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, routeURL)
@@ -212,7 +113,7 @@ func TemplateForPrometheusRuleResource(url, name string, percent string) monitor
 		       targeturl: getmeright
 		*/
 
-		const alertTemplate string = ` 
+		const alertTemplate string = `
 	        	 sum(http_requests_total:burnrate%[3]s{%[1]s}) > (14.40 * (1-%[2]s))
 	        	 and
 	        	 sum(http_requests_total:burnrate%[4]s{%[1]s}) > (14.40 * (1-%[2]s))
@@ -257,6 +158,10 @@ func TemplateForPrometheusRuleResource(url, name string, percent string) monitor
 	}
 
 	resource := monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
+		},
 		Spec: monitoringv1.PrometheusRuleSpec{
 			Groups: []monitoringv1.RuleGroup{
 				{
