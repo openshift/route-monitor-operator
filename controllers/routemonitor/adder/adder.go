@@ -95,8 +95,8 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	// Is the SloSpec configured on this CR?
-	tstSlo := v1alpha1.SloSpec{}
-	if routeMonitor.Spec.Slo == tstSlo {
+	emptySlo := v1alpha1.SloSpec{}
+	if routeMonitor.Spec.Slo == emptySlo {
 		return utilreconcile.ContinueReconcile()
 	}
 
