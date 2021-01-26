@@ -1,5 +1,4 @@
 resources:
 - ../prometheus
-- ../prom-k8s
 - catalogsource.yaml
 - subscription.yaml

@@ -1,6 +1,3 @@
 resources:
 - prom-k8s-role.yaml
 - prom-k8s-rolebinding.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: openshift-rbac-permissions
