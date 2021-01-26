@@ -77,7 +77,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering CreateBlackBoxExporterResources")
+	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go
 	err = r.BlackboxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
@@ -90,7 +90,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.V(2).Info("Entering UpdateRouteURL")
+	log.V(2).Info("Entering EnsureRouteURLExists")
 	res, err = r.EnsureRouteURLExists(ctx, route, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -99,7 +99,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering CreateServiceMonitorResource")
+	log.V(2).Info("Entering EnsureServiceMonitorResourceExists")
 	res, err = r.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -107,6 +107,16 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
+
+	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
+	res, err = r.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.Stop()
+	}
+
 	return utilreconcile.Stop()
 }
 

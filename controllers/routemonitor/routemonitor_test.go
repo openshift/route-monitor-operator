@@ -46,6 +46,7 @@ var _ = Describe("Routemonitor", func() {
 		get                                   helper.MockHelper
 		create                                helper.MockHelper
 		ensureServiceMonitorResourceAbsent    helper.MockHelper
+		ensurePrometheusRuleResourceAbsent    helper.MockHelper
 		shouldDeleteBlackBoxExporterResources helper.MockHelper
 		ensureBlackBoxExporterResourcesAbsent helper.MockHelper
 		ensureBlackBoxExporterResourcesExist  helper.MockHelper
@@ -79,6 +80,7 @@ var _ = Describe("Routemonitor", func() {
 		get = helper.MockHelper{}
 		create = helper.MockHelper{}
 		ensureServiceMonitorResourceAbsent = helper.MockHelper{}
+		ensurePrometheusRuleResourceAbsent = helper.MockHelper{}
 		shouldDeleteBlackBoxExporterResources = helper.MockHelper{}
 		ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
 		ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
@@ -108,6 +110,10 @@ var _ = Describe("Routemonitor", func() {
 		mockDeleter.EXPECT().EnsureServiceMonitorResourceAbsent(gomock.Any(), gomock.Any()).
 			Return(ensureServiceMonitorResourceAbsent.ErrorResponse).
 			Times(ensureServiceMonitorResourceAbsent.CalledTimes)
+
+		mockDeleter.EXPECT().EnsurePrometheusRuleResourceAbsent(gomock.Any(), gomock.Any()).
+			Return(ensurePrometheusRuleResourceAbsent.ErrorResponse).
+			Times(ensurePrometheusRuleResourceAbsent.CalledTimes)
 
 		mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
 			Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).

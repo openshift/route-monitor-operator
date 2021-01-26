@@ -71,6 +71,64 @@ var _ = Describe("Deleter", func() {
 		mockCtrl.Finish()
 	})
 
+	Describe("DeletePrometheusRuleResource", func() {
+		BeforeEach(func() {
+			get.CalledTimes = 1
+			routeMonitorDeleterClient = mockClient
+
+		})
+		When("'Get' returns an unhandled error", func() {
+			// Arrange
+			BeforeEach(func() {
+				get.ErrorResponse = consterror.CustomError
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorDeleter.EnsurePrometheusRuleResourceAbsent(ctx, v1alpha1.RouteMonitor{})
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
+		When("'Get' returns an 'Not found' error", func() {
+			// Arrange
+			BeforeEach(func() {
+				get.ErrorResponse = consterror.NotFoundErr
+			})
+			It("should succeed as there is nothing to delete", func() {
+				// Act
+				err := routeMonitorDeleter.EnsurePrometheusRuleResourceAbsent(ctx, v1alpha1.RouteMonitor{})
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("'Delete' returns an unhandled error", func() {
+			// Arrange
+			BeforeEach(func() {
+				delete = helper.CustomErrorHappensOnce()
+				routeMonitorDeleterClient = mockClient
+			})
+			It("should bubble the error up", func() {
+				// Act
+				err := routeMonitorDeleter.EnsurePrometheusRuleResourceAbsent(ctx, v1alpha1.RouteMonitor{})
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
+		When("'Delete' passes", func() {
+			// Arrange
+			BeforeEach(func() {
+				delete.CalledTimes = 1
+			})
+			It("should succeed as the object was deleted", func() {
+				// Act
+				err := routeMonitorDeleter.EnsurePrometheusRuleResourceAbsent(ctx, v1alpha1.RouteMonitor{})
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
 	Describe("DeleteServiceMonitorResource", func() {
 		BeforeEach(func() {
 			get.CalledTimes = 1

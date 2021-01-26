@@ -417,17 +417,20 @@ var _ = Describe("Adder", func() {
 				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
 					Times(1).
 					Return(nil)
+				routeMonitor.Name = "rmo-name"
+				routeMonitor.Namespace = "rmo-namespace"
 			})
 
-			It("should call `Get` and not call `Create`", func() {
+			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
 				//Act
-				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				resp, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				//Assert
 				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
-		When("", func() {
-			// Arrange
+		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
 			BeforeEach(func() {
 				routeMonitorAdderClient = mockClient
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
@@ -437,15 +440,26 @@ var _ = Describe("Adder", func() {
 					SloType: v1alpha1.Percent,
 					Value:   "99.95",
 				}
-				update.CalledTimes = 1
-				routeMonitorFinalizers = nil
+				routeMonitorFinalizers = routemonitorconst.FinalizerList
+				get.CalledTimes = 1
 			})
-			It("should Throw an error", func() {
-				// Act
-				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
+
+			JustBeforeEach(func() {
+				routeMonitor.Name = "rmo-name"
+				routeMonitor.Namespace = "rmo-namespace"
+				routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
+					Name:      routeMonitor.Name,
+					Namespace: routeMonitor.Namespace,
+				}
+			})
+
+			It("should continue reconciling", func() {
+				//Act
+				resp, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.ContinueOperation()))
 			})
 		})
 	})

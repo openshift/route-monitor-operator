@@ -52,3 +52,25 @@ func (r *RouteMonitorDeleter) EnsureServiceMonitorResourceAbsent(ctx context.Con
 	}
 	return nil
 }
+
+func (r *RouteMonitorDeleter) EnsurePrometheusRuleResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
+	namespacedName := types.NamespacedName{Name: routeMonitor.Status.PrometheusRuleRef.Name,
+		Namespace: routeMonitor.Status.PrometheusRuleRef.Namespace}
+	resource := &monitoringv1.PrometheusRule{}
+	// Does the resource already exist?
+	err := r.Get(ctx, namespacedName, resource)
+	if err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return err
+		}
+		// Resource doesn't exist, nothing to do
+		return nil
+	}
+	err = r.Delete(ctx, resource)
+	if err != nil {
+		return err
+	}
+	return nil
+}
