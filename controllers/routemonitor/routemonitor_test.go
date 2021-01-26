@@ -218,10 +218,25 @@ var _ = Describe("Routemonitor", func() {
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
+			When("func EnsurePrometheusRuleResourceAbsent fails unexpectedly", func() {
+				BeforeEach(func() {
+					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
+					ensureServiceMonitorResourceAbsent.CalledTimes = 1
+					ensurePrometheusRuleResourceAbsent = helper.CustomErrorHappensOnce()
+				})
+				It("should bubble up the error", func() {
+					// Act
+					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
+					// Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(consterror.CustomError))
+				})
+			})
 			When("func EnsureFinalizerAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
 					ensureServiceMonitorResourceAbsent.CalledTimes = 1
+					ensurePrometheusRuleResourceAbsent.CalledTimes = 1
 					ensureFinalizerAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
@@ -236,6 +251,7 @@ var _ = Describe("Routemonitor", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
 					ensureServiceMonitorResourceAbsent.CalledTimes = 1
+					ensurePrometheusRuleResourceAbsent.CalledTimes = 1
 					ensureFinalizerAbsent.CalledTimes = 1
 				})
 				It("should reconcile", func() {
@@ -252,11 +268,27 @@ var _ = Describe("Routemonitor", func() {
 				// Arrange
 				shouldDeleteBlackBoxExporterResourcesResponse = blackbox.KeepBlackBoxExporter
 				ensureServiceMonitorResourceAbsent.CalledTimes = 1
+				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
 			})
 			When("func EnsureServiceMonitorResourceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
 					// Arrange
 					ensureServiceMonitorResourceAbsent.ErrorResponse = consterror.CustomError
+					ensurePrometheusRuleResourceAbsent.CalledTimes = 0
+				})
+				It("should bubble up the error", func() {
+					// Act
+					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
+					// Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(consterror.CustomError))
+				})
+			})
+
+			When("func EnsurePrometheusRuleResourceAbsent fails unexpectedly", func() {
+				BeforeEach(func() {
+					// Arrange
+					ensurePrometheusRuleResourceAbsent.ErrorResponse = consterror.CustomError
 				})
 				It("should bubble up the error", func() {
 					// Act

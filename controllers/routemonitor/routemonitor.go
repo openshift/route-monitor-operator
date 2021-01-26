@@ -109,7 +109,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
-	res, err = r.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+	res, err = r.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
