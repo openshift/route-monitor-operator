@@ -6,7 +6,7 @@ parameters:
 - name: IMAGE_TAG
   required: true
 - name: NAMESPACE
-  value: openshift-monitoring
+  value: openshift-route-monitor-operator
 - name: REGISTRY_IMG
   required: true
 - name: REPO_NAME
@@ -52,14 +52,6 @@ objects:
         name: ${REPO_NAME}-registry
         namespace: ${NAMESPACE}
       spec:
-        affinity:
-          nodeAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - preference:
-                matchExpressions:
-                - key: node-role.kubernetes.io/infra
-                  operator: Exists
-              weight: 1
         displayName: ${REPO_NAME}
         icon:
           base64data: ''
@@ -67,10 +59,6 @@ objects:
         image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
         publisher: Red Hat
         sourceType: grpc
-        tolerations:
-        - effect: NoSchedule
-          key: node-role.kubernetes.io/infra
-          operator: Exists
     - apiVersion: operators.coreos.com/v1alpha1
       kind: Subscription
       metadata:

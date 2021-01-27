@@ -199,6 +199,23 @@ packagemanifests: manifests kustomize pre-deploy
 packagemanifests-build:
 	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
 
+syncset-install: 
+	oc process --local -f $(SELECTOR_SYNC_SET_DESTINATION) \
+			CHANNEL=$(CHANNELS) \
+			REGISTRY_IMG=$(REGISTRY_IMG) \
+			IMAGE_TAG=$(VERSION) \
+		| jq '{"kind": "List", "apiVersion": "v1", "items": .items[].spec.resources}' \
+		| kubectl apply -f -
+
+syncset-uninstall:
+	oc process --local -f $(SELECTOR_SYNC_SET_DESTINATION)  \
+			CHANNEL=$(CHANNELS) \
+			REGISTRY_IMG=$(REGISTRY_IMG) \
+			IMAGE_TAG=$(VERSION) \
+		| jq '{"kind": "List", "apiVersion": "v1", "items": .items[].spec.resources}' \
+		| kubectl delete -f -
+
+
 # Taken from https://www.cmcrossroads.com/article/dumping-every-makefile-variable
 .PHONY: printvars
 printvars:
