@@ -35,20 +35,6 @@ objects:
         labels:
           openshift.io/cluster-monitoring: 'true'
         name: ${NAMESPACE}
-    - apiVersion: monitoring.coreos.com/v1
-      kind: ServiceMonitor
-      metadata:
-        labels:
-          control-plane: controller-manager
-        name: controller-manager-metrics-monitor
-        namespace: ${NAMESPACE}
-      spec:
-        endpoints:
-        - path: /metrics
-          port: https
-        selector:
-          matchLabels:
-            control-plane: controller-manager
     - apiVersion: operators.coreos.com/v1alpha1
       kind: CatalogSource
       metadata:
@@ -58,14 +44,6 @@ objects:
         name: ${REPO_NAME}-registry
         namespace: ${NAMESPACE}
       spec:
-        affinity:
-          nodeAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - preference:
-                matchExpressions:
-                - key: node-role.kubernetes.io/infra
-                  operator: Exists
-              weight: 1
         displayName: ${REPO_NAME}
         icon:
           base64data: ''
@@ -73,10 +51,6 @@ objects:
         image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
         publisher: Red Hat
         sourceType: grpc
-        tolerations:
-        - effect: NoSchedule
-          key: node-role.kubernetes.io/infra
-          operator: Exists
     - apiVersion: operators.coreos.com/v1alpha1
       kind: Subscription
       metadata:

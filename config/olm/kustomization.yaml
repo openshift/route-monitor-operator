@@ -3,7 +3,6 @@ kind: Kustomization
 # this variable is used in hack/generate_template.py to override the namespace
 namespace: ${NAMESPACE}
 resources:
-- ../prometheus
 - catalogsource.yaml
 - namespace.yaml
 - operatorgroup.yaml
