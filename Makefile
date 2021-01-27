@@ -197,7 +197,9 @@ packagemanifests: manifests kustomize pre-deploy
 	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate packagemanifests -q \
 		--channel $(CHANNELS) \
 		--version $(VERSION) \
-		--from-version $(PREV_VERSION)
+		--from-version $(PREV_VERSION) \
+		--input-dir $(BUNDLE_DIR) \
+		--output-dir $(BUNDLE_DIR) \
 
 packagemanifests-build:
 	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
