@@ -97,6 +97,10 @@ if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
     exit 0
 fi
 
+if [[ "$DRY_RUN" == "y" ]]; then
+  exit 0
+fi
+
 
 pushd $SAAS_OPERATOR_DIR
   git push origin "$BRANCH_CHANNEL"
