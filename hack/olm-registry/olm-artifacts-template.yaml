@@ -22,7 +22,7 @@ objects:
       managed.openshift.io/gitHash: ${IMAGE_TAG}
       managed.openshift.io/gitRepoName: ${REPO_NAME}
       managed.openshift.io/osd: 'true'
-    name: hack-olm-base-resources
+    name: route-monitor-operator
   spec:
     clusterDeploymentSelector:
       matchLabels:
