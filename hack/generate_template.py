@@ -115,7 +115,7 @@ if __name__ == '__main__':
     for (dirpath, dirnames, filenames) in os.walk(arguments.yaml_directory):
         # skip 'crds' directory, these are bundled in the CSV
         if filenames:
-            sss_name = dirpath.replace('/','-').replace(arguments.yaml_directory,arguments.repo_name)
+            sss_name = dirpath.replace('/','-').replace(arguments.yaml_directory.replace('/','-'),arguments.repo_name)
             process_yamls(sss_name, dirpath, selectorsyncset_data)
 
     # write template file ordering by keys
