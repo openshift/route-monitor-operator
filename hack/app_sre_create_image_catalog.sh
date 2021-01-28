@@ -69,14 +69,15 @@ docker run  \
 -e CHANNELS=$BRANCH_CHANNEL \
 -e IMG=$QUAY_IMAGE:$GIT_HASH \
 -e PREV_VERSION=$PREV_VERSION \
+-e BUNDLE_DIR=$BUNDLE_DIR \
 --name route-monitor-operator-pipeline \
 pipelinebuilder:latest
-docker cp route-monitor-operator-pipeline:/pipeline/route-monitor-operator/packagemanifests .
+docker cp "route-monitor-operator-pipeline:/pipeline/route-monitor-operator/$BUNDLE_DIR" packagemanifests
 docker rm route-monitor-operator-pipeline
 rsync -a packagemanifests/* $BUNDLE_DIR/
 rm -rf packagemanifests
 
-BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" make packagemanifests-build
+BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" PREV_VERSION="$PREV_VERSION" make packagemanifests-build
 
 pushd $SAAS_OPERATOR_DIR
 
@@ -92,7 +93,7 @@ popd
 
 NEW_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
-if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
+if [ "$NEW_VERSION" == "$PREV_VERSION" ]; then
     # stopping script as that version was already built, so no need to rebuild it
     exit 0
 fi
