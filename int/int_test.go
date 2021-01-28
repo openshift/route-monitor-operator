@@ -176,13 +176,21 @@ var _ = Describe("Integrationtests", func() {
 				_, err = i.WaitForServiceMonitor(expectedDependentResource, 20)
 				Expect(err).NotTo(HaveOccurred())
 
+				_, err = i.WaitForPrometheusRule(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
 				err = i.RemoveRouteMonitor(routeMonitorNamespace, routeMonitorName)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("removes the ServiceMonitor as well within 20 seconds", func() {
+			It("removes the Dependant resources as well", func() {
 				serviceMonitor := monitoringv1.ServiceMonitor{}
 				err := i.Client.Get(context.TODO(), expectedDependentResource, &serviceMonitor)
+				Expect(err).To(HaveOccurred())
+				Expect(errors.IsNotFound(err)).To(BeTrue())
+
+				prometheusRule := monitoringv1.PrometheusRule{}
+				err = i.Client.Get(context.TODO(), expectedDependentResource, &prometheusRule)
 				Expect(err).To(HaveOccurred())
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			})
