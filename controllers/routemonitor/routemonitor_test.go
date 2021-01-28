@@ -346,33 +346,6 @@ var _ = Describe("Routemonitor", func() {
 						Expect(res).To(Equal(utilreconcile.StopOperation()))
 					})
 				})
-				When("func 'Delete' fails unexpectedly", func() {
-					// Arrange
-					BeforeEach(func() {
-						delete.ErrorResponse = consterror.CustomError
-					})
-					It("Should bubble up the failure", func() {
-						// Act
-						_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-						// Assert
-						Expect(err).To(HaveOccurred())
-						Expect(err).To(MatchError(consterror.CustomError))
-					})
-				})
-				When("when the 'Delete' succeeds", func() {
-					BeforeEach(func() {
-						ensureFinalizerAbsent.CalledTimes = 1
-					})
-					// Arrange
-					It("should succeed and stop processing", func() {
-						// Act
-						res, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-						// Assert
-						Expect(err).NotTo(HaveOccurred())
-						Expect(res).To(Equal(utilreconcile.StopOperation()))
-
-					})
-				})
 			})
 		})
 	})

@@ -45,15 +45,6 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	log.V(2).Info("Entering ensureRouteMonitorAbsent")
-	res, err := r.ensureServiceMonitoRelatedResourcesrAbsent(ctx, routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
-	}
-
 	log.V(2).Info("Entering ensureFinalizerAbsent")
 	// only the last command can throw the result (as no matter what happens it will stop)
 	_, err = r.EnsureFinalizerAbsent(ctx, routeMonitor)
