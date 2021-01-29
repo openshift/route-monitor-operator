@@ -2,8 +2,13 @@
 
 set -euxo pipefail
 
-CONTAINER_ENGINE=${CONAINER_ENGINE:-docker}
-IN_CONTAINER=${IN_CONTAINER:-false}
+IN_CONTAINER=${IN_CONTAINER:-true}
+
+if [[ $(which podman) ]]; then
+	CONTAINER_ENGINE=podman
+elif [[ $(which docker) ]]; then
+	CONTAINER_ENGINE=docker
+fi
 # This is a tad ambitious, but it should usually work.
 export REPO_NAME=$(git config --get remote.origin.url | sed 's,.*/,,; s/\.git$//')
 # If that still didn't work, warn (but proceed)
