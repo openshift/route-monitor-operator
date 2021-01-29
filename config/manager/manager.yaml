@@ -27,6 +27,18 @@ spec:
         app: route-monitor-operator
         component: operator
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+            weight: 1
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/infra
+          operator: Exists
       containers:
       - command:
         - /manager
