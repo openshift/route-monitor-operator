@@ -64,6 +64,5 @@ objects:
     - apiVersion: operators.coreos.com/v1alpha2
       kind: OperatorGroup
       metadata:
-        name: route-monitor-operator
+        name: ${REPO_NAME}
         namespace: ${NAMESPACE}
-      spec: {}
