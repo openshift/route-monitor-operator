@@ -266,28 +266,51 @@ var _ = Describe("Adder", func() {
 		})
 
 		Context("Updating the ServiceMonitorRef", func() {
-			When("the ref is ServiceMonitorRef is empty", func() {
+			When("the ref of servicemonitor is not equal to the expected output", func() {
 				BeforeEach(func() {
 					// Arrange
-					get.CalledTimes = 1
 					routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 						RouteURL: "fake-route-url",
 					}
 					routeMonitorFinalizers = routemonitorconst.FinalizerList
-					mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+					get.CalledTimes = 1
 				})
 
 				JustBeforeEach(func() {
-					mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
-						Times(1).
-						Return(nil)
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name + "-but-different",
 						Namespace: routeMonitor.Namespace,
 					}
 				})
 
-				It("Should stop processing as the RouteMonitor changed", func() {
+				It("Should throw an 'this is currently unsupported' error", func() {
+					//Act
+					_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(customerrors.InvalidReferenceUpdate))
+				})
+			})
+			When("the ref in ServiceMonitorRef is empty", func() {
+				BeforeEach(func() {
+					// Arrange
+					routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+						RouteURL: "fake-route-url",
+					}
+					routeMonitorFinalizers = routemonitorconst.FinalizerList
+					get.CalledTimes = 1
+					mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+
+				})
+
+				JustBeforeEach(func() {
+					mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{}
+				})
+
+				It("Update the service monitor ref and stop processing", func() {
 					//Act
 					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 					//Assert
@@ -296,15 +319,16 @@ var _ = Describe("Adder", func() {
 					Expect(res).To(Equal(utilreconcile.StopOperation()))
 				})
 			})
-			When("the ref is ServiceMonitorRef is empty", func() {
+			When("the ref in ServiceMonitorRef is equal to the expected resource", func() {
 				BeforeEach(func() {
 					// Arrange
-					get.CalledTimes = 1
 					routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 						RouteURL: "fake-route-url",
 					}
 					routeMonitorFinalizers = routemonitorconst.FinalizerList
+					get.CalledTimes = 1
 				})
+
 				JustBeforeEach(func() {
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
@@ -312,7 +336,7 @@ var _ = Describe("Adder", func() {
 					}
 				})
 
-				It("Continue Reconciling", func() {
+				It("should skip any operation and continue processing", func() {
 					//Act
 					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 					//Assert

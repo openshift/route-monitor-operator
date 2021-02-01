@@ -85,7 +85,12 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	}
 	emptyRef := v1alpha1.NamespacedName{}
 
-	if routeMonitor.Status.ServiceMonitorRef != desiredRef && routeMonitor.Status.ServiceMonitorRef != emptyRef {
+	currentRef := routeMonitor.Status.ServiceMonitorRef
+	if currentRef != emptyRef && desiredRef != currentRef {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
+	}
+
+	if currentRef == emptyRef && desiredRef != emptyRef {
 		routeMonitor.Status.ServiceMonitorRef = desiredRef
 
 		err := r.Status().Update(ctx, &routeMonitor)
