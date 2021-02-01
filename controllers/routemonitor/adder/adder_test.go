@@ -41,6 +41,8 @@ var _ = Describe("Adder", func() {
 		ctx context.Context
 
 		routeMonitor           v1alpha1.RouteMonitor
+		routeMonitorName       string
+		routeMonitorNamespace  string
 		routeMonitorSlo        v1alpha1.SloSpec
 		routeMonitorStatus     v1alpha1.RouteMonitorStatus
 		routeMonitorFinalizers []string
@@ -71,6 +73,8 @@ var _ = Describe("Adder", func() {
 		routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 			RouteURL: "fake-route-url",
 		}
+		routeMonitorName = "fake-name"
+		routeMonitorNamespace = "fake-namespace"
 		routeMonitorFinalizers = routemonitorconst.FinalizerList
 
 	})
@@ -100,6 +104,8 @@ var _ = Describe("Adder", func() {
 		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Finalizers: routeMonitorFinalizers,
+				Name:       routeMonitorName,
+				Namespace:  routeMonitorNamespace,
 			},
 			Spec: v1alpha1.RouteMonitorSpec{
 				Slo: routeMonitorSlo,
@@ -110,88 +116,7 @@ var _ = Describe("Adder", func() {
 	AfterEach(func() {
 		mockCtrl.Finish()
 	})
-
-	Describe("Testing CreateResourceIfNotFound", func() {
-		BeforeEach(func() {
-			// Arrange
-			get = helper.NotFoundErrorHappensOnce()
-			create.CalledTimes = 1
-
-		})
-		When("the resource Exists", func() {
-			BeforeEach(func() {
-				// Arrange
-				get.ErrorResponse = nil
-				create.CalledTimes = 0
-				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-			})
-
-			JustBeforeEach(func() {
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
-					Times(1).
-					Return(nil)
-			})
-
-			It("should call `Get` and not call `Create`", func() {
-				//Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the resource Get fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-				create.CalledTimes = 0
-			})
-
-			It("should return the error and not call `Create`", func() {
-				//Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("the resource is Not Found", func() {
-			BeforeEach(func() {
-				// Arrange
-				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-			})
-
-			JustBeforeEach(func() {
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
-					Times(1).
-					Return(nil)
-			})
-
-			// Arrange
-			It("should call `Get` successfully and `Create` the resource", func() {
-				//Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("the resource Create fails unexpectedly", func() {
-			BeforeEach(func() {
-				// Arrange
-				create.ErrorResponse = consterror.CustomError
-			})
-			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				//Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-	})
-	Describe("CreateServiceMonitorResource", func() {
+	Describe("EnsureServiceMonitorResourceExists", func() {
 		When("the RouteMonitor has no Host", func() {
 			// Arrange
 			BeforeEach(func() {
@@ -206,7 +131,7 @@ var _ = Describe("Adder", func() {
 				Expect(err).To(MatchError(customerrors.NoHost))
 			})
 		})
-		When("func 'Update' failed unexpectidly", func() {
+		When("Updating the finalizers using the 'Update' func failed unexpectidly", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorAdderClient = mockClient
@@ -241,6 +166,160 @@ var _ = Describe("Adder", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
 				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+		Describe("Testing ServiceMonitor creation", func() {
+			BeforeEach(func() {
+				// Arrange
+				get = helper.NotFoundErrorHappensOnce()
+				create.CalledTimes = 1
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorFinalizers = routemonitorconst.FinalizerList
+
+			})
+			When("the resource Get fails unexpectedly", func() {
+				// Arrange
+				BeforeEach(func() {
+					get.ErrorResponse = consterror.CustomError
+					create.CalledTimes = 0
+				})
+
+				It("should return the error and not call `Create`", func() {
+					//Act
+					_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(consterror.CustomError))
+				})
+			})
+			When("the resource Create fails unexpectedly", func() {
+				BeforeEach(func() {
+					// Arrange
+					create.ErrorResponse = consterror.CustomError
+				})
+				It("should call `Get` Successfully and call `Create` but return the error", func() {
+					//Act
+					_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(consterror.CustomError))
+				})
+			})
+			When("the resource Exists", func() {
+				BeforeEach(func() {
+					// Arrange
+					get.ErrorResponse = nil
+					create.CalledTimes = 0
+				})
+				JustBeforeEach(func() {
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+						Name:      routeMonitor.Name,
+						Namespace: routeMonitor.Namespace,
+					}
+				})
+
+				It("should pass all checks and continue", func() {
+					//Act
+					_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+				})
+			})
+
+			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
+				JustBeforeEach(func() {
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+						Name:      routeMonitor.Name,
+						Namespace: routeMonitor.Namespace,
+					}
+				})
+				// Arrange
+				It("Work correctly and continue processing", func() {
+					//Act
+					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res).NotTo(BeNil())
+					Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+				})
+			})
+
+			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
+				JustBeforeEach(func() {
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+						Name:      routeMonitor.Name,
+						Namespace: routeMonitor.Namespace,
+					}
+				})
+				// Arrange
+				It("Work correctly and continue processing", func() {
+					//Act
+					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res).NotTo(BeNil())
+					Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+				})
+			})
+		})
+
+		Context("Updating the ServiceMonitorRef", func() {
+			When("the ref is ServiceMonitorRef is empty", func() {
+				BeforeEach(func() {
+					// Arrange
+					get.CalledTimes = 1
+					routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+						RouteURL: "fake-route-url",
+					}
+					routeMonitorFinalizers = routemonitorconst.FinalizerList
+					mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				})
+
+				JustBeforeEach(func() {
+					mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+						Name:      routeMonitor.Name + "-but-different",
+						Namespace: routeMonitor.Namespace,
+					}
+				})
+
+				It("Should stop processing as the RouteMonitor changed", func() {
+					//Act
+					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res).NotTo(BeNil())
+					Expect(res).To(Equal(utilreconcile.StopOperation()))
+				})
+			})
+			When("the ref is ServiceMonitorRef is empty", func() {
+				BeforeEach(func() {
+					// Arrange
+					get.CalledTimes = 1
+					routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+						RouteURL: "fake-route-url",
+					}
+					routeMonitorFinalizers = routemonitorconst.FinalizerList
+				})
+				JustBeforeEach(func() {
+					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+						Name:      routeMonitor.Name,
+						Namespace: routeMonitor.Namespace,
+					}
+				})
+
+				It("Continue Reconciling", func() {
+					//Act
+					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+					Expect(res).NotTo(BeNil())
+					Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+				})
 			})
 		})
 	})
@@ -445,8 +524,6 @@ var _ = Describe("Adder", func() {
 			})
 
 			JustBeforeEach(func() {
-				routeMonitor.Name = "rmo-name"
-				routeMonitor.Namespace = "rmo-namespace"
 				routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
 					Name:      routeMonitor.Name,
 					Namespace: routeMonitor.Namespace,

@@ -83,8 +83,9 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 		Name:      namespacedName.Name,
 		Namespace: namespacedName.Namespace,
 	}
+	emptyRef := v1alpha1.NamespacedName{}
 
-	if routeMonitor.Status.ServiceMonitorRef != desiredRef {
+	if routeMonitor.Status.ServiceMonitorRef != desiredRef && routeMonitor.Status.ServiceMonitorRef != emptyRef {
 		routeMonitor.Status.ServiceMonitorRef = desiredRef
 
 		err := r.Status().Update(ctx, &routeMonitor)
