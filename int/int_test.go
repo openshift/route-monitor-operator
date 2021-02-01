@@ -35,10 +35,11 @@ var _ = Describe("Integrationtests", func() {
 			expectedServiceMonitorName types.NamespacedName
 		)
 		BeforeEach(func() {
-			err := i.RemoveClusterUrlMonitor(clusterUrlMonitorNamespace, clusterUrlMonitorName)
-			Expect(err).NotTo(HaveOccurred())
 			clusterUrlMonitorName = "fake-url-monitor"
 			clusterUrlMonitorNamespace = "default"
+
+			err := i.RemoveClusterUrlMonitor(clusterUrlMonitorNamespace, clusterUrlMonitorName)
+			Expect(err).NotTo(HaveOccurred())
 			expectedServiceMonitorName = types.NamespacedName{Name: clusterUrlMonitorName, Namespace: clusterUrlMonitorNamespace}
 			clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 				ObjectMeta: metav1.ObjectMeta{
@@ -114,9 +115,9 @@ var _ = Describe("Integrationtests", func() {
 			expectedDependentResource types.NamespacedName
 		)
 		BeforeEach(func() {
-			err := i.RemoveRouteMonitor(routeMonitorNamespace, routeMonitorName)
 			routeMonitorName = "fake-route-monitor"
 			routeMonitorNamespace = "default"
+			err := i.RemoveRouteMonitor(routeMonitorNamespace, routeMonitorName)
 			expectedDependentResource = types.NamespacedName{Name: routeMonitorName, Namespace: routeMonitorNamespace}
 			Expect(err).NotTo(HaveOccurred())
 			routeMonitor = v1alpha1.RouteMonitor{
