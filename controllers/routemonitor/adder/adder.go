@@ -102,27 +102,20 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	}
 	return utilreconcile.ContinueReconcile()
 }
-func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	// Was the RouteURL populated by a previous step?
-	if routeMonitor.Status.RouteURL == "" {
-		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
-	}
 
-	// Is the SloSpec configured on this CR?
-	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
+func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	shouldCreate, err := shouldCreatePrometheusRule(routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	} else if !shouldCreate {
 		return utilreconcile.ContinueReconcile()
 	}
 
-	if !routeMonitor.Spec.Slo.IsValid() {
-		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
+	res, err := r.addFinalizerToRouteMointor(ctx, routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
-
-	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
-		// If the routeMonitor doesn't have a finalizer, add it
-		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
-		if err := r.Update(ctx, &routeMonitor); err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
+	if res.ShouldStop() {
 		return utilreconcile.StopReconcile()
 	}
 
@@ -150,11 +143,50 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		}
 	}
 
+	res, err = r.addStatusToPrometheusRule(ctx, routeMonitor, namespacedName)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.StopReconcile()
+	}
+
+	return utilreconcile.ContinueReconcile()
+}
+
+func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error) {
+	// Was the RouteURL populated by a previous step?
+	if routeMonitor.Status.RouteURL == "" {
+		return false, customerrors.NoHost
+	}
+
+	// Is the SloSpec configured on this CR?
+	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
+		return false, nil
+	}
+
+	if !routeMonitor.Spec.Slo.IsValid() {
+		return false, customerrors.InvalidSLO
+	}
+	return true, nil
+}
+
+func (r *RouteMonitorAdder) addFinalizerToRouteMointor(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// If the routeMonitor doesn't have a finalizer, add it
+		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+	return utilreconcile.ContinueReconcile()
+}
+func (r *RouteMonitorAdder) addStatusToPrometheusRule(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, namespacedName types.NamespacedName) (utilreconcile.Result, error) {
 	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
 		Namespace: namespacedName.Namespace,
 		Name:      namespacedName.Name,
 	}
-
 	if routeMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
 		// Update status with PrometheusRuleRef
 		routeMonitor.Status.PrometheusRuleRef = desiredPrometheusRuleRef
