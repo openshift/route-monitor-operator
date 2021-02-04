@@ -67,7 +67,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, routeURL)
 	rules := []monitoringv1.Rule{}
 
-	for _, thunderStruct := range []struct {
+	for _, alertStruct := range []struct {
 		duration  string
 		severity  string
 		timeShort string
@@ -123,13 +123,13 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 			Expr: intstr.FromString(fmt.Sprintf(alertTemplate,
 				routeURLLabel,
 				percent,
-				thunderStruct.timeShort,
-				thunderStruct.timeLong)),
-			Labels: sampleTemplateLabelsWithSev(routeURL, thunderStruct.severity),
+				alertStruct.timeShort,
+				alertStruct.timeLong)),
+			Labels: sampleTemplateLabelsWithSev(routeURL, alertStruct.severity),
 			Annotations: map[string]string{
 				"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", routeURLLabel),
 			},
-			For: thunderStruct.duration,
+			For: alertStruct.duration,
 		})
 	}
 
