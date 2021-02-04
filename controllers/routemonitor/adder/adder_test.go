@@ -387,8 +387,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					Value:   "-10",
-					SloType: v1alpha1.Percent,
+					TargetAvailabilityPercentile: "-0/10",
 				}
 			})
 			It("should Throw an error", func() {
@@ -407,8 +406,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					Value:   "101",
-					SloType: v1alpha1.Percent,
+					TargetAvailabilityPercentile: "1.01",
 				}
 			})
 			It("should Throw an error", func() {
@@ -426,17 +424,15 @@ var _ = Describe("Adder", func() {
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 					RouteURL: "fake-route-url",
 				}
-				routeMonitorSlo = v1alpha1.SloSpec{
-					Value:   "",
-					SloType: v1alpha1.Percent,
-				}
+				routeMonitorSlo = v1alpha1.SloSpec{}
 			})
 			It("should Throw an error", func() {
 				// Act
-				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				res, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
 			})
 		})
 		When("the RouteMonitor has invalid slo type", func() {
@@ -447,27 +443,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					Value:   "fake-slo-type",
-					SloType: v1alpha1.Percent,
-				}
-			})
-			It("should Throw an error", func() {
-				// Act
-				_, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
-			})
-		})
-		When("the RouteMonitor has a slo spec but percent is Unsupported", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorAdderClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
-				routeMonitorSlo = v1alpha1.SloSpec{
-					SloType: v1alpha1.Percentile,
+					TargetAvailabilityPercentile: "fake-slo-type",
 				}
 			})
 			It("should Throw an error", func() {
@@ -488,8 +464,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					SloType: v1alpha1.Percent,
-					Value:   "99.95",
+					TargetAvailabilityPercentile: "0.9995",
 				}
 			})
 			It("Should update the RouteMonitor with the finalizer", func() {
@@ -508,8 +483,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					SloType: v1alpha1.Percent,
-					Value:   "99.95",
+					TargetAvailabilityPercentile: "0.9995",
 				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
@@ -540,8 +514,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					SloType: v1alpha1.Percent,
-					Value:   "99.95",
+					TargetAvailabilityPercentile: "0.9995",
 				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				get.CalledTimes = 1

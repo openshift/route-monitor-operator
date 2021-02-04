@@ -127,8 +127,7 @@ var _ = Describe("Integrationtests", func() {
 				},
 				Spec: v1alpha1.RouteMonitorSpec{
 					Slo: v1alpha1.SloSpec{
-						SloType: v1alpha1.Percent,
-						Value:   "99.95",
+						TargetAvailabilityPercentile: "0.9995",
 					},
 					Route: v1alpha1.RouteMonitorRouteSpec{
 						Name:      "console",

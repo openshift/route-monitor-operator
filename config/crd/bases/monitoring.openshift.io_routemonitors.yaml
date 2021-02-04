@@ -49,18 +49,12 @@ spec:
             slo:
               description: SloSpec defines what is the percentage
               properties:
-                type:
-                  enum:
-                  - ""
-                  - percent
-                  - percentile
-                  type: string
-                value:
-                  description: Value defines the whole number being used
+                targetAvailabilityPercentile:
+                  description: TargetAvailabilityPercentile defines the percentile
+                    number to be used
                   type: string
               required:
-              - type
-              - value
+              - targetAvailabilityPercentile
               type: object
           type: object
         status:

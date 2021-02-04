@@ -128,14 +128,11 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
-	normalizedPercent, succeed := routeMonitor.Spec.Slo.NormalizeValue()
-	if !succeed {
-		return utilreconcile.RequeueReconcileWith(customerrors.InvalidSLO)
-	}
+	percentile := routeMonitor.Spec.Slo.TargetAvailabilityPercentile
 
 	resource := &monitoringv1.PrometheusRule{}
 	populationFunc := func() monitoringv1.PrometheusRule {
-		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, normalizedPercent, namespacedName)
+		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, percentile, namespacedName)
 	}
 
 	// Does the resource already exist?

@@ -10,56 +10,36 @@ type NamespacedName struct {
 
 // SloSpec defines what is the percentage
 type SloSpec struct {
-	// Value defines the whole number being used
-	Value   string  `json:"value"`
-	SloType SloType `json:"type"`
-}
-
-// +kubebuilder:validation:Enum="";percent;percentile
-type SloType string
-
-const (
-	Percent    SloType = "percent"
-	Percentile SloType = "percentile"
-)
-
-func (s SloSpec) NormalizeValue() (string, bool) {
-	switch s.SloType {
-	case Percent:
-		d, sucess := new(inf.Dec).SetString(s.Value)
-		if !sucess {
-			return "", false
-		}
-		// divide d by 100
-		percentile := d.Mul(inf.NewDec(1, -2), d)
-		return percentile.String(), true
-	case Percentile:
-		return s.Value, true
-	}
-	return "", false
+	// TargetAvailabilityPercentile defines the percentile number to be used
+	TargetAvailabilityPercentile string `json:"targetAvailabilityPercentile"`
 }
 
 func (s SloSpec) IsValid() bool {
-	switch s.SloType {
-	case Percent:
-		d, sucess := new(inf.Dec).SetString(s.Value)
-		if !sucess {
-			return false
-		}
-
-		// Is SLO a negative number
-		if d.Sign() <= 0 {
-			return false
-		}
-
-		// Is SLO higher that 100% availability
-		diff := d.Sub(d, inf.NewDec(100, 0))
-		if diff.Sign() >= 0 {
-			return false
-		}
-		return true
-	case Percentile:
+	if s.TargetAvailabilityPercentile == "" {
 		return false
 	}
+
+	d, sucess := new(inf.Dec).SetString(s.TargetAvailabilityPercentile)
+	// value is not parsable
+	if !sucess {
+		return false
+	}
+
+	// will be 0.9
+	ninty := inf.NewDec(9, 1)
+	// is higher than lower bound
+	nintyPercentDiff := new(inf.Dec).Sub(d, ninty)
+	if nintyPercentDiff.Sign() <= 0 {
+		return false
+	}
+
+	// will be 1.0
+	hundred := inf.NewDec(1, 0)
+	// is higher than upper bound
+	hundredPercentDiff := new(inf.Dec).Sub(d, hundred)
+	if hundredPercentDiff.Sign() >= 0 {
+		return false
+	}
+
 	return true
 }
