@@ -1,7 +1,6 @@
 package blackbox
 
 const ( // All things related BlackBoxExporter
-	BlackBoxNamespace  = "openshift-route-monitor-operator"
 	BlackBoxName       = "blackbox-exporter"
 	BlackBoxPortName   = "blackbox"
 	BlackBoxPortNumber = 9115

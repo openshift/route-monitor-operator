@@ -20,11 +20,11 @@ import (
 )
 
 type BlackboxExporter struct {
-	Client                 client.Client
-	Log                    logr.Logger
-	Ctx                    context.Context
-	BlackBoxImage          string
-	BlackBoxNamespacedName types.NamespacedName
+	Client         client.Client
+	Log            logr.Logger
+	Ctx            context.Context
+	Image          string
+	NamespacedName types.NamespacedName
 }
 
 func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxNamespace string) *BlackboxExporter {
@@ -62,11 +62,11 @@ func (b *BlackboxExporter) ShouldDeleteBlackBoxExporterResources() (blackbox.Sho
 func (b *BlackboxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
 	populationFunc := func() appsv1.Deployment {
-		return templateForBlackBoxExporterDeployment(b.BlackBoxImage, b.BlackBoxNamespacedName)
+		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
 	}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.BlackBoxNamespacedName, &resource)
+	err := b.Client.Get(b.Ctx, b.NamespacedName, &resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -86,10 +86,10 @@ func (b *BlackboxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 
 func (b *BlackboxExporter) EnsureBlackBoxExporterServiceExists() error {
 	resource := corev1.Service{}
-	populationFunc := func() corev1.Service { return templateForBlackBoxExporterService(b.BlackBoxNamespacedName) }
+	populationFunc := func() corev1.Service { return templateForBlackBoxExporterService(b.NamespacedName) }
 
 	// Does the resource already exist?
-	if err := b.Client.Get(b.Ctx, b.BlackBoxNamespacedName, &resource); err != nil {
+	if err := b.Client.Get(b.Ctx, b.NamespacedName, &resource); err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
 			// return unexpectedly
@@ -169,7 +169,7 @@ func (b *BlackboxExporter) EnsureBlackBoxExporterDeploymentAbsent() error {
 	resource := &appsv1.Deployment{}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.BlackBoxNamespacedName, resource)
+	err := b.Client.Get(b.Ctx, b.NamespacedName, resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -190,7 +190,7 @@ func (b *BlackboxExporter) EnsureBlackBoxExporterServiceAbsent() error {
 	resource := &corev1.Service{}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.BlackBoxNamespacedName, resource)
+	err := b.Client.Get(b.Ctx, b.NamespacedName, resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
