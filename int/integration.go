@@ -154,3 +154,19 @@ func (i *Integration) WaitForPrometheusRule(name types.NamespacedName, seconds i
 	}
 	return prometheusRule, nil
 }
+
+func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, seconds int) error {
+	prometheusRule := monitoringv1.PrometheusRule{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &prometheusRule)
+		if errors.IsNotFound(err) {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return fmt.Errorf("PrometheusRule didn't vanish after %d seconds", seconds)
+	}
+	return nil
+}

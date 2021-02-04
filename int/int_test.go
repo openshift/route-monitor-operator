@@ -195,5 +195,42 @@ var _ = Describe("Integrationtests", func() {
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			})
 		})
+
+		When("the RouteMonitor Slo changes", func() {
+			It("creates/deletes a PrometheusRule as necessary", func() {
+				By("creating a RouteMonitor with no SLO")
+				routeMonitor.Spec.Slo = v1alpha1.SloSpec{}
+				err := i.Client.Create(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForServiceMonitor(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+				err = i.WaitForPrometheusRuleToClear(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("adding a SLO")
+				err = i.Client.Get(context.TODO(), expectedDependentResource, &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				routeMonitor.Spec.Slo.TargetAvailabilityPercentile = "0.995"
+				err = i.Client.Update(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForPrometheusRule(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("removing the SLO again")
+				err = i.Client.Get(context.TODO(), expectedDependentResource, &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				routeMonitor.Spec.Slo = v1alpha1.SloSpec{}
+				err = i.Client.Update(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = i.WaitForPrometheusRuleToClear(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = i.RemoveRouteMonitor(routeMonitorNamespace, routeMonitorName)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
 	})
 })
