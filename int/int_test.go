@@ -196,7 +196,7 @@ var _ = Describe("Integrationtests", func() {
 			})
 		})
 
-		When("the RouteMonitor Slo changes", func() {
+		PWhen("the RouteMonitor Slo changes", func() {
 			It("creates/deletes a PrometheusRule as necessary", func() {
 				By("creating a RouteMonitor with no SLO")
 				routeMonitor.Spec.Slo = v1alpha1.SloSpec{}
