@@ -109,8 +109,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	// Is the SloSpec configured on this CR?
-	emptySlo := v1alpha1.SloSpec{}
-	if routeMonitor.Spec.Slo == emptySlo {
+	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
 		return utilreconcile.ContinueReconcile()
 	}
 
@@ -127,7 +126,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		return utilreconcile.StopReconcile()
 	}
 
-	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
 	percentile := routeMonitor.Spec.Slo.TargetAvailabilityPercentile
 
 	resource := &monitoringv1.PrometheusRule{}
@@ -152,8 +151,8 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
-		Name:      namespacedName.Name,
 		Namespace: namespacedName.Namespace,
+		Name:      namespacedName.Name,
 	}
 
 	if routeMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
