@@ -127,7 +127,7 @@ var _ = Describe("Integrationtests", func() {
 				},
 				Spec: v1alpha1.RouteMonitorSpec{
 					Slo: v1alpha1.SloSpec{
-						TargetAvailabilityPercentile: "0.9995",
+						TargetAvailabilityPercent: "99.95",
 					},
 					Route: v1alpha1.RouteMonitorRouteSpec{
 						Name:      "console",
@@ -211,7 +211,7 @@ var _ = Describe("Integrationtests", func() {
 				By("adding a SLO")
 				err = i.Client.Get(context.TODO(), expectedDependentResource, &routeMonitor)
 				Expect(err).NotTo(HaveOccurred())
-				routeMonitor.Spec.Slo.TargetAvailabilityPercentile = "0.995"
+				routeMonitor.Spec.Slo.TargetAvailabilityPercent = "99.5"
 				err = i.Client.Update(context.TODO(), &routeMonitor)
 				Expect(err).NotTo(HaveOccurred())
 

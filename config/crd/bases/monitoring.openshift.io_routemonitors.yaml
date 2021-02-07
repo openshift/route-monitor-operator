@@ -49,12 +49,12 @@ spec:
             slo:
               description: SloSpec defines what is the percentage
               properties:
-                targetAvailabilityPercentile:
-                  description: TargetAvailabilityPercentile defines the percentile
-                    number to be used
+                targetAvailabilityPercent:
+                  description: TargetAvailabilityPercent defines the percent number
+                    to be used
                   type: string
               required:
-              - targetAvailabilityPercentile
+              - targetAvailabilityPercent
               type: object
           type: object
         status:

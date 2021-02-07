@@ -10,36 +10,42 @@ type NamespacedName struct {
 
 // SloSpec defines what is the percentage
 type SloSpec struct {
-	// TargetAvailabilityPercentile defines the percentile number to be used
-	TargetAvailabilityPercentile string `json:"targetAvailabilityPercentile"`
+	// TargetAvailabilityPercent defines the percent number to be used
+	TargetAvailabilityPercent string `json:"targetAvailabilityPercent"`
 }
 
-func (s SloSpec) IsValid() bool {
-	if s.TargetAvailabilityPercentile == "" {
-		return false
+func (s SloSpec) IsValid() (bool, string) {
+	if s.TargetAvailabilityPercent == "" {
+		return false, ""
 	}
 
-	d, sucess := new(inf.Dec).SetString(s.TargetAvailabilityPercentile)
+	d, sucess := new(inf.Dec).SetString(s.TargetAvailabilityPercent)
 	// value is not parsable
 	if !sucess {
-		return false
+		return false, ""
 	}
 
-	// will be 0.9
-	ninty := inf.NewDec(9, 1)
-	// is higher than lower bound
-	nintyPercentDiff := new(inf.Dec).Sub(d, ninty)
-	if nintyPercentDiff.Sign() <= 0 {
-		return false
+	// will be 90
+	ninty := inf.NewDec(9, -1)
+	// is lower than lower bound
+	if d.Cmp(ninty) <= 0 {
+		return false, ""
 	}
 
-	// will be 1.0
-	hundred := inf.NewDec(1, 0)
+	// will be 100
+	hundred := inf.NewDec(1, -2)
 	// is higher than upper bound
-	hundredPercentDiff := new(inf.Dec).Sub(d, hundred)
-	if hundredPercentDiff.Sign() >= 0 {
-		return false
+	if d.Cmp(hundred) >= 0 {
+		return false, ""
 	}
 
-	return true
+	// will be 1/100
+	oneHundredth := inf.NewDec(1, 2)
+
+	// if value / 100 is invalid
+	res := d.Mul(d, oneHundredth).String()
+	if res == "" || res == "<nil>" {
+		return false, ""
+	}
+	return true, res
 }

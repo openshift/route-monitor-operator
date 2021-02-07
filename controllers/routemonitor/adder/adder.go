@@ -104,7 +104,7 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 }
 
 func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	shouldCreate, err := shouldCreatePrometheusRule(routeMonitor)
+	shouldCreate, err, parsedSlo := shouldCreatePrometheusRule(routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	} else if !shouldCreate {
@@ -120,11 +120,10 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	}
 
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
-	percentile := routeMonitor.Spec.Slo.TargetAvailabilityPercentile
 
 	resource := &monitoringv1.PrometheusRule{}
 	populationFunc := func() monitoringv1.PrometheusRule {
-		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, percentile, namespacedName)
+		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
 	}
 
 	// Does the resource already exist?
@@ -154,21 +153,21 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	return utilreconcile.ContinueReconcile()
 }
 
-func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error) {
+func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error, string) {
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
-		return false, customerrors.NoHost
+		return false, customerrors.NoHost, ""
 	}
 
 	// Is the SloSpec configured on this CR?
 	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
-		return false, nil
+		return false, nil, ""
 	}
-
-	if !routeMonitor.Spec.Slo.IsValid() {
-		return false, customerrors.InvalidSLO
+	isValid, parsedSlo := routeMonitor.Spec.Slo.IsValid()
+	if !isValid {
+		return false, customerrors.InvalidSLO, ""
 	}
-	return true, nil
+	return true, nil, parsedSlo
 }
 
 func (r *RouteMonitorAdder) addFinalizerToRouteMointor(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {

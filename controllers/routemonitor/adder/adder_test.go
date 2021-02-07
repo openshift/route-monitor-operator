@@ -387,7 +387,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "-0/10",
+					TargetAvailabilityPercent: "-0/10",
 				}
 			})
 			It("should Throw an error", func() {
@@ -406,7 +406,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "1.01",
+					TargetAvailabilityPercent: "101",
 				}
 			})
 			It("should Throw an error", func() {
@@ -443,7 +443,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "fake-slo-type",
+					TargetAvailabilityPercent: "fake-slo-type",
 				}
 			})
 			It("should Throw an error", func() {
@@ -464,7 +464,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "0.9995",
+					TargetAvailabilityPercent: "99.95",
 				}
 			})
 			It("Should update the RouteMonitor with the finalizer", func() {
@@ -483,7 +483,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "0.9995",
+					TargetAvailabilityPercent: "99.95",
 				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
@@ -514,7 +514,7 @@ var _ = Describe("Adder", func() {
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercentile: "0.9995",
+					TargetAvailabilityPercent: "99.95",
 				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				get.CalledTimes = 1
