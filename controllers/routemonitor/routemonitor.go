@@ -110,12 +110,10 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
-	res, err = r.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+	// result is silenced as it's the end of the function, if this moves add it back
+	_, err = r.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
 	}
 
 	return utilreconcile.Stop()
