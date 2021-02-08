@@ -79,12 +79,121 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	}
 
 	//Update status with serviceMonitorRef
-	routeMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
-	routeMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
-	err := r.Status().Update(ctx, &routeMonitor)
+	desiredRef := v1alpha1.NamespacedName{
+		Name:      namespacedName.Name,
+		Namespace: namespacedName.Namespace,
+	}
+	emptyRef := v1alpha1.NamespacedName{}
+
+	currentRef := routeMonitor.Status.ServiceMonitorRef
+	if currentRef != emptyRef && desiredRef != currentRef {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
+	}
+
+	if currentRef == emptyRef && desiredRef != emptyRef {
+		routeMonitor.Status.ServiceMonitorRef = desiredRef
+
+		err := r.Status().Update(ctx, &routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+
+	}
+	return utilreconcile.ContinueReconcile()
+}
+
+func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	shouldCreate, err, parsedSlo := shouldCreatePrometheusRule(routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	} else if !shouldCreate {
+		return utilreconcile.ContinueReconcile()
+	}
+
+	res, err := r.addFinalizerToRouteMointor(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
+	if res.ShouldStop() {
+		return utilreconcile.StopReconcile()
+	}
 
+	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
+
+	resource := &monitoringv1.PrometheusRule{}
+	populationFunc := func() monitoringv1.PrometheusRule {
+		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
+	}
+
+	// Does the resource already exist?
+	if err := r.Get(ctx, namespacedName, resource); err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		// populate the resource with the template
+		resource := populationFunc()
+		// and create it
+		err = r.Create(ctx, &resource)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+	}
+
+	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.StopReconcile()
+	}
+
+	return utilreconcile.ContinueReconcile()
+}
+
+func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error, string) {
+	// Was the RouteURL populated by a previous step?
+	if routeMonitor.Status.RouteURL == "" {
+		return false, customerrors.NoHost, ""
+	}
+
+	// Is the SloSpec configured on this CR?
+	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
+		return false, nil, ""
+	}
+	isValid, parsedSlo := routeMonitor.Spec.Slo.IsValid()
+	if !isValid {
+		return false, customerrors.InvalidSLO, ""
+	}
+	return true, nil, parsedSlo
+}
+
+func (r *RouteMonitorAdder) addFinalizerToRouteMointor(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// If the routeMonitor doesn't have a finalizer, add it
+		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
+		if err := r.Update(ctx, &routeMonitor); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+	return utilreconcile.ContinueReconcile()
+}
+func (r *RouteMonitorAdder) addPrometheusRuleRefToStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, namespacedName types.NamespacedName) (utilreconcile.Result, error) {
+	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
+		Namespace: namespacedName.Namespace,
+		Name:      namespacedName.Name,
+	}
+	if routeMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
+		// Update status with PrometheusRuleRef
+		routeMonitor.Status.PrometheusRuleRef = desiredPrometheusRuleRef
+		err := r.Status().Update(ctx, &routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
 	return utilreconcile.ContinueReconcile()
 }

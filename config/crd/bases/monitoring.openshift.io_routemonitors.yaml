@@ -37,8 +37,7 @@ spec:
           description: RouteMonitorSpec defines the desired state of RouteMonitor
           properties:
             route:
-              description: Route is the resource that holds the name and Namespace
-                of the Route to monitor
+              description: RouteMonitorSpec references the obsered Route resource
               properties:
                 name:
                   description: Name is the name of the Route
@@ -47,10 +46,31 @@ spec:
                   description: Namespace is the namespace of the Route
                   type: string
               type: object
+            slo:
+              description: SloSpec defines what is the percentage
+              properties:
+                targetAvailabilityPercent:
+                  description: TargetAvailabilityPercent defines the percent number
+                    to be used
+                  type: string
+              required:
+              - targetAvailabilityPercent
+              type: object
           type: object
         status:
           description: RouteMonitorStatus defines the observed state of RouteMonitor
           properties:
+            prometheusRuleRef:
+              description: NamespacedName contains the name of a object and its namespace
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
+              required:
+              - name
+              - namespace
+              type: object
             routeURL:
               description: RouteURL is the url extracted from the Route resource
               type: string

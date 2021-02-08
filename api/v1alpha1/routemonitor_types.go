@@ -25,8 +25,8 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	// Route is the resource that holds the name and Namespace of the Route to monitor
 	Route RouteMonitorRouteSpec `json:"route,omitempty"`
+	Slo   SloSpec               `json:"slo,omitempty"`
 }
 
 // RouteMonitorSpec references the obsered Route resource
@@ -42,6 +42,7 @@ type RouteMonitorStatus struct {
 	// RouteURL is the url extracted from the Route resource
 	RouteURL          string         `json:"routeURL,omitempty"`
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
+	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true

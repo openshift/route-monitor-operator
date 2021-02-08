@@ -32,9 +32,39 @@ func New(r routemonitor.RouteMonitorReconciler) *RouteMonitorDeleter {
 }
 
 func (r *RouteMonitorDeleter) EnsureServiceMonitorResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
+	// nothing to delete, stopping early
+	if routeMonitor.Status.ServiceMonitorRef == *new(v1alpha1.NamespacedName) {
+		return nil
+	}
 	namespacedName := types.NamespacedName{Name: routeMonitor.Status.ServiceMonitorRef.Name,
 		Namespace: routeMonitor.Status.ServiceMonitorRef.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
+	// Does the resource already exist?
+	err := r.Get(ctx, namespacedName, resource)
+	if err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return err
+		}
+		// Resource doesn't exist, nothing to do
+		return nil
+	}
+	err = r.Delete(ctx, resource)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RouteMonitorDeleter) EnsurePrometheusRuleResourceAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) error {
+	// nothing to delete, stopping early
+	if routeMonitor.Status.PrometheusRuleRef == *new(v1alpha1.NamespacedName) {
+		return nil
+	}
+	namespacedName := types.NamespacedName{Name: routeMonitor.Status.PrometheusRuleRef.Name,
+		Namespace: routeMonitor.Status.PrometheusRuleRef.Namespace}
+	resource := &monitoringv1.PrometheusRule{}
 	// Does the resource already exist?
 	err := r.Get(ctx, namespacedName, resource)
 	if err != nil {

@@ -65,7 +65,9 @@ function cleanup {
 
 }
 
-trap cleanup EXIT
+if [[ "$SKIP" != "--skip-test" ]]; then
+  trap cleanup EXIT
+fi
 
 if [[ "$SKIP" != "--skip-build" ]]; then
   buildImage
@@ -75,4 +77,6 @@ deployOperator
 
 waitForDeployment
 
-runTests
+if [[ "$SKIP" != "--skip-test" ]]; then
+  runTests
+fi

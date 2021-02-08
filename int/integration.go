@@ -95,23 +95,23 @@ func (i *Integration) RemoveClusterUrlMonitor(namespace, name string) error {
 
 func (i *Integration) RemoveRouteMonitor(namespace, name string) error {
 	namespacedName := types.NamespacedName{Namespace: namespace, Name: name}
-	clusterUrlMonitor := v1alpha1.RouteMonitor{}
+	routeMonitor := v1alpha1.RouteMonitor{}
 
-	err := i.Client.Get(context.TODO(), namespacedName, &clusterUrlMonitor)
+	err := i.Client.Get(context.TODO(), namespacedName, &routeMonitor)
 	if errors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	err = i.Client.Delete(context.TODO(), &clusterUrlMonitor)
+	err = i.Client.Delete(context.TODO(), &routeMonitor)
 	if err != nil {
 		return err
 	}
 	t := 0
 	maxRetries := 20
 	for ; t < maxRetries; t++ {
-		err := i.Client.Get(context.TODO(), namespacedName, &clusterUrlMonitor)
+		err := i.Client.Get(context.TODO(), namespacedName, &routeMonitor)
 		if errors.IsNotFound(err) {
 			break
 		}
@@ -137,4 +137,36 @@ func (i *Integration) WaitForServiceMonitor(name types.NamespacedName, seconds i
 		return serviceMonitor, fmt.Errorf("ServiceMonitor didn't appear after %d seconds", seconds)
 	}
 	return serviceMonitor, nil
+}
+
+func (i *Integration) WaitForPrometheusRule(name types.NamespacedName, seconds int) (monitoringv1.PrometheusRule, error) {
+	prometheusRule := monitoringv1.PrometheusRule{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &prometheusRule)
+		if !errors.IsNotFound(err) {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return prometheusRule, fmt.Errorf("PrometheusRule didn't appear after %d seconds", seconds)
+	}
+	return prometheusRule, nil
+}
+
+func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, seconds int) error {
+	prometheusRule := monitoringv1.PrometheusRule{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &prometheusRule)
+		if errors.IsNotFound(err) {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return fmt.Errorf("PrometheusRule didn't vanish after %d seconds", seconds)
+	}
+	return nil
 }

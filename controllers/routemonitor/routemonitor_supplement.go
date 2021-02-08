@@ -39,13 +39,10 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	log.V(2).Info("Entering ensureRouteMonitorAbsent")
-	res, err := r.ensureServiceMonitoRelatedResourcesrAbsent(ctx, routeMonitor)
+	log.V(2).Info("Entering ensurePrometheusRuleResourceAbsent")
+	err = r.EnsurePrometheusRuleResourceAbsent(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
 	}
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")

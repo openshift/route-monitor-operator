@@ -43,6 +43,7 @@ type RouteMonitorReconciler struct {
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch
@@ -77,7 +78,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering CreateBlackBoxExporterResources")
+	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go
 	err = r.BlackboxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
@@ -90,7 +91,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.V(2).Info("Entering UpdateRouteURL")
+	log.V(2).Info("Entering EnsureRouteURLExists")
 	res, err = r.EnsureRouteURLExists(ctx, route, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -99,7 +100,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering CreateServiceMonitorResource")
+	log.V(2).Info("Entering EnsureServiceMonitorResourceExists")
 	res, err = r.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -107,6 +108,14 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
+
+	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
+	// result is silenced as it's the end of the function, if this moves add it back
+	_, err = r.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+
 	return utilreconcile.Stop()
 }
 
