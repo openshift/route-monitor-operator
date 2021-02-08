@@ -128,6 +128,24 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					Affinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{{
+								Preference: corev1.NodeSelectorTerm{
+									MatchExpressions: []corev1.NodeSelectorRequirement{{
+										Key:      "node-role.kubernetes.io/infra",
+										Operator: corev1.NodeSelectorOpExists,
+									}},
+								},
+								Weight: 1,
+							}},
+						},
+					},
+					Tolerations: []corev1.Toleration{{
+						Operator: corev1.TolerationOpExists,
+						Effect:   corev1.TaintEffectNoSchedule,
+						Key:      "node-role.kubernetes.io/infra",
+					}},
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,
 						Name:  "blackbox-exporter",
