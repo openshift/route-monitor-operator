@@ -42,10 +42,7 @@ func (s SloSpec) IsValid() (bool, string) {
 	// will be 1/100
 	oneHundredth := inf.NewDec(1, 2)
 
-	// if value / 100 is invalid
 	res := d.Mul(d, oneHundredth).String()
-	if res == "" || res == "<nil>" {
-		return false, ""
-	}
+	
 	return true, res
 }
