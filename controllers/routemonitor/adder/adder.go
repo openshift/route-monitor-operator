@@ -142,7 +142,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		}
 	}
 
-	res, err = r.addStatusToPrometheusRule(ctx, routeMonitor, namespacedName)
+	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -181,7 +181,7 @@ func (r *RouteMonitorAdder) addFinalizerToRouteMointor(ctx context.Context, rout
 	}
 	return utilreconcile.ContinueReconcile()
 }
-func (r *RouteMonitorAdder) addStatusToPrometheusRule(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, namespacedName types.NamespacedName) (utilreconcile.Result, error) {
+func (r *RouteMonitorAdder) addPrometheusRuleRefToStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, namespacedName types.NamespacedName) (utilreconcile.Result, error) {
 	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
 		Namespace: namespacedName.Namespace,
 		Name:      namespacedName.Name,

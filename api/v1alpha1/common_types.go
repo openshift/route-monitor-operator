@@ -43,6 +43,6 @@ func (s SloSpec) IsValid() (bool, string) {
 	oneHundredth := inf.NewDec(1, 2)
 
 	res := d.Mul(d, oneHundredth).String()
-	
+
 	return true, res
 }
