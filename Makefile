@@ -6,6 +6,10 @@ CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 KUBECTL ?= kubectl
 
+# for boilerplate
+OPERATOR_NAME=route-monitor-operator
+MAINPACKAGE=.
+
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
 # Default bundle image tag
@@ -90,13 +94,6 @@ vet:
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-go-generate: mockgen
-	go generate ./...
-
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
 
 # Build the image with podman
 podman-build:

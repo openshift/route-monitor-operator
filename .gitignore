@@ -28,6 +28,8 @@ saas*
 
 gomock_reflect*
 
+build/_output
+
 # generated file, do not commit
 hack/olm-base-resources
 bundle/

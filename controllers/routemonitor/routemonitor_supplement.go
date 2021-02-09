@@ -5,7 +5,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
@@ -52,17 +51,4 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	return utilreconcile.StopReconcile()
-}
-
-// ensureServiceMonitoRelatedResourcesrAbsent assumes that the ServiceMonitor that is related was deleted
-func (r *RouteMonitorReconciler) ensureServiceMonitoRelatedResourcesrAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	// if the monitor is not deleting no action is needed
-	if !finalizer.WasDeleteRequested(&routeMonitor) {
-		return utilreconcile.ContinueReconcile()
-	}
-	err := r.Delete(ctx, &routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	return utilreconcile.ContinueReconcile()
 }
