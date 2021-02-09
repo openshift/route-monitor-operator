@@ -6,6 +6,14 @@ CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 KUBECTL ?= kubectl
 
+# for boilerplate
+OPERATOR_NAME=route-monitor-operator
+MAINPACKAGE=.
+TESTTARGETS=$(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | grep -v /int)
+
+# need to override boilerplate targets which are not working on this operator
+op-generate openapi-generate: ;
+
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
 # Default bundle image tag
@@ -36,6 +44,7 @@ OPERATOR_SDK ?= operator-sdk
 all: manager
 
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+
 # Run tests
 test: generate fmt vet manifests
 	go test $(TESTS) -coverprofile cover.out
@@ -90,13 +99,6 @@ vet:
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-go-generate: mockgen
-	go generate ./...
-
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
 
 # Build the image with podman
 podman-build:
