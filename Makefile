@@ -1,3 +1,5 @@
+include boilerplate/generated-includes.mk
+
 # Current Operator version
 VERSION_MAJOR=0
 VERSION_MINOR=1
@@ -213,3 +215,7 @@ syncset-uninstall:
 			IMAGE_TAG=$(VERSION) \
 		| jq '{"kind": "List", "apiVersion": "v1", "items": .items[].spec.resources}' \
 		| kubectl delete -f -
+
+.PHONY: boilerplate-update
+boilerplate-update:
+	@boilerplate/update
