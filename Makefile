@@ -1,11 +1,5 @@
 include boilerplate/generated-includes.mk
 
-# Current Operator version
-VERSION_MAJOR=0
-VERSION_MINOR=1
-COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$$"`..HEAD --count)
-CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
-OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 KUBECTL ?= kubectl
 
 # for boilerplate
@@ -101,14 +95,6 @@ vet:
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-# Build the image with podman
-podman-build:
-	podman build . -t ${IMG}
-
-# Push the image with podman
-podman-push:
-	podman push ${IMG} --tls-verify=false
 
 test-integration:
 	hack/test-integration.sh
