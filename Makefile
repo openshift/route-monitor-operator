@@ -40,7 +40,7 @@ all: manager
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
 
 # Run tests
-test: mockgen generate fmt vet manifests 
+test: generate fmt vet manifests 
 	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
@@ -91,7 +91,7 @@ vet:
 	go vet ./...
 
 # Generate code
-generate: controller-gen
+generate: mockgen controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 test-integration:
