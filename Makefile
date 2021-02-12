@@ -48,7 +48,7 @@ all: manager
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
 
 # Run tests
-test: generate fmt vet manifests
+test: mockgen generate fmt vet manifests 
 	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
