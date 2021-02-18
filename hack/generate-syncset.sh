@@ -24,7 +24,7 @@ if [[ "${IN_CONTAINER}" == "true" ]]; then
     -e REPO_NAME \
     -v "$(pwd -P):$(pwd -P)" \
     quay.io/bitnami/python:2.7.18 /bin/sh \
-    -c "cd $(pwd); pip install oyaml; IN_CONTAINER=false hack/generate-syncset.sh;cat $SELECTOR_SYNC_SET_DESTINATION";
+    -c "cd $(pwd); pip install oyaml; hack/generate-syncset.sh;cat $SELECTOR_SYNC_SET_DESTINATION";
 else
   hack/generate_template.py --template-dir "${SELECTOR_SYNC_SET_TEMPLATE_DIR}" --yaml-directory "${YAML_DIRECTORY}" --destination "${SELECTOR_SYNC_SET_DESTINATION}" --repo-name "${REPO_NAME}"
 fi
