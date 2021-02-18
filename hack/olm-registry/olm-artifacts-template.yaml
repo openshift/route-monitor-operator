@@ -66,6 +66,3 @@ objects:
       metadata:
         name: ${REPO_NAME}
         namespace: ${NAMESPACE}
-      spec:
-        targetNamespaces:
-        - openshift-route-monitor-operator
