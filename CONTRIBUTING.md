@@ -9,5 +9,4 @@ Folow a simple workflow:
 * Follow the bot instructions
 
 This operator is build using the [operator-sdk](https://sdk.operatorframework.io)
-
-
+For a rough overview of the tests please read [this document](TESTS.md)
