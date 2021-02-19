@@ -1,20 +1,24 @@
 # openshift-route-monitor-operator
 
 ## What does this do?
+
 Automatically enables blackbox probes for routes on OpenShift clusters to be consumed by the Cluster Monitoring Operator
 or any vanilla Prometheus Operator.
 
 ## How does this work?
 
 ### Exporter
+
 The operator is making sure that there is one deployment + service of the [blackbox exporter](https://github.com/prometheus/blackbox_exporter).
 If it does not exist in `openshift-monitoring`, it creates one.
 
 ### ServiceMonitors
+
 The probes are effectively configured via `ServiceMonitors`, see more details in [Prometheus Operator troubleshooting docs](https://github.com/prometheus-operator/prometheus-operator/blob/566b18b2c9bf62ff3558804a69de5e1127ce8171/Documentation/user-guides/running-exporters.md#the-goal-of-servicemonitors).
 openshift-route-monitor-operator creates `ServiceMonitors` based on the defined `RouteMonitors`.
 
 ### RouteMonitors
+
 The operator watches all namespaces for `routeMonitors`.
 They are used to define what route to probe.
 `RouteMonitors` are namespace scoped and need to exist in the same namespaces as the `Route` they're used for.
