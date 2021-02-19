@@ -56,6 +56,7 @@ In order to develop the repo follow these steps to get an env started:
 6. retrigger pull of pod with `oc delete -n openshift-monitoring -lapp=route-monitor-operator,component=operator`
 
 ### Test operator locally
+
 The [makefile](./Makefile) has a command to run the operator locally:
 
 ```
