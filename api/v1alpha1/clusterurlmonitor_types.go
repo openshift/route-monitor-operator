@@ -29,9 +29,10 @@ type ClusterUrlMonitorSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of ClusterUrlMonitor. Edit ClusterUrlMonitor_types.go to remove/update
-	Prefix string `json:"prefix,omitempty"`
-	Suffix string `json:"suffix,omitempty"`
-	Port   string `json:"port,omitempty"`
+	Prefix string  `json:"prefix,omitempty"`
+	Suffix string  `json:"suffix,omitempty"`
+	Port   string  `json:"port,omitempty"`
+	Slo    SloSpec `json:"slo,omitempty"`
 }
 
 // ClusterUrlMonitorStatus defines the observed state of ClusterUrlMonitor
@@ -39,6 +40,7 @@ type ClusterUrlMonitorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
+	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
 }
 
 // +kubebuilder:object:root=true

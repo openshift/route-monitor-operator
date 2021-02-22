@@ -61,10 +61,10 @@ func TemplateForServiceMonitorResource(url string, namespacedName types.Namespac
 }
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
-func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
+func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName, sourceCRName string) monitoringv1.PrometheusRule {
 
 	routeURL := url
-	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, routeURL)
+	routeURLLabel := fmt.Sprintf(`%s="%s"`, sourceCRName, routeURL)
 	rules := []monitoringv1.Rule{}
 
 	for _, alertStruct := range []struct {
@@ -125,7 +125,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 				percent,
 				alertStruct.timeShort,
 				alertStruct.timeLong)),
-			Labels: sampleTemplateLabelsWithSev(routeURL, alertStruct.severity),
+			Labels: sampleTemplateLabelsWithSev(routeURL, alertStruct.severity, sourceCRName),
 			Annotations: map[string]string{
 				"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", routeURLLabel),
 			},
@@ -151,7 +151,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	for _, timePeriod := range []string{"5m", "30m", "1h", "2h", "6h", "1d", "3d"} {
 		rules = append(rules, monitoringv1.Rule{
 			Expr:   intstr.FromString(fmt.Sprintf(recordingRuleTemplate, routeURLLabel, timePeriod)),
-			Labels: sampleTemplateLabels(routeURL),
+			Labels: sampleTemplateLabels(routeURL, sourceCRName),
 			Record: fmt.Sprintf("http_requests_total:burnrate%s", timePeriod),
 		})
 
@@ -173,14 +173,14 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 	return resource
 }
-func sampleTemplateLabelsWithSev(url, severity string) map[string]string {
+func sampleTemplateLabelsWithSev(url, severity string, sourceCRName string) map[string]string {
 	return map[string]string{
-		"severity":        severity,
-		"RouteMonitorUrl": url,
+		"severity":   severity,
+		sourceCRName: url,
 	}
 }
-func sampleTemplateLabels(url string) map[string]string {
+func sampleTemplateLabels(url string, sourceCRName string) map[string]string {
 	return map[string]string{
-		"RouteMonitorUrl": url,
+		sourceCRName: url,
 	}
 }
