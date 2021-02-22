@@ -4,7 +4,9 @@ set -euxo pipefail
 
 IN_CONTAINER=${IN_CONTAINER:-true}
 
-if [[ $(which podman) ]]; then
+if [[ -n $CONTAINER_ENGINE ]]; then
+	echo "CONTAINER_ENGINE is filled, using it"
+elif [[ $(which podman) ]]; then
 	CONTAINER_ENGINE=podman
 elif [[ $(which docker) ]]; then
 	CONTAINER_ENGINE=docker
