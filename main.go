@@ -69,11 +69,11 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
-	var blackBoxImage string
-	flag.StringVar(&blackBoxImage, "blackbox-image", "quay.io/app-sre/prom-blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
+	var blackboxExporterImage string
+	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/app-sre/prom-blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
 
-	var blackBoxNamespace string
-	flag.StringVar(&blackBoxNamespace, "blackbox-namespace", "openshift-route-monitor-operator", "Blackbox-exporter deployment will reside on this Namespace")
+	var blackboxExporterNamespace string
+	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", "openshift-route-monitor-operator", "Blackbox-exporter deployment will reside on this Namespace")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -101,9 +101,9 @@ func main() {
 
 	routeMonitorReconciler.RouteMonitorSupplement = supplement.New(*routeMonitorReconciler)
 	routeMonitorReconciler.RouteMonitorDeleter = deleter.New(*routeMonitorReconciler)
-	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler)
-	routeMonitorReconciler.BlackboxExporter = blackboxexporter.New(routeMonitorReconciler.Client,
-		routeMonitorReconciler.Log, context.Background(), blackBoxImage, blackBoxNamespace)
+	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler, blackboxExporterNamespace)
+	routeMonitorReconciler.BlackBoxExporter = blackboxexporter.New(routeMonitorReconciler.Client,
+		routeMonitorReconciler.Log, context.Background(), blackboxExporterImage, blackboxExporterNamespace)
 
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
@@ -111,11 +111,11 @@ func main() {
 	}
 
 	if err = (&clusterurlmonitor.ClusterUrlMonitorReconciler{
-		Client:            mgr.GetClient(),
-		Log:               ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
-		Scheme:            mgr.GetScheme(),
-		BlackBoxImage:     blackBoxImage,
-		BlackBoxNamespace: blackBoxNamespace,
+		Client:                    mgr.GetClient(),
+		Log:                       ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
+		Scheme:                    mgr.GetScheme(),
+		BlackBoxExporterImage:     blackboxExporterImage,
+		BlackBoxExporterNamespace: blackboxExporterNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterUrlMonitor")
 		os.Exit(1)

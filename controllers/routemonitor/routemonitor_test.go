@@ -16,7 +16,7 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -38,7 +38,7 @@ var _ = Describe("Routemonitor", func() {
 		mockSupplement               *routemonitormocks.MockRouteMonitorSupplement
 		mockDeleter                  *routemonitormocks.MockRouteMonitorDeleter
 		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
-		mockBlackboxExporter         *routemonitormocks.MockBlackboxExporter
+		mockBlackboxExporter         *routemonitormocks.MockBlackBoxExporter
 		ctx                          context.Context
 
 		update                                helper.MockHelper
@@ -52,7 +52,7 @@ var _ = Describe("Routemonitor", func() {
 		ensureBlackBoxExporterResourcesExist  helper.MockHelper
 		ensureFinalizerAbsent                 helper.MockHelper
 
-		shouldDeleteBlackBoxExporterResourcesResponse blackbox.ShouldDeleteBlackBoxExporter
+		shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
 		ensureFinalizerAbsentResponse                 utilreconcile.Result
 
 		routeMonitor                  v1alpha1.RouteMonitor
@@ -68,7 +68,7 @@ var _ = Describe("Routemonitor", func() {
 		mockAdder = routemonitormocks.NewMockRouteMonitorAdder(mockCtrl)
 
 		mockSupplement = routemonitormocks.NewMockRouteMonitorSupplement(mockCtrl)
-		mockBlackboxExporter = routemonitormocks.NewMockBlackboxExporter(mockCtrl)
+		mockBlackboxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
 		routeMonitorFinalizers = routemonitorconst.FinalizerList
 
 		routeMonitorReconcilerClient = mockClient
@@ -85,7 +85,7 @@ var _ = Describe("Routemonitor", func() {
 		ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
 		ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
 		ensureFinalizerAbsent = helper.MockHelper{}
-		shouldDeleteBlackBoxExporterResourcesResponse = blackbox.KeepBlackBoxExporter
+		shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 
 		ensureFinalizerAbsentResponse = utilreconcile.Result{}
 
@@ -138,7 +138,7 @@ var _ = Describe("Routemonitor", func() {
 			RouteMonitorSupplement: mockSupplement,
 			RouteMonitorDeleter:    mockDeleter,
 			RouteMonitorAdder:      mockAdder,
-			BlackboxExporter:       mockBlackboxExporter,
+			BlackBoxExporter:       mockBlackboxExporter,
 		}
 
 		routeMonitor = v1alpha1.RouteMonitor{
@@ -175,7 +175,7 @@ var _ = Describe("Routemonitor", func() {
 		Describe("ShouldDeleteBlackBoxExporterResources instructs to delete", func() {
 			BeforeEach(func() {
 				// Arrange
-				shouldDeleteBlackBoxExporterResourcesResponse = blackbox.DeleteBlackBoxExporter
+				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.DeleteBlackBoxExporter
 				ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
 
 			})
@@ -266,7 +266,7 @@ var _ = Describe("Routemonitor", func() {
 		When("ShouldDeleteBlackBoxExporterResources instructs to keep the BlackBoxExporter", func() {
 			BeforeEach(func() {
 				// Arrange
-				shouldDeleteBlackBoxExporterResourcesResponse = blackbox.KeepBlackBoxExporter
+				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 				ensureServiceMonitorResourceAbsent.CalledTimes = 1
 				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
 			})

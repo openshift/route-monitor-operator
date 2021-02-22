@@ -6,35 +6,35 @@ package routemonitor
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	blackbox "github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reflect "reflect"
 )
 
-// MockBlackboxExporter is a mock of BlackboxExporter interface
-type MockBlackboxExporter struct {
+// MockBlackBoxExporter is a mock of BlackBoxExporter interface
+type MockBlackBoxExporter struct {
 	ctrl     *gomock.Controller
-	recorder *MockBlackboxExporterMockRecorder
+	recorder *MockBlackBoxExporterMockRecorder
 }
 
-// MockBlackboxExporterMockRecorder is the mock recorder for MockBlackboxExporter
-type MockBlackboxExporterMockRecorder struct {
-	mock *MockBlackboxExporter
+// MockBlackBoxExporterMockRecorder is the mock recorder for MockBlackBoxExporter
+type MockBlackBoxExporterMockRecorder struct {
+	mock *MockBlackBoxExporter
 }
 
-// NewMockBlackboxExporter creates a new mock instance
-func NewMockBlackboxExporter(ctrl *gomock.Controller) *MockBlackboxExporter {
-	mock := &MockBlackboxExporter{ctrl: ctrl}
-	mock.recorder = &MockBlackboxExporterMockRecorder{mock}
+// NewMockBlackBoxExporter creates a new mock instance
+func NewMockBlackBoxExporter(ctrl *gomock.Controller) *MockBlackBoxExporter {
+	mock := &MockBlackBoxExporter{ctrl: ctrl}
+	mock.recorder = &MockBlackBoxExporterMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockBlackboxExporter) EXPECT() *MockBlackboxExporterMockRecorder {
+func (m *MockBlackBoxExporter) EXPECT() *MockBlackBoxExporterMockRecorder {
 	return m.recorder
 }
 
 // EnsureBlackBoxExporterResourcesExist mocks base method
-func (m *MockBlackboxExporter) EnsureBlackBoxExporterResourcesExist() error {
+func (m *MockBlackBoxExporter) EnsureBlackBoxExporterResourcesExist() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist")
 	ret0, _ := ret[0].(error)
@@ -42,13 +42,13 @@ func (m *MockBlackboxExporter) EnsureBlackBoxExporterResourcesExist() error {
 }
 
 // EnsureBlackBoxExporterResourcesExist indicates an expected call of EnsureBlackBoxExporterResourcesExist
-func (mr *MockBlackboxExporterMockRecorder) EnsureBlackBoxExporterResourcesExist() *gomock.Call {
+func (mr *MockBlackBoxExporterMockRecorder) EnsureBlackBoxExporterResourcesExist() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackboxExporter)(nil).EnsureBlackBoxExporterResourcesExist))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporter)(nil).EnsureBlackBoxExporterResourcesExist))
 }
 
 // EnsureBlackBoxExporterResourcesAbsent mocks base method
-func (m *MockBlackboxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
+func (m *MockBlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent")
 	ret0, _ := ret[0].(error)
@@ -56,22 +56,36 @@ func (m *MockBlackboxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
 }
 
 // EnsureBlackBoxExporterResourcesAbsent indicates an expected call of EnsureBlackBoxExporterResourcesAbsent
-func (mr *MockBlackboxExporterMockRecorder) EnsureBlackBoxExporterResourcesAbsent() *gomock.Call {
+func (mr *MockBlackBoxExporterMockRecorder) EnsureBlackBoxExporterResourcesAbsent() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackboxExporter)(nil).EnsureBlackBoxExporterResourcesAbsent))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporter)(nil).EnsureBlackBoxExporterResourcesAbsent))
 }
 
 // ShouldDeleteBlackBoxExporterResources mocks base method
-func (m *MockBlackboxExporter) ShouldDeleteBlackBoxExporterResources() (blackbox.ShouldDeleteBlackBoxExporter, error) {
+func (m *MockBlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources")
-	ret0, _ := ret[0].(blackbox.ShouldDeleteBlackBoxExporter)
+	ret0, _ := ret[0].(blackboxexporter.ShouldDeleteBlackBoxExporter)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources
-func (mr *MockBlackboxExporterMockRecorder) ShouldDeleteBlackBoxExporterResources() *gomock.Call {
+func (mr *MockBlackBoxExporterMockRecorder) ShouldDeleteBlackBoxExporterResources() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackboxExporter)(nil).ShouldDeleteBlackBoxExporterResources))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporter)(nil).ShouldDeleteBlackBoxExporterResources))
+}
+
+// GetBlackBoxExporterNamespace mocks base method
+func (m *MockBlackBoxExporter) GetBlackBoxExporterNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlackBoxExporterNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetBlackBoxExporterNamespace indicates an expected call of GetBlackBoxExporterNamespace
+func (mr *MockBlackBoxExporterMockRecorder) GetBlackBoxExporterNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlackBoxExporterNamespace", reflect.TypeOf((*MockBlackBoxExporter)(nil).GetBlackBoxExporterNamespace))
 }

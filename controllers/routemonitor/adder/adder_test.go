@@ -548,7 +548,7 @@ var _ = Describe("Adder", func() {
 					Scheme: constinit.Scheme,
 				}
 				// Act
-				res := adder.New(r)
+				res := adder.New(r, "")
 				// Assert
 				Expect(res).To(Equal(&adder.RouteMonitorAdder{
 					Client: routeMonitorAdderClient,

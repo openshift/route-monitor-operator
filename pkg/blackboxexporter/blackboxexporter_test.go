@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
@@ -24,7 +24,7 @@ var _ = Describe("Blackboxexporter", func() {
 		mockClient *clientmocks.MockClient
 		mockCtrl   *gomock.Controller
 
-		blackboxExporter BlackboxExporter
+		blackboxExporter BlackBoxExporter
 
 		ctx context.Context
 
@@ -45,7 +45,7 @@ var _ = Describe("Blackboxexporter", func() {
 		list = helper.MockHelper{}
 	})
 	JustBeforeEach(func() {
-		blackboxExporter = BlackboxExporter{
+		blackboxExporter = BlackBoxExporter{
 			Log:    constinit.Logger,
 			Client: mockClient,
 			Ctx:    ctx,
@@ -356,7 +356,7 @@ var _ = Describe("Blackboxexporter", func() {
 				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackbox.KeepBlackBoxExporter))
+				Expect(res).To(Equal(blackboxexporter.KeepBlackBoxExporter))
 
 			})
 		})
@@ -380,7 +380,7 @@ var _ = Describe("Blackboxexporter", func() {
 				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackbox.DeleteBlackBoxExporter))
+				Expect(res).To(Equal(blackboxexporter.DeleteBlackBoxExporter))
 			})
 
 		})

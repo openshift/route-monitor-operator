@@ -7,7 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -19,10 +19,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type BlackboxExporter interface {
+type BlackBoxExporter interface {
 	EnsureBlackBoxExporterResourcesExist() error
 	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackbox.ShouldDeleteBlackBoxExporter, error)
+	ShouldDeleteBlackBoxExporterResources() (blackboxexporterconsts.ShouldDeleteBlackBoxExporter, error)
+	GetBlackBoxExporterNamespace() string
 }
 
 type ClusterUrlMonitorSupplement struct {
@@ -30,11 +31,11 @@ type ClusterUrlMonitorSupplement struct {
 	Client            client.Client
 	Log               logr.Logger
 	Ctx               context.Context
-	BlackboxExporter  BlackboxExporter
+	BlackBoxExporter  BlackBoxExporter
 }
 
-func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, BlackboxExporter *blackboxexporter.BlackboxExporter) *ClusterUrlMonitorSupplement {
-	return &ClusterUrlMonitorSupplement{ClusterUrlMonitor, Client, log, context.Background(), BlackboxExporter}
+func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter) *ClusterUrlMonitorSupplement {
+	return &ClusterUrlMonitorSupplement{ClusterUrlMonitor, Client, log, context.Background(), blackBoxExporter}
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error) {
@@ -61,7 +62,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, namespacedName)
+	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName)
 	err = s.Client.Create(s.Ctx, &serviceMonitor)
 	if err != nil {
 		return err
@@ -101,12 +102,12 @@ func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Resul
 		}
 	}
 
-	shouldDelete, err := s.BlackboxExporter.ShouldDeleteBlackBoxExporterResources()
+	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
 	if err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
-	if shouldDelete == blackbox.DeleteBlackBoxExporter {
-		err := s.BlackboxExporter.EnsureBlackBoxExporterResourcesAbsent()
+	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
+		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
 		if err != nil {
 			return reconcile.RequeueReconcileWith(err)
 		}
@@ -134,7 +135,7 @@ func (s *ClusterUrlMonitorSupplement) doesServiceMonitorExist(namespacedName typ
 	return true, err
 }
 
-func ProcessRequest(blackboxExporter *blackboxexporter.BlackboxExporter, sup *ClusterUrlMonitorSupplement) (ctrl.Result, error) {
+func ProcessRequest(blackboxExporter *blackboxexporter.BlackBoxExporter, sup *ClusterUrlMonitorSupplement) (ctrl.Result, error) {
 	res, err := sup.EnsureDeletionProcessed()
 	if err != nil {
 		return utilreconcile.RequeueWith(err)

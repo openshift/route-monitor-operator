@@ -29,15 +29,17 @@ import (
 // RouteMonitorAdder hold additional actions that supplement the Reconcile
 type RouteMonitorAdder struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log                       logr.Logger
+	Scheme                    *runtime.Scheme
+	BlackBoxExporterNamespace string
 }
 
-func New(r routemonitor.RouteMonitorReconciler) *RouteMonitorAdder {
+func New(r routemonitor.RouteMonitorReconciler, blackBoxExporterNamespace string) *RouteMonitorAdder {
 	return &RouteMonitorAdder{
-		Client: r.Client,
-		Log:    r.Log,
-		Scheme: r.Scheme,
+		Client:                    r.Client,
+		Log:                       r.Log,
+		Scheme:                    r.Scheme,
+		BlackBoxExporterNamespace: blackBoxExporterNamespace,
 	}
 }
 
@@ -59,7 +61,7 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
 	populationFunc := func() monitoringv1.ServiceMonitor {
-		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, namespacedName)
+		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName)
 	}
 
 	// Does the resource already exist?

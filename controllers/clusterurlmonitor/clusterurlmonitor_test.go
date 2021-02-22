@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	. "github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
@@ -67,7 +67,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor        v1alpha1.ClusterUrlMonitor
 		sup                      ClusterUrlMonitorSupplement
 		mockClient               *clientmocks.MockClient
-		mockBlackboxExporter     *routemonitormocks.MockBlackboxExporter
+		mockBlackBoxExporter     *routemonitormocks.MockBlackBoxExporter
 		mockStatusWriter         *clientmocks.MockStatusWriter
 		mockCtrl                 *gomock.Controller
 		clusterUrlMonitorMatcher *ClusterUrlMonitorMatcher
@@ -83,7 +83,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockBlackboxExporter = routemonitormocks.NewMockBlackboxExporter(mockCtrl)
+		mockBlackBoxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -103,7 +103,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		sup = ClusterUrlMonitorSupplement{
 			Log:               constinit.Logger,
 			Client:            mockClient,
-			BlackboxExporter:  mockBlackboxExporter,
+			BlackBoxExporter:  mockBlackBoxExporter,
 			Ctx:               context.TODO(),
 			ClusterUrlMonitor: clusterUrlMonitor,
 		}
@@ -163,6 +163,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Create(gomock.Any(), serviceMonitorMatcher).Times(1)
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
 				mockStatusWriter.EXPECT().Update(gomock.Any(), clusterUrlMonitorMatcher).Times(1).Return(nil)
+				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 			})
 
 			It("creates a ServiceMonitor with the service URL", func() {
@@ -221,10 +222,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				})
 				When("the blackboxexporter needs to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackbox.DeleteBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.DeleteBlackBoxExporter, nil)
 					})
 					It("removes the servicemonitor, the blackbox exporter and cleans up the finalizer", func() {
-						mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
+						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
 
 						res, err := sup.EnsureDeletionProcessed()
 
@@ -238,7 +239,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 
 				When("the blackboxexporter doesn't need to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackbox.KeepBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.KeepBlackBoxExporter, nil)
 					})
 					It("removes the servicemonitor and cleans up the finalizer", func() {
 						res, err := sup.EnsureDeletionProcessed()
@@ -257,10 +258,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				})
 				When("the blackboxexporter needs to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackbox.DeleteBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.DeleteBlackBoxExporter, nil)
 					})
 					It("removes the blackbox exporter and cleans up the finalizer", func() {
-						mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
+						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
 
 						res, err := sup.EnsureDeletionProcessed()
 
@@ -272,7 +273,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 
 				When("the blackboxexporter doesn't need to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackbox.KeepBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.KeepBlackBoxExporter, nil)
 					})
 					It("cleans up the finalizer", func() {
 						res, err := sup.EnsureDeletionProcessed()

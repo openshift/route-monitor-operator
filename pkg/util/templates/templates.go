@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -12,11 +12,11 @@ import (
 )
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
-func TemplateForServiceMonitorResource(url string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
+func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
 
 	routeURL := url
 
-	routeMonitorLabels := blackbox.GenerateBlackBoxLables()
+	routeMonitorLabels := blackboxexporter.GenerateBlackBoxExporterLables()
 
 	labelSelector := metav1.LabelSelector{MatchLabels: routeMonitorLabels}
 
@@ -35,10 +35,9 @@ func TemplateForServiceMonitorResource(url string, namespacedName types.Namespac
 			Namespace: namespacedName.Namespace,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
-			JobLabel: namespacedName.Name,
 			Endpoints: []monitoringv1.Endpoint{
 				{
-					Port: blackbox.BlackBoxPortName,
+					Port: blackboxexporter.BlackBoxExporterPortName,
 					// Probe every 30s
 					Interval: "30s",
 					// Timeout has to be smaller than probe interval
@@ -53,8 +52,12 @@ func TemplateForServiceMonitorResource(url string, namespacedName types.Namespac
 						},
 					},
 				}},
-			Selector:          labelSelector,
-			NamespaceSelector: monitoringv1.NamespaceSelector{},
+			Selector: labelSelector,
+			NamespaceSelector: monitoringv1.NamespaceSelector{
+				MatchNames: []string{
+					blackBoxExporterNamespace,
+				},
+			},
 		},
 	}
 	return serviceMonitor
