@@ -124,8 +124,9 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
 
 	resource := &monitoringv1.PrometheusRule{}
+	sourceCRName := "RouteMonitorUrl"
 	populationFunc := func() monitoringv1.PrometheusRule {
-		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
+		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName, sourceCRName)
 	}
 
 	// Does the resource already exist?
