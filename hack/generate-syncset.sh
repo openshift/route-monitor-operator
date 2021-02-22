@@ -4,6 +4,8 @@ set -euxo pipefail
 
 IN_CONTAINER=${IN_CONTAINER:-true}
 
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-} # to the CONTAINER_ENGINE won't be unbound
+
 if [[ -n $CONTAINER_ENGINE ]]; then
 	echo "CONTAINER_ENGINE is filled, using it"
 elif [[ $(which podman) ]]; then
