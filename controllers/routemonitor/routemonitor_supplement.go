@@ -4,22 +4,23 @@ import (
 	"context"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackbox"
+	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
-//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/blackboxexporter.go -package $GOPACKAGE BlackboxExporter
-type BlackboxExporter interface {
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/blackboxexporter.go -package $GOPACKAGE BlackBoxExporter
+type BlackBoxExporter interface {
 	EnsureBlackBoxExporterResourcesExist() error
 	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackbox.ShouldDeleteBlackBoxExporter, error)
+	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
+	GetBlackBoxExporterNamespace() string
 }
 
 func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
-	shouldDeleteBlackBoxResources, err := r.BlackboxExporter.ShouldDeleteBlackBoxExporterResources()
+	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -27,7 +28,7 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")
-		err := r.BlackboxExporter.EnsureBlackBoxExporterResourcesAbsent()
+		err := r.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}

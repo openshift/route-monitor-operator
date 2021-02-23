@@ -34,7 +34,7 @@ type RouteMonitorReconciler struct {
 	client.Client
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
-	BlackboxExporter BlackboxExporter
+	BlackBoxExporter BlackBoxExporter
 	RouteMonitorSupplement
 	RouteMonitorAdder
 	RouteMonitorDeleter
@@ -80,7 +80,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go
-	err = r.BlackboxExporter.EnsureBlackBoxExporterResourcesExist()
+	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
