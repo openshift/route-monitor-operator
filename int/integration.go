@@ -155,6 +155,22 @@ func (i *Integration) WaitForPrometheusRule(name types.NamespacedName, seconds i
 	return prometheusRule, nil
 }
 
+func (i *Integration) WaitForPrometheusRuleRef(name types.NamespacedName, seconds int) (v1alpha1.RouteMonitor, error) {
+	routeMonitor := v1alpha1.RouteMonitor{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &routeMonitor)
+		if routeMonitor.Status.PrometheusRuleRef.Name != "" || err != nil {
+			return routeMonitor, err
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return routeMonitor, fmt.Errorf("PrometheusRuleRef didn't appear after %d seconds", seconds)
+	}
+	return routeMonitor, nil
+}
+
 func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, seconds int) error {
 	prometheusRule := monitoringv1.PrometheusRule{}
 	t := 0
