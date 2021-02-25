@@ -78,6 +78,15 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
+	log.V(2).Info("Entering EnsureFinalizerSet")
+	res, err = r.EnsureFinalizerSet(ctx, routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.Stop()
+	}
+
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go
 	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()

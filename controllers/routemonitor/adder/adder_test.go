@@ -116,22 +116,8 @@ var _ = Describe("Adder", func() {
 	AfterEach(func() {
 		mockCtrl.Finish()
 	})
-	Describe("EnsureServiceMonitorResourceExists", func() {
-		When("the RouteMonitor has no Host", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorAdderClient = fake.NewFakeClientWithScheme(scheme)
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
-			})
-			It("should return No Host error", func() {
-				// Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.NoHost))
-			})
-		})
-		When("Updating the finalizers using the 'Update' func failed unexpectidly", func() {
+	Describe("EnsureFinalizerSet", func() {
+		When("Updating the finalizers using the 'Update' func failed unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorAdderClient = mockClient
@@ -143,7 +129,7 @@ var _ = Describe("Adder", func() {
 			})
 			It("should bubble up the error", func() {
 				// Act
-				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+				_, err := routeMonitorAdder.EnsureFinalizerSet(ctx, routeMonitor)
 				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
@@ -161,11 +147,27 @@ var _ = Describe("Adder", func() {
 			})
 			It("Should update the RouteMonitor with the finalizer", func() {
 				// Act
-				resp, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+				resp, err := routeMonitorAdder.EnsureFinalizerSet(ctx, routeMonitor)
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
 				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+	})
+	Describe("EnsureServiceMonitorResourceExists", func() {
+		When("the RouteMonitor has no Host", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorAdderClient = fake.NewFakeClientWithScheme(scheme)
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
+			})
+			It("should return No Host error", func() {
+				// Act
+				_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.NoHost))
 			})
 		})
 		Describe("Testing ServiceMonitor creation", func() {
@@ -452,28 +454,6 @@ var _ = Describe("Adder", func() {
 				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(customerrors.InvalidSLO))
-			})
-		})
-		When("the RouteMonitor has no Finalizer", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorAdderClient = mockClient
-				update.CalledTimes = 1
-				routeMonitorFinalizers = nil
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "99.95",
-				}
-			})
-			It("Should update the RouteMonitor with the finalizer", func() {
-				// Act
-				resp, err := routeMonitorAdder.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp).NotTo(BeNil())
-				Expect(resp).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
 		When("the resource Exists", func() {

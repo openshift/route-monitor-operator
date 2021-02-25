@@ -49,15 +49,6 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
 	}
 
-	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
-		// If the routeMonitor doesn't have a finalizer, add it
-		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
-		if err := r.Update(ctx, &routeMonitor); err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-	}
-
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
 	populationFunc := func() monitoringv1.ServiceMonitor {
@@ -113,14 +104,6 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		return utilreconcile.ContinueReconcile()
 	}
 
-	res, err := r.addFinalizerToRouteMointor(ctx, routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
-	}
-
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
 
 	resource := &monitoringv1.PrometheusRule{}
@@ -144,7 +127,7 @@ func (r *RouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Conte
 		}
 	}
 
-	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
+	res, err := r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -172,7 +155,7 @@ func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error
 	return true, nil, parsedSlo
 }
 
-func (r *RouteMonitorAdder) addFinalizerToRouteMointor(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+func (r *RouteMonitorAdder) EnsureFinalizerSet(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	if !finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey) {
 		// If the routeMonitor doesn't have a finalizer, add it
 		utilfinalizer.Add(&routeMonitor, routemonitorconst.FinalizerKey)
