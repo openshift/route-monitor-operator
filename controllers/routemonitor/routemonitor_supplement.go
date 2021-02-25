@@ -73,7 +73,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
-		return utilreconcile.ContinueReconcile()
+		return r.addPrometheusRuleRefToStatus(ctx, routeMonitor, types.NamespacedName{})
 	}
 
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}

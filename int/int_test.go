@@ -215,6 +215,13 @@ var _ = Describe("Integrationtests", func() {
 				Expect(err).NotTo(HaveOccurred())
 				err = i.WaitForPrometheusRuleToClear(expectedDependentResource, 20)
 				Expect(err).NotTo(HaveOccurred())
+
+				updatedRouteMonitor := v1alpha1.RouteMonitor{}
+				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: routeMonitorNamespace, Name: routeMonitorName}, &updatedRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedRouteMonitor.Status.PrometheusRuleRef.Name).To(Equal(""))
+				Expect(updatedRouteMonitor.Status.PrometheusRuleRef.Namespace).To(Equal(""))
+
 			})
 		})
 
