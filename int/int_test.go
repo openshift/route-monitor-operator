@@ -195,6 +195,35 @@ var _ = Describe("Integrationtests", func() {
 				Expect(errors.IsNotFound(err)).To(BeTrue())
 			})
 		})
+		When("A RouteMonitor with SLO is created, but rolled back later", func() {
+			BeforeEach(func() {
+				err := i.Client.Create(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForServiceMonitor(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForPrometheusRule(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("removes the corresponding PrometheusRule", func() {
+				latestRouteMonitor, err := i.WaitForPrometheusRuleRef(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+				latestRouteMonitor.Spec.Slo.TargetAvailabilityPercent = ""
+				err = i.Client.Update(context.TODO(), &latestRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				err = i.WaitForPrometheusRuleToClear(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				updatedRouteMonitor := v1alpha1.RouteMonitor{}
+				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: routeMonitorNamespace, Name: routeMonitorName}, &updatedRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedRouteMonitor.Status.PrometheusRuleRef.Name).To(Equal(""))
+				Expect(updatedRouteMonitor.Status.PrometheusRuleRef.Namespace).To(Equal(""))
+
+			})
+		})
 
 		PWhen("the RouteMonitor Slo changes", func() {
 			It("creates/deletes a PrometheusRule as necessary", func() {

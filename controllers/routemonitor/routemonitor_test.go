@@ -13,12 +13,14 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
@@ -151,6 +153,195 @@ var _ = Describe("Routemonitor", func() {
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
+	})
+
+	Describe("EnsurePrometheusRuleResourceExists", func() {
+		var (
+			routeMonitorSlo  v1alpha1.SloSpec
+			mockStatusWriter *clientmocks.MockStatusWriter
+		)
+		BeforeEach(func() {
+			routeMonitorSlo = v1alpha1.SloSpec{}
+			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+
+			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
+				Slo: routeMonitorSlo,
+			}
+		})
+		JustBeforeEach(func() {
+			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
+				Slo: routeMonitorSlo,
+			}
+		})
+		When("the RouteMonitor has no Host", func() {
+			// Arrange
+			BeforeEach(func() {
+				scheme := constinit.Scheme
+				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
+			})
+			It("should return No Host error", func() {
+				// Act
+				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.NoHost))
+			})
+		})
+		When("the RouteMonitor has no slo spec", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
+			})
+			It("should skip processing and continue", func() {
+				// Act
+				res, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+		When("the RouteMonitor has a slo spec but percent is too low", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "-0/10",
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the RouteMonitor has a slo spec but percent is too high", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "101",
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the RouteMonitor has an empty slo value", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{}
+				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
+			})
+			It("should do nothing", func() {
+				// Act
+				res, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+		When("the RouteMonitor has invalid slo type", func() {
+			// Arrange
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "fake-slo-type",
+				}
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				// Assert
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.InvalidSLO))
+			})
+		})
+		When("the resource Exists", func() {
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.95",
+				}
+				routeMonitorFinalizers = routemonitorconst.FinalizerList
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				get.CalledTimes = 1
+			})
+
+			JustBeforeEach(func() {
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				routeMonitor.Name = "rmo-name"
+				routeMonitor.Namespace = "rmo-namespace"
+			})
+
+			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
+				//Act
+				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
+				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorSlo = v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.95",
+				}
+				routeMonitorFinalizers = routemonitorconst.FinalizerList
+				get.CalledTimes = 1
+			})
+
+			JustBeforeEach(func() {
+				routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
+					Name:      routeMonitor.Name,
+					Namespace: routeMonitor.Namespace,
+				}
+			})
+
+			It("should continue reconciling", func() {
+				//Act
+				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
 	})
 
 	Describe("EnsureRouteMonitorAndDependenciesAbsent", func() {

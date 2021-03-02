@@ -172,6 +172,21 @@ func (m *MockRouteMonitorAdder) EXPECT() *MockRouteMonitorAdderMockRecorder {
 	return m.recorder
 }
 
+// EnsureFinalizerSet mocks base method
+func (m *MockRouteMonitorAdder) EnsureFinalizerSet(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureFinalizerSet", ctx, routeMonitor)
+	ret0, _ := ret[0].(reconcile.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EnsureFinalizerSet indicates an expected call of EnsureFinalizerSet
+func (mr *MockRouteMonitorAdderMockRecorder) EnsureFinalizerSet(ctx, routeMonitor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureFinalizerSet", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsureFinalizerSet), ctx, routeMonitor)
+}
+
 // EnsureServiceMonitorResourceExists mocks base method
 func (m *MockRouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
@@ -185,19 +200,4 @@ func (m *MockRouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.C
 func (mr *MockRouteMonitorAdderMockRecorder) EnsureServiceMonitorResourceExists(ctx, routeMonitor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureServiceMonitorResourceExists", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsureServiceMonitorResourceExists), ctx, routeMonitor)
-}
-
-// EnsurePrometheusRuleResourceExists mocks base method
-func (m *MockRouteMonitorAdder) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (reconcile.Result, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsurePrometheusRuleResourceExists", ctx, routeMonitor)
-	ret0, _ := ret[0].(reconcile.Result)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// EnsurePrometheusRuleResourceExists indicates an expected call of EnsurePrometheusRuleResourceExists
-func (mr *MockRouteMonitorAdderMockRecorder) EnsurePrometheusRuleResourceExists(ctx, routeMonitor interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsurePrometheusRuleResourceExists", reflect.TypeOf((*MockRouteMonitorAdder)(nil).EnsurePrometheusRuleResourceExists), ctx, routeMonitor)
 }
