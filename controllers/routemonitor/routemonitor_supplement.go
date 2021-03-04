@@ -2,6 +2,7 @@ package routemonitor
 
 import (
 	"context"
+	"reflect"
 
 	// k8s packages
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -97,6 +98,20 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
+		// if PrometheusRule exists, make sure that the SLO target is set correctly
+	} else {
+		// create the template to compare
+		template := populationFunc()
+		// Compare the PrometheusRule template to the actual existing object
+		if !reflect.DeepEqual(template.Spec, resource.Spec) {
+			// update the object with the new Spec
+			resource.Spec = template.Spec
+			err := r.Update(ctx, resource)
+			if err != nil {
+				return utilreconcile.RequeueReconcileWith(err)
+			}
+		}
+
 	}
 
 	res, err := r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
