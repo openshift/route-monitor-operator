@@ -2,6 +2,7 @@ package routemonitor
 
 import (
 	"context"
+	"reflect"
 
 	// k8s packages
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -80,26 +81,11 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 	}
 
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
+	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
 
-	resource := &monitoringv1.PrometheusRule{}
-	populationFunc := func() monitoringv1.PrometheusRule {
-		return templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
-	}
-
-	// Does the resource already exist?
-	if err := r.Get(ctx, namespacedName, resource); err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		// populate the resource with the template
-		resource := populationFunc()
-		// and create it
-		err = r.Create(ctx, &resource)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
+	err = r.createOrUpdatePrometheusRule(ctx, template)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
@@ -111,6 +97,25 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 	}
 
 	return utilreconcile.ContinueReconcile()
+}
+
+func (r *RouteMonitorReconciler) createOrUpdatePrometheusRule(ctx context.Context, template monitoringv1.PrometheusRule) error {
+	resource := &monitoringv1.PrometheusRule{}
+	err := r.Get(ctx, types.NamespacedName{Namespace: template.Namespace, Name: template.Name}, resource)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	}
+
+	if !k8serrors.IsNotFound(err) {
+		if r.DeepEqual(template.Spec, resource.Spec) {
+			return nil
+		}
+		// Update PrometheusRule if the specs are different
+		resource.Spec = template.Spec
+		return r.Update(ctx, resource)
+	}
+	// Create the PrometheusRule if it does not exist
+	return r.Create(ctx, &template)
 }
 
 func (r *RouteMonitorReconciler) updateErrorStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, err error) (utilreconcile.Result, error) {
@@ -179,4 +184,10 @@ func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error
 		return false, customerrors.InvalidSLO, ""
 	}
 	return true, nil, parsedSlo
+}
+
+type ResourceComparerStruct struct{}
+
+func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
+	return reflect.DeepEqual(x, y)
 }

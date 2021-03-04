@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
-
+	"reflect"
+	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -185,4 +186,42 @@ func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, se
 		return fmt.Errorf("PrometheusRule didn't vanish after %d seconds", seconds)
 	}
 	return nil
+}
+
+func (i *Integration) WaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int) error {
+	prometheusRule := monitoringv1.PrometheusRule{}
+	err := i.Client.Get(context.TODO(), name, &prometheusRule)
+	if errors.IsNotFound(err) {
+		return fmt.Errorf("PrometheusRule wasn't found")
+	}
+	if err != nil {
+		return err
+	}
+
+	routeMonitor := v1alpha1.RouteMonitor{}
+	err = i.Client.Get(context.TODO(), name, &routeMonitor)
+	if errors.IsNotFound(err) {
+		return fmt.Errorf("RouteMonitor wasn't found")
+	}
+	if err != nil {
+		return err
+	}
+
+	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &prometheusRule)
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("PrometheusRule wasn't found")
+		}
+		if reflect.DeepEqual(template.Spec, prometheusRule.Spec){
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return fmt.Errorf("PrometheusRule wasn't updated with the correct SLO after %d seconds", seconds)
+	}
+	return nil
+
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 )
 
-//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter,RouteMonitorAdder
+//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/routemonitor.go -package $GOPACKAGE RouteMonitorActionDoer,RouteMonitorDeleter,RouteMonitorAdder,DeepEqual
 
 type RouteMonitorSupplement interface {
 	GetRouteMonitor(ctx context.Context, req ctrl.Request) (routeMonitor v1alpha1.RouteMonitor, res utilreconcile.Result, err error)
@@ -27,4 +27,8 @@ type RouteMonitorDeleter interface {
 type RouteMonitorAdder interface {
 	EnsureFinalizerSet(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 	EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
+}
+
+type ResourceComparer interface {
+	DeepEqual(x, y interface{}) bool
 }

@@ -104,7 +104,7 @@ func main() {
 	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler, blackboxExporterNamespace)
 	routeMonitorReconciler.BlackBoxExporter = blackboxexporter.New(routeMonitorReconciler.Client,
 		routeMonitorReconciler.Log, context.Background(), blackboxExporterImage, blackboxExporterNamespace)
-
+	routeMonitorReconciler.ResourceComparer = routemonitor.ResourceComparerStruct{}
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)

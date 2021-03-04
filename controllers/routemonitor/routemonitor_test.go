@@ -39,19 +39,21 @@ var _ = Describe("Routemonitor", func() {
 		mockDeleter                  *routemonitormocks.MockRouteMonitorDeleter
 		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
 		mockBlackboxExporter         *routemonitormocks.MockBlackBoxExporter
+		mockResourceComparer         *routemonitormocks.MockResourceComparer
 		ctx                          context.Context
 
-		update                                helper.MockHelper
-		delete                                helper.MockHelper
-		get                                   helper.MockHelper
-		create                                helper.MockHelper
-		ensureServiceMonitorResourceAbsent    helper.MockHelper
-		ensurePrometheusRuleResourceAbsent    helper.MockHelper
-		shouldDeleteBlackBoxExporterResources helper.MockHelper
-		ensureBlackBoxExporterResourcesAbsent helper.MockHelper
-		ensureBlackBoxExporterResourcesExist  helper.MockHelper
-		ensureFinalizerAbsent                 helper.MockHelper
-
+		update                                        helper.MockHelper
+		delete                                        helper.MockHelper
+		get                                           helper.MockHelper
+		create                                        helper.MockHelper
+		ensureServiceMonitorResourceAbsent            helper.MockHelper
+		ensurePrometheusRuleResourceAbsent            helper.MockHelper
+		shouldDeleteBlackBoxExporterResources         helper.MockHelper
+		ensureBlackBoxExporterResourcesAbsent         helper.MockHelper
+		ensureBlackBoxExporterResourcesExist          helper.MockHelper
+		ensureFinalizerAbsent                         helper.MockHelper
+		deepEqualCalledTimes                          int
+		deepEqualResponse                             bool
 		shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
 		ensureFinalizerAbsentResponse                 utilreconcile.Result
 
@@ -67,6 +69,7 @@ var _ = Describe("Routemonitor", func() {
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockDeleter = routemonitormocks.NewMockRouteMonitorDeleter(mockCtrl)
 		mockAdder = routemonitormocks.NewMockRouteMonitorAdder(mockCtrl)
+		mockResourceComparer = routemonitormocks.NewMockResourceComparer(mockCtrl)
 
 		mockSupplement = routemonitormocks.NewMockRouteMonitorSupplement(mockCtrl)
 		mockBlackboxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
@@ -86,6 +89,8 @@ var _ = Describe("Routemonitor", func() {
 		ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
 		ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
 		ensureFinalizerAbsent = helper.MockHelper{}
+		deepEqualCalledTimes = 0
+		deepEqualResponse = true
 		shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 
 		ensureFinalizerAbsentResponse = utilreconcile.Result{}
@@ -116,6 +121,10 @@ var _ = Describe("Routemonitor", func() {
 			Return(ensurePrometheusRuleResourceAbsent.ErrorResponse).
 			Times(ensurePrometheusRuleResourceAbsent.CalledTimes)
 
+		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
+			Return(deepEqualResponse).
+			Times(deepEqualCalledTimes)
+
 		mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
 			Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).
 			Return(ensureBlackBoxExporterResourcesAbsent.ErrorResponse)
@@ -140,6 +149,7 @@ var _ = Describe("Routemonitor", func() {
 			RouteMonitorDeleter:    mockDeleter,
 			RouteMonitorAdder:      mockAdder,
 			BlackBoxExporter:       mockBlackboxExporter,
+			ResourceComparer:       mockResourceComparer,
 		}
 
 		routeMonitor = v1alpha1.RouteMonitor{
@@ -152,6 +162,10 @@ var _ = Describe("Routemonitor", func() {
 			Status: routeMonitorStatus,
 		}
 		expectedRouteMonitor = routeMonitor
+
+		deepEqualResponse = true
+		deepEqualCalledTimes = 0
+
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
@@ -165,7 +179,14 @@ var _ = Describe("Routemonitor", func() {
 			shouldPopulateError bool
 		)
 		BeforeEach(func() {
-			routeMonitorSlo = v1alpha1.SloSpec{}
+			//			routeMonitorSlo = v1alpha1.SloSpec{}
+			routeMonitorSlo = v1alpha1.SloSpec{
+				TargetAvailabilityPercent: "99.95",
+			}
+			routeMonitorStatus = v1alpha1.RouteMonitorStatus{
+				RouteURL: "fake-route-url",
+			}
+
 			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 			errorToPopulate = nil
 			shouldPopulateError = false
@@ -208,10 +229,8 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
 				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
+				routeMonitorSlo = v1alpha1.SloSpec{}
 			})
 			It("should skip processing and continue", func() {
 				// Act
@@ -226,9 +245,6 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "-0/10",
 				}
@@ -245,9 +261,6 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "101",
 				}
@@ -265,9 +278,6 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
 				routeMonitorSlo = v1alpha1.SloSpec{}
 				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
 			})
@@ -284,9 +294,6 @@ var _ = Describe("Routemonitor", func() {
 			// Arrange
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "fake-slo-type",
 				}
@@ -299,18 +306,50 @@ var _ = Describe("Routemonitor", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
-		When("the resource Exists", func() {
+		Describe("the resource exists but...", func() {
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "99.95",
-				}
+				routeMonitorFinalizers = routemonitorconst.FinalizerList
+				get.CalledTimes = 1
+				deepEqualCalledTimes = 1
+			})
+			JustBeforeEach(func() {
+				routeMonitor.Name = "rmo-name"
+				routeMonitor.Namespace = "rmo-namespace"
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				//Act
+				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+			When("deepEqual is true (they are the same)", func() {
+				It("should stop operation", func() {})
+			})
+			When("deepEqual is false (they are different)", func() {
+				BeforeEach(func() {
+					deepEqualResponse = false
+					update.CalledTimes = 1
+				})
+				It("should stop operation", func() {})
+			})
+		})
+
+		When("the resource Exists but not the same as the generated template", func() {
+			BeforeEach(func() {
+				routeMonitorReconcilerClient = mockClient
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
 				get.CalledTimes = 1
+
+				deepEqualResponse = false
+				deepEqualCalledTimes = 1
+
+				update.CalledTimes = 1
 			})
 
 			JustBeforeEach(func() {
@@ -320,7 +359,6 @@ var _ = Describe("Routemonitor", func() {
 				routeMonitor.Name = "rmo-name"
 				routeMonitor.Namespace = "rmo-namespace"
 			})
-
 			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
 				//Act
 				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
@@ -330,17 +368,15 @@ var _ = Describe("Routemonitor", func() {
 				Expect(resp).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
+
 		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
 			BeforeEach(func() {
 				routeMonitorReconcilerClient = mockClient
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-					RouteURL: "fake-route-url",
-				}
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "99.95",
-				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				get.CalledTimes = 1
+
+				deepEqualResponse = true
+				deepEqualCalledTimes = 1
 			})
 
 			JustBeforeEach(func() {
