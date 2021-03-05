@@ -108,9 +108,9 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		     annotations:
 		       message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
 		     expr: |
-		       sum(http_requests_total:burnrate5m{targeturl="getmeright"}) > (14.40 * (1-0.95000))
+		       1-rate(probe_success{targeturl="getmeright"}[5m]) > (14.40 * (1-0.95000))
 		       and
-		       sum(http_requests_total:burnrate1h{targeturl="getmeright"}) > (14.40 * (1-0.95000))
+		       1-rate(probe_success{targeturl="getmeright"}[1h]) > (14.40 * (1-0.95000))
 		     for: 2m
 		     labels:
 		       severity: critical
@@ -118,9 +118,9 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		*/
 
 		alertTemplate := strings.Join([]string{
-			`sum(http_requests_total:burnrate%[3]s{%[1]s}) > (14.40 * (1-%[2]s))`,
+			`1-rate(probe_success{%[1]s}[%[3]s]) > (14.40 * (1-%[2]s))`,
 			`and`,
-			`sum(http_requests_total:burnrate%[4]s{%[1]s}) > (14.40 * (1-%[2]s))`}, "\n")
+			`1-rate(probe_success{%[1]s}[%[4]s]) > (14.40 * (1-%[2]s))`}, "\n")
 		rules = append(rules, monitoringv1.Rule{
 			Alert: "ErrorBudgetBurn",
 			Expr: intstr.FromString(fmt.Sprintf(alertTemplate,
@@ -134,30 +134,6 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 			},
 			For: alertStruct.duration,
 		})
-	}
-
-	// Create all the recording rules
-	// Sample resource
-	/*
-	   - expr: |
-	       sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[6h]))
-	       /
-	       sum(rate(http_requests_total{targeturl="getmeright"}[6h]))
-	     labels:
-	       targeturl: getmeright
-	     record: http_requests_total:burnrate6h
-	*/
-	recordingRuleTemplate := strings.Join([]string{
-		`sum(rate(http_requests_total{%[1]s,code=~"5.."}[%[2]s]))`,
-		`/`,
-		`sum(rate(http_requests_total{%[1]s}[%[2]s]))`}, "\n")
-	for _, timePeriod := range []string{"5m", "30m", "1h", "2h", "6h", "1d", "3d"} {
-		rules = append(rules, monitoringv1.Rule{
-			Expr:   intstr.FromString(fmt.Sprintf(recordingRuleTemplate, routeURLLabel, timePeriod)),
-			Labels: sampleTemplateLabels(routeURL),
-			Record: fmt.Sprintf("http_requests_total:burnrate%s", timePeriod),
-		})
-
 	}
 
 	resource := monitoringv1.PrometheusRule{
