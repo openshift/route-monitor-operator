@@ -2,7 +2,6 @@ package templates
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -68,6 +67,7 @@ type multiWindowMultiBurnAlertRule struct {
 	severity    string
 	longWindow  string
 	shortWindow string
+	burnRate    string
 }
 
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
@@ -86,17 +86,12 @@ type multiWindowMultiBurnAlertRule struct {
 			 targeturl: getmeright
 */
 func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string) monitoringv1.Rule {
-	alertTemplate := strings.Join([]string{
-		`1-rate(probe_success{%[1]s}[%[3]s]) > (14.40 * (1-%[2]s))`,
-		`and`,
-		`1-rate(probe_success{%[1]s}[%[4]s]) > (14.40 * (1-%[2]s))`}, "\n")
+	alertString := "1-avg_over_time(probe_success{" + label + "}[" + r.shortWindow + "]) > (" + r.burnRate + "*(1-" + percent + "))\n" +
+		"and\n" +
+		"1-avg_over_time(probe_success{" + label + "}[" + r.longWindow + "]) > (" + r.burnRate + "*(1-" + percent + " ))"
 	return monitoringv1.Rule{
-		Alert: alertName,
-		Expr: intstr.FromString(fmt.Sprintf(alertTemplate,
-			label,
-			percent,
-			r.shortWindow,
-			r.longWindow)),
+		Alert:  alertName,
+		Expr:   intstr.FromString(alertString),
 		Labels: sampleTemplateLabelsWithSev(url, r.severity),
 		Annotations: map[string]string{
 			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", label),
@@ -116,24 +111,28 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 			severity:    "critical",
 			longWindow:  "1h",
 			shortWindow: "5m",
+			burnRate:    "14.40",
 		},
 		{
 			duration:    "15m",
 			severity:    "critical",
 			longWindow:  "6h",
 			shortWindow: "30m",
+			burnRate:    "6",
 		},
 		{
 			duration:    "1h",
 			severity:    "warning",
 			longWindow:  "1d",
 			shortWindow: "2h",
+			burnRate:    "3",
 		},
 		{
 			duration:    "3h",
 			severity:    "warning",
 			longWindow:  "3d",
 			shortWindow: "6h",
+			burnRate:    "1",
 		},
 	}
 
