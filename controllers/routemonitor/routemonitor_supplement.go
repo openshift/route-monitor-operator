@@ -67,11 +67,8 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 	shouldHave, err, parsedSlo := shouldCreatePrometheusRule(routeMonitor)
 
 	res, err := r.updateErrorStatus(ctx, routeMonitor, err)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
+	if err != nil || res.RequeueOrStop() {
+		return res, err
 	}
 
 	if !shouldHave {
