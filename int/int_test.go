@@ -5,13 +5,16 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	. "github.com/openshift/route-monitor-operator/int"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	. "github.com/openshift/route-monitor-operator/int"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 )
 
 var _ = Describe("Integrationtests", func() {
@@ -141,6 +144,28 @@ var _ = Describe("Integrationtests", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		When("the RouteMonitor spec has an incorrect value", func() {
+			It("doesn't create a prometheusrule with error but does create a servicemonitor", func() {
+				// This is a very available target XP
+				routeMonitor.Spec.Slo.TargetAvailabilityPercent = "100"
+				err := i.Client.Create(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				serviceMonitor, err := i.WaitForServiceMonitor(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(serviceMonitor.Name).To(Equal(expectedDependentResource.Name))
+				Expect(serviceMonitor.Namespace).To(Equal(expectedDependentResource.Namespace))
+
+				err = i.WaitForPrometheusRuleToClear(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				updatedRouteMonitor := v1alpha1.RouteMonitor{}
+				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: routeMonitorNamespace, Name: routeMonitorName}, &updatedRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(updatedRouteMonitor.Status.ErrorStatus).To(Equal(customerrors.InvalidSLO.Error()))
+			})
+		})
 		When("the RouteMonitor does not exist", func() {
 			It("creates a ServiceMonitor within 20 seconds", func() {
 				err := i.Client.Create(context.TODO(), &routeMonitor)
