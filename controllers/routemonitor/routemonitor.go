@@ -38,6 +38,7 @@ type RouteMonitorReconciler struct {
 	RouteMonitorSupplement
 	RouteMonitorAdder
 	RouteMonitorDeleter
+	ResourceComparer
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;delete

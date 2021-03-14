@@ -103,7 +103,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 		// create the template to compare
 		template := populationFunc()
 		// Compare the PrometheusRule template to the actual existing object
-		if !reflect.DeepEqual(template.Spec, resource.Spec) {
+		if !r.DeepEqual(template.Spec, resource.Spec) {
 			// update the object with the new Spec
 			resource.Spec = template.Spec
 			err := r.Update(ctx, resource)
@@ -157,4 +157,11 @@ func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error
 		return false, customerrors.InvalidSLO, ""
 	}
 	return true, nil, parsedSlo
+}
+
+type ResourceComparerStruct struct{}
+
+func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
+
+	return reflect.DeepEqual(x, y)
 }
