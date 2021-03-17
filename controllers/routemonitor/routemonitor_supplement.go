@@ -65,9 +65,12 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 
 func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	shouldHave, err, parsedSlo := shouldCreatePrometheusRule(routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
+
+	res, err := r.updateErrorStatus(ctx, routeMonitor, err)
+	if err != nil || res.RequeueOrStop() {
+		return res, err
 	}
+
 	if !shouldHave {
 		err = r.EnsurePrometheusRuleResourceAbsent(ctx, routeMonitor)
 		if err != nil {
@@ -99,7 +102,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 		}
 	}
 
-	res, err := r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
+	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -107,6 +110,40 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 		return utilreconcile.StopReconcile()
 	}
 
+	return utilreconcile.ContinueReconcile()
+}
+
+func (r *RouteMonitorReconciler) updateErrorStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, err error) (utilreconcile.Result, error) {
+	// If an error has already been flagged and still occurs
+	if routeMonitor.Status.ErrorStatus != "" && err != nil {
+		// Skip as the resource should not be created
+		return utilreconcile.ContinueReconcile()
+	}
+
+	// If the error was flagged but stopped firing
+	if routeMonitor.Status.ErrorStatus != "" && err == nil {
+		// Clear the error and restart
+		routeMonitor.Status.ErrorStatus = ""
+		err := r.Status().Update(ctx, &routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	// If the error was not flagged but has started firing
+	if routeMonitor.Status.ErrorStatus == "" && err != nil {
+		// Raise the alert and restart
+		routeMonitor.Status.ErrorStatus = err.Error()
+		err := r.Status().Update(ctx, &routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	// only case left is ErrorStatus == "" && err == nil
+	// so there is no need to check if err != nil
 	return utilreconcile.ContinueReconcile()
 }
 

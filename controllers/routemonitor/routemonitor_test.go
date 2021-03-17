@@ -1,17 +1,17 @@
 package routemonitor_test
 
 import (
-	"time"
-
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"context"
+	"time"
 
 	//tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -25,8 +25,6 @@ import (
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Routemonitor", func() {
@@ -58,6 +56,7 @@ var _ = Describe("Routemonitor", func() {
 		ensureFinalizerAbsentResponse                 utilreconcile.Result
 
 		routeMonitor                  v1alpha1.RouteMonitor
+		expectedRouteMonitor          v1alpha1.RouteMonitor
 		routeMonitorFinalizers        []string
 		routeMonitorDeletionTimestamp *metav1.Time
 		routeMonitorStatus            v1alpha1.RouteMonitorStatus
@@ -145,11 +144,14 @@ var _ = Describe("Routemonitor", func() {
 
 		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
+				Name:              "scott-pilgrim",
+				Namespace:         "the-world",
 				DeletionTimestamp: routeMonitorDeletionTimestamp,
 				Finalizers:        routeMonitorFinalizers,
 			},
 			Status: routeMonitorStatus,
 		}
+		expectedRouteMonitor = routeMonitor
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
@@ -157,12 +159,16 @@ var _ = Describe("Routemonitor", func() {
 
 	Describe("EnsurePrometheusRuleResourceExists", func() {
 		var (
-			routeMonitorSlo  v1alpha1.SloSpec
-			mockStatusWriter *clientmocks.MockStatusWriter
+			routeMonitorSlo     v1alpha1.SloSpec
+			mockStatusWriter    *clientmocks.MockStatusWriter
+			errorToPopulate     error
+			shouldPopulateError bool
 		)
 		BeforeEach(func() {
 			routeMonitorSlo = v1alpha1.SloSpec{}
 			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+			errorToPopulate = nil
+			shouldPopulateError = false
 
 			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
 				Slo: routeMonitorSlo,
@@ -172,20 +178,30 @@ var _ = Describe("Routemonitor", func() {
 			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
 				Slo: routeMonitorSlo,
 			}
+			expectedRouteMonitor = routeMonitor
+			if shouldPopulateError {
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				expectedRouteMonitor.Status.ErrorStatus = errorToPopulate.Error()
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).
+					Times(1).
+					Return(nil)
+			}
 		})
 		When("the RouteMonitor has no Host", func() {
 			// Arrange
 			BeforeEach(func() {
-				scheme := constinit.Scheme
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme)
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
+				shouldPopulateError, errorToPopulate = true, customerrors.NoHost
+			})
+			JustBeforeEach(func() {
+				scheme := constinit.Scheme
+				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
 			})
 			It("should return No Host error", func() {
 				// Act
 				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.NoHost))
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 		When("the RouteMonitor has no slo spec", func() {
@@ -216,13 +232,13 @@ var _ = Describe("Routemonitor", func() {
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "-0/10",
 				}
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
 			})
 			It("should Throw an error", func() {
 				// Act
 				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 		When("the RouteMonitor has a slo spec but percent is too high", func() {
@@ -235,13 +251,14 @@ var _ = Describe("Routemonitor", func() {
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "101",
 				}
+
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
 			})
 			It("should Throw an error", func() {
 				// Act
 				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 		When("the RouteMonitor has an empty slo value", func() {
@@ -273,13 +290,13 @@ var _ = Describe("Routemonitor", func() {
 				routeMonitorSlo = v1alpha1.SloSpec{
 					TargetAvailabilityPercent: "fake-slo-type",
 				}
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
 			})
 			It("should Throw an error", func() {
 				// Act
 				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
 				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(customerrors.InvalidSLO))
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 		When("the resource Exists", func() {

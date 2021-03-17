@@ -43,6 +43,7 @@ type RouteMonitorStatus struct {
 	RouteURL          string         `json:"routeURL,omitempty"`
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
 	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
+	ErrorStatus       string         `json:"errorStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
