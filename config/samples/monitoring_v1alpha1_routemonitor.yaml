@@ -7,4 +7,4 @@ spec:
     namespace: openshift-console
     name: console
   slo:
-    targetAvailabilityPercent: "99.5"
+    targetAvailabilityPercent: "99.95"
