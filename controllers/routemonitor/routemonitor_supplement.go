@@ -111,7 +111,6 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 				return utilreconcile.RequeueReconcileWith(err)
 			}
 		}
-
 	}
 
 	res, err := r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
@@ -162,6 +161,5 @@ func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error
 type ResourceComparerStruct struct{}
 
 func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
-
 	return reflect.DeepEqual(x, y)
 }
