@@ -41,8 +41,8 @@ var _ = Describe("Routemonitor", func() {
 		mockDeleter                  *routemonitormocks.MockRouteMonitorDeleter
 		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
 		mockBlackboxExporter         *routemonitormocks.MockBlackBoxExporter
-		ctx                          context.Context
 		mockResourceComparer         *routemonitormocks.MockResourceComparer
+		ctx                          context.Context
 
 		update                                        helper.MockHelper
 		delete                                        helper.MockHelper
@@ -54,7 +54,7 @@ var _ = Describe("Routemonitor", func() {
 		ensureBlackBoxExporterResourcesAbsent         helper.MockHelper
 		ensureBlackBoxExporterResourcesExist          helper.MockHelper
 		ensureFinalizerAbsent                         helper.MockHelper
-		deepEqual                                     helper.MockHelper
+		deepEqualCalledTimes                          int
 		deepEqualResponse                             bool
 		shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
 		ensureFinalizerAbsentResponse                 utilreconcile.Result
@@ -90,7 +90,7 @@ var _ = Describe("Routemonitor", func() {
 		ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
 		ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
 		ensureFinalizerAbsent = helper.MockHelper{}
-		deepEqual = helper.MockHelper{}
+		deepEqualCalledTimes = 0
 		deepEqualResponse = true
 		shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 
@@ -124,7 +124,7 @@ var _ = Describe("Routemonitor", func() {
 
 		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
 			Return(deepEqualResponse).
-			Times(deepEqual.CalledTimes)
+			Times(deepEqualCalledTimes)
 
 		mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
 			Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).
@@ -162,7 +162,7 @@ var _ = Describe("Routemonitor", func() {
 		}
 
 		deepEqualResponse = true
-		deepEqual.CalledTimes = 0
+		deepEqualCalledTimes = 0
 
 	})
 	AfterEach(func() {
@@ -294,7 +294,7 @@ var _ = Describe("Routemonitor", func() {
 				routeMonitorReconcilerClient = mockClient
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
 				get.CalledTimes = 1
-				deepEqual.CalledTimes = 1
+				deepEqualCalledTimes = 1
 			})
 			JustBeforeEach(func() {
 				routeMonitor.Name = "rmo-name"
@@ -330,7 +330,7 @@ var _ = Describe("Routemonitor", func() {
 				get.CalledTimes = 1
 
 				deepEqualResponse = false
-				deepEqual.CalledTimes = 1
+				deepEqualCalledTimes = 1
 
 				update.CalledTimes = 1
 			})
@@ -359,7 +359,7 @@ var _ = Describe("Routemonitor", func() {
 				get.CalledTimes = 1
 
 				deepEqualResponse = true
-				deepEqual.CalledTimes = 1
+				deepEqualCalledTimes = 1
 			})
 
 			JustBeforeEach(func() {
