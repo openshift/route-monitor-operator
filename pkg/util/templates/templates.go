@@ -2,7 +2,6 @@ package templates
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -63,101 +62,82 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 	return serviceMonitor
 }
 
+type multiWindowMultiBurnAlertRule struct {
+	duration    string
+	severity    string
+	longWindow  string
+	shortWindow string
+	burnRate    string
+}
+
+//render creates a monitoring rule for the defined multiwindow multi-burn rate alert
+// Sample result as yaml
+/*
+	 - alert: ErrorBudgetBurn
+		 annotations:
+			 message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
+		 expr: |
+			 1-rate(probe_success{targeturl="getmeright"}[5m]) > (14.40 * (1-0.95000))
+			 and
+			 1-rate(probe_success{targeturl="getmeright"}[1h]) > (14.40 * (1-0.95000))
+		 for: 2m
+		 labels:
+			 severity: critical
+			 targeturl: getmeright
+*/
+func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string) monitoringv1.Rule {
+	alertString := "1-avg_over_time(probe_success{" + label + "}[" + r.shortWindow + "]) > (" + r.burnRate + "*(1-" + percent + "))\n" +
+		"and\n" +
+		"1-avg_over_time(probe_success{" + label + "}[" + r.longWindow + "]) > (" + r.burnRate + "*(1-" + percent + " ))"
+	return monitoringv1.Rule{
+		Alert:  alertName,
+		Expr:   intstr.FromString(alertString),
+		Labels: sampleTemplateLabelsWithSev(url, r.severity),
+		Annotations: map[string]string{
+			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", label),
+		},
+		For: r.duration,
+	}
+}
+
 // TemplateForPrometheusRuleResource returns a PrometheusRule
 func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
 
-	routeURL := url
-	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, routeURL)
+	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, url)
 	rules := []monitoringv1.Rule{}
-
-	for _, alertStruct := range []struct {
-		duration  string
-		severity  string
-		timeShort string
-		timeLong  string
-	}{
+	alertRules := []multiWindowMultiBurnAlertRule{
 		{
-			duration:  "2m",
-			severity:  "critical",
-			timeLong:  "1h",
-			timeShort: "5m",
+			duration:    "2m",
+			severity:    "critical",
+			longWindow:  "1h",
+			shortWindow: "5m",
+			burnRate:    "14.40",
 		},
 		{
-			duration:  "15m",
-			severity:  "critical",
-			timeLong:  "6h",
-			timeShort: "30m",
+			duration:    "15m",
+			severity:    "critical",
+			longWindow:  "6h",
+			shortWindow: "30m",
+			burnRate:    "6",
 		},
 		{
-			duration:  "1h",
-			severity:  "warning",
-			timeLong:  "1d",
-			timeShort: "2h",
+			duration:    "1h",
+			severity:    "warning",
+			longWindow:  "1d",
+			shortWindow: "2h",
+			burnRate:    "3",
 		},
 		{
-			duration:  "3h",
-			severity:  "warning",
-			timeLong:  "3d",
-			timeShort: "6h",
+			duration:    "3h",
+			severity:    "warning",
+			longWindow:  "3d",
+			shortWindow: "6h",
+			burnRate:    "1",
 		},
-	} {
-		// Create all the alerts
-		// Sample resource
-		/*
-		   - alert: ErrorBudgetBurn
-		     annotations:
-		       message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-		     expr: |
-		       sum(http_requests_total:burnrate5m{targeturl="getmeright"}) > (14.40 * (1-0.95000))
-		       and
-		       sum(http_requests_total:burnrate1h{targeturl="getmeright"}) > (14.40 * (1-0.95000))
-		     for: 2m
-		     labels:
-		       severity: critical
-		       targeturl: getmeright
-		*/
-
-		alertTemplate := strings.Join([]string{
-			`sum(http_requests_total:burnrate%[3]s{%[1]s}) > (14.40 * (1-%[2]s))`,
-			`and`,
-			`sum(http_requests_total:burnrate%[4]s{%[1]s}) > (14.40 * (1-%[2]s))`}, "\n")
-		rules = append(rules, monitoringv1.Rule{
-			Alert: "ErrorBudgetBurn",
-			Expr: intstr.FromString(fmt.Sprintf(alertTemplate,
-				routeURLLabel,
-				percent,
-				alertStruct.timeShort,
-				alertStruct.timeLong)),
-			Labels: sampleTemplateLabelsWithSev(routeURL, alertStruct.severity),
-			Annotations: map[string]string{
-				"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", routeURLLabel),
-			},
-			For: alertStruct.duration,
-		})
 	}
 
-	// Create all the recording rules
-	// Sample resource
-	/*
-	   - expr: |
-	       sum(rate(http_requests_total{targeturl="getmeright",code=~"5.."}[6h]))
-	       /
-	       sum(rate(http_requests_total{targeturl="getmeright"}[6h]))
-	     labels:
-	       targeturl: getmeright
-	     record: http_requests_total:burnrate6h
-	*/
-	recordingRuleTemplate := strings.Join([]string{
-		`sum(rate(http_requests_total{%[1]s,code=~"5.."}[%[2]s]))`,
-		`/`,
-		`sum(rate(http_requests_total{%[1]s}[%[2]s]))`}, "\n")
-	for _, timePeriod := range []string{"5m", "30m", "1h", "2h", "6h", "1d", "3d"} {
-		rules = append(rules, monitoringv1.Rule{
-			Expr:   intstr.FromString(fmt.Sprintf(recordingRuleTemplate, routeURLLabel, timePeriod)),
-			Labels: sampleTemplateLabels(routeURL),
-			Record: fmt.Sprintf("http_requests_total:burnrate%s", timePeriod),
-		})
-
+	for _, alertrule := range alertRules { // Create all the alerts
+		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName.Name+"-ErrorBudgetBurn"))
 	}
 
 	resource := monitoringv1.PrometheusRule{
@@ -168,7 +148,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		Spec: monitoringv1.PrometheusRuleSpec{
 			Groups: []monitoringv1.RuleGroup{
 				{
-					Name:  "SLOs-http_requests_total",
+					Name:  "SLOs-probe",
 					Rules: rules,
 				},
 			},

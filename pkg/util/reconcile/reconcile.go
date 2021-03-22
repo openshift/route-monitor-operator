@@ -9,6 +9,10 @@ type Result struct {
 	RequeueAfter time.Duration
 }
 
+func (r Result) RequeueOrStop() bool {
+	return r.Requeue || !r.Continue
+}
+
 func (r Result) ShouldStop() bool {
 	return !r.Continue
 }
