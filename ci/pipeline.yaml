@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: test-oc-cli
+spec:
+  workspaces:
+  - name: oc
+  tasks:
+  - name: test-oc
+    taskRef:
+      name: test-oc
+      kind: Task
+    workspaces:
+    - name: oc
+      workspace: oc
+    params:
+    - name: url value: $(params.git-url)
+    - name: subdirectory
+      value: ""
+    - name: deleteExisting
+      value: "true"
+    - name: revision
+      value: $(params.git-revision)
