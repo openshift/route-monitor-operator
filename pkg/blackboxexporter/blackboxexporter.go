@@ -2,7 +2,6 @@ package blackboxexporter
 
 import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 
 	"context"
@@ -12,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	blackboxconst "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +28,7 @@ type BlackBoxExporter struct {
 }
 
 func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
-	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
+	blackboxNamespacedName := types.NamespacedName{Name: blackboxconst.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
 	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName}
 }
 
@@ -36,12 +36,12 @@ func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 	return b.NamespacedName.Namespace
 }
 
-func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxconst.ShouldDeleteBlackBoxExporter, error) {
 	objectsDependingOnExporter := []v1.Object{}
 
 	routeMonitors := &v1alpha1.RouteMonitorList{}
 	if err := b.Client.List(b.Ctx, routeMonitors); err != nil {
-		return blackboxexporter.KeepBlackBoxExporter, err
+		return blackboxconst.KeepBlackBoxExporter, err
 	}
 	for _, routeMonitor := range routeMonitors.Items {
 		objectsDependingOnExporter = append(objectsDependingOnExporter, &routeMonitor)
@@ -49,7 +49,7 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 
 	clusterUrlMonitors := &v1alpha1.ClusterUrlMonitorList{}
 	if err := b.Client.List(b.Ctx, clusterUrlMonitors); err != nil {
-		return blackboxexporter.KeepBlackBoxExporter, err
+		return blackboxconst.KeepBlackBoxExporter, err
 	}
 	for _, clusterUrlMonitor := range clusterUrlMonitors.Items {
 		objectsDependingOnExporter = append(objectsDependingOnExporter, &clusterUrlMonitor)
@@ -58,16 +58,13 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 
 	if len(objectsDependingOnExporter) == 1 && finalizer.WasDeleteRequested(objectsDependingOnExporter[0]) {
 		b.Log.V(3).Info("Deleting BlackBoxResources: decided to clean BlackBoxExporter resources")
-		return blackboxexporter.DeleteBlackBoxExporter, nil
+		return blackboxconst.DeleteBlackBoxExporter, nil
 	}
-	return blackboxexporter.KeepBlackBoxExporter, nil
+	return blackboxconst.KeepBlackBoxExporter, nil
 }
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
-	populationFunc := func() appsv1.Deployment {
-		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
-	}
 
 	// Does the resource already exist?
 	err := b.Client.Get(b.Ctx, b.NamespacedName, &resource)
@@ -78,7 +75,11 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 			return err
 		}
 		// populate the resource with the template
-		resource := populationFunc()
+		blackBoxLabels, err := blackboxconst.GetBlackBoxLabels(b.Client)
+		if err != nil {
+			return err
+		}
+		resource := templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName, blackBoxLabels)
 		// and create it
 		err = b.Client.Create(b.Ctx, &resource)
 		if err != nil {
@@ -90,7 +91,6 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 	resource := corev1.Service{}
-	populationFunc := func() corev1.Service { return templateForBlackBoxExporterService(b.NamespacedName) }
 
 	// Does the resource already exist?
 	if err := b.Client.Get(b.Ctx, b.NamespacedName, &resource); err != nil {
@@ -100,7 +100,11 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 			return err
 		}
 		// populate the resource with the template
-		resource := populationFunc()
+		blackBoxLabels, err := blackboxconst.GetBlackBoxLabels(b.Client)
+		if err != nil {
+			return err
+		}
+		resource := templateForBlackBoxExporterService(b.NamespacedName, blackBoxLabels)
 		// and create it
 		if err = b.Client.Create(b.Ctx, &resource); err != nil {
 			return err
@@ -110,10 +114,9 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
-	labels := blackboxexporter.GenerateBlackBoxExporterLables()
+func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName, blackBoxLabels map[string]string) appsv1.Deployment {
 	labelSelectors := metav1.LabelSelector{
-		MatchLabels: labels}
+		MatchLabels: blackBoxLabels}
 	// hardcode the replicasize for no
 	//replicas := m.Spec.Size
 	var replicas int32 = 1
@@ -122,14 +125,14 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      blackBoxNamespacedName.Name,
 			Namespace: blackBoxNamespacedName.Namespace,
-			Labels:    labels,
+			Labels:    blackBoxLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &labelSelectors,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels: blackBoxLabels,
 				},
 				Spec: corev1.PodSpec{
 					Affinity: &corev1.Affinity{
@@ -154,8 +157,8 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 						Image: blackBoxImage,
 						Name:  "blackbox-exporter",
 						Ports: []corev1.ContainerPort{{
-							ContainerPort: blackboxexporter.BlackBoxExporterPortNumber,
-							Name:          blackboxexporter.BlackBoxExporterPortName,
+							ContainerPort: blackboxconst.BlackBoxExporterPortNumber,
+							Name:          blackboxconst.BlackBoxExporterPortName,
 						}},
 					}},
 				},
@@ -166,21 +169,20 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 }
 
 // templateForBlackBoxExporterService returns a blackbox service
-func templateForBlackBoxExporterService(blackboxNamespacedName types.NamespacedName) corev1.Service {
-	labels := blackboxexporter.GenerateBlackBoxExporterLables()
+func templateForBlackBoxExporterService(blackboxNamespacedName types.NamespacedName, blackBoxLabels map[string]string) corev1.Service {
 
 	svc := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      blackboxNamespacedName.Name,
 			Namespace: blackboxNamespacedName.Namespace,
-			Labels:    labels,
+			Labels:    blackBoxLabels,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: labels,
+			Selector: blackBoxLabels,
 			Ports: []corev1.ServicePort{{
-				TargetPort: intstr.FromString(blackboxexporter.BlackBoxExporterPortName),
-				Port:       blackboxexporter.BlackBoxExporterPortNumber,
-				Name:       blackboxexporter.BlackBoxExporterPortName,
+				TargetPort: intstr.FromString(blackboxconst.BlackBoxExporterPortName),
+				Port:       blackboxconst.BlackBoxExporterPortNumber,
+				Name:       blackboxconst.BlackBoxExporterPortName,
 			}},
 		},
 	}

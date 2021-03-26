@@ -3,7 +3,7 @@ package templates
 import (
 	"fmt"
 
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	blackboxConst "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -11,13 +11,11 @@ import (
 )
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
-func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
+func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, blackBoxLabels map[string]string) monitoringv1.ServiceMonitor {
 
 	routeURL := url
 
-	routeMonitorLabels := blackboxexporter.GenerateBlackBoxExporterLables()
-
-	labelSelector := metav1.LabelSelector{MatchLabels: routeMonitorLabels}
+	labelSelector := metav1.LabelSelector{MatchLabels: blackBoxLabels}
 
 	// Currently we only support `http_2xx` as module
 	// Still make it a variable so we can easily add functionality later
@@ -36,7 +34,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Endpoints: []monitoringv1.Endpoint{
 				{
-					Port: blackboxexporter.BlackBoxExporterPortName,
+					Port: blackboxConst.BlackBoxExporterPortName,
 					// Probe every 30s
 					Interval: "30s",
 					// Timeout has to be smaller than probe interval

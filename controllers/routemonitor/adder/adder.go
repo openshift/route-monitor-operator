@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
+	blackboxconst "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
@@ -51,9 +52,6 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
-	populationFunc := func() monitoringv1.ServiceMonitor {
-		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName)
-	}
 
 	// Does the resource already exist?
 	if err := r.Get(ctx, namespacedName, resource); err != nil {
@@ -62,8 +60,13 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 			// return unexpectedly
 			return utilreconcile.RequeueReconcileWith(err)
 		}
+
 		// populate the resource with the template
-		resource := populationFunc()
+		blackBoxLabels, err := blackboxconst.GetBlackBoxLabels(r.Client)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		resource := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName, blackBoxLabels)
 		// and create it
 		err = r.Create(ctx, &resource)
 		if err != nil {

@@ -7,7 +7,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	blackboxconst "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -22,7 +22,7 @@ import (
 type BlackBoxExporter interface {
 	EnsureBlackBoxExporterResourcesExist() error
 	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporterconsts.ShouldDeleteBlackBoxExporter, error)
+	ShouldDeleteBlackBoxExporterResources() (blackboxconst.ShouldDeleteBlackBoxExporter, error)
 	GetBlackBoxExporterNamespace() string
 }
 
@@ -62,7 +62,11 @@ func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName)
+	blackBoxLabels, err := blackboxconst.GetBlackBoxLabels(s.Client)
+	if err != nil {
+		return err
+	}
+	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, blackBoxLabels)
 	err = s.Client.Create(s.Ctx, &serviceMonitor)
 	if err != nil {
 		return err
@@ -106,7 +110,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Resul
 	if err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
-	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
+	if shouldDelete == blackboxconst.DeleteBlackBoxExporter {
 		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
 		if err != nil {
 			return reconcile.RequeueReconcileWith(err)
