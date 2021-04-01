@@ -162,8 +162,3 @@ func sampleTemplateLabelsWithSev(url, severity string) map[string]string {
 		"RouteMonitorUrl": url,
 	}
 }
-func sampleTemplateLabels(url string) map[string]string {
-	return map[string]string{
-		"RouteMonitorUrl": url,
-	}
-}

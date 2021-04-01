@@ -1,5 +1,4 @@
 FROM quay.io/app-sre/boilerplate:image-v0.4.0 AS builder
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.13 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
