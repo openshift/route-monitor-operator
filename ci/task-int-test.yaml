@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: test-int
+  namespace: ci
+spec:
+  steps:
+    - name: test
+      image: quay.io/bitnami/golang:1.14
+      command: ["/bin/bash", "-c"]
+      args:
+        - |-
+          HASH=$(cat ./installed_commit)
+          rm -f .git/index.lock || true
+          git checkout $HASH
+          echo "Starting Integration Tests"
+          go test ./int -v -count=1
+      resources: {}
+      workingDir: /workspace/output
+  workspaces:
+    - name: output
+

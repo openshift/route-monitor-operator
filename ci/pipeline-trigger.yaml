@@ -1,0 +1,78 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: pipe-trigger
+  namespace: ci
+spec:
+  params:
+  - name: gitrevision
+    value: master
+  - name: gitrepositoryurl
+    value: https://github.com/openshift/route-monitor-operator
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: pipe-trigger-template
+  namespace: ci
+spec:
+  params:
+  - name: gitrevision
+    description: The git revision
+    default: master
+  - name: gitrepositoryurl
+    description: The git repository url
+    default: https://github.com/openshift/route-monitor-operator
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1beta1
+    kind: PipelineRun 
+    metadata:
+      name: pipeline-int-run-$(uid) 
+      namespace: ci
+    spec:
+      timeout: 30m
+      serviceAccountName: rmo-pipelines
+      pipelineRef:
+        name: pipeline-integration-test 
+      params: 
+      - name: git-revision
+        value: $(tt.params.gitrevision)
+      - name: git-url
+        value: $(tt.params.gitrepositoryurl)
+      workspaces: 
+      - name: ci
+        persistentVolumeClaim:
+          claimName: ci-pvc
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: pipeline-event-listener
+  namespace: ci
+spec:
+  serviceAccountName: rmo-pipelines
+  triggers:
+    - name: pipe-listener
+      bindings:
+      - ref: pipe-trigger
+      template:
+        name: pipe-trigger-template
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: pipeline-cronjob
+  namespace: ci
+spec:
+  serviceAccountName: rmo-pipelines
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trigger
+            image: curlimages/curl
+            args: ["curl", "-X", "POST", "--connect-timeout", "1", "-v", "--data", "{}", "http://el-pipeline-event-listener.ci.svc.cluster.local:8080"]
+          restartPolicy: Never
+

@@ -1,23 +1,52 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: test-oc-cli
+  name: pipeline-integration-test
+  namespace: ci
 spec:
-  workspaces:
-  - name: oc
+  workspaces: 
+    - name: ci
+  params:
+    - default: 'https://github.com/openshift/route-monitor-operator'
+      description: url of the git repo for the code of deployment
+      name: git-url
+      type: string
+    - default: master
+      description: revision to be used from repo of the code for deployment
+      name: git-revision
+      type: string
   tasks:
-  - name: test-oc
-    taskRef:
-      name: test-oc
-      kind: Task
-    workspaces:
-    - name: oc
-      workspace: oc
-    params:
-    - name: url value: $(params.git-url)
-    - name: subdirectory
-      value: ""
-    - name: deleteExisting
-      value: "true"
-    - name: revision
-      value: $(params.git-revision)
+    - name: fetch-repository
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: subdirectory
+          value: ''
+        - name: deleteExisting
+          value: 'true'
+        - name: revision
+          value: $(params.git-revision)
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: ci
+    - name: fetch-deployed-version
+      taskRef:
+        kind: Task
+        name: fetch-deployed-version
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: output
+          workspace: ci
+    - name: test-integration
+      runAfter:
+        - fetch-deployed-version
+      taskRef:
+        kind: Task
+        name: test-int
+      workspaces:
+        - name: output
+          workspace: ci

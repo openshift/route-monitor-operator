@@ -1,0 +1,18 @@
+apiVersion: tekton.dev/v1beta1 
+kind: PipelineRun 
+metadata:
+  generateName: pipeline-int-run-
+  namespace: ci
+spec:
+  serviceAccountName: rmo-pipelines
+  pipelineRef:
+    name: pipeline-integration-test
+  params: 
+  - name: git-url
+    value: "https://github.com/openshift/route-monitor-operator"
+  - name: git-revision
+    value: master
+  workspaces: 
+  - name: ci
+    persistentVolumeClaim:
+      claimName: ci-pvc
