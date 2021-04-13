@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: fetch-deployed-version
+  namespace: ci
+spec:
+  steps:
+    - args:
+        - |-
+          version=$(oc describe sub route-monitor-operator -n openshift-route-monitor-operator | grep "Current CSV:" | tr "-" "\n" | tail -1)
+          if [ -z "$version" ]
+          then
+            echo "Couldn't determine RMO installation version"
+            exit -1 
+          else
+            echo "Found RMO with commit hash:"
+            echo ${version}
+            echo ${version} > installed_commit
+          fi
+      command:
+        - /bin/bash
+        - '-c'
+      image: 'quay.io/openshift/origin-cli:latest'
+      resources: {}
+      workingDir: /workspace/output
+  workspaces:
+    - name: output
