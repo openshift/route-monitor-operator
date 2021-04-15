@@ -250,6 +250,30 @@ var _ = Describe("Integrationtests", func() {
 			})
 		})
 
+		When("A RouteMonitor with SLO is created, but the SLO is changed later", func() {
+			BeforeEach(func() {
+				err := i.Client.Create(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForServiceMonitor(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForPrometheusRule(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("changes the corresponding PrometheusRule", func() {
+				latestRouteMonitor, err := i.WaitForPrometheusRuleRef(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+				latestRouteMonitor.Spec.Slo.TargetAvailabilityPercent = "99.5"
+				err = i.Client.Update(context.TODO(), &latestRouteMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				_ , parsedSlo := latestRouteMonitor.Spec.Slo.IsValid()
+				err = i.WaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
 		PWhen("the RouteMonitor Slo changes", func() {
 			It("creates/deletes a PrometheusRule as necessary", func() {
 				By("creating a RouteMonitor with no SLO")
