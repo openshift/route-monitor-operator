@@ -1,10 +1,14 @@
-# Current Operator version
-VERSION_MAJOR=0
-VERSION_MINOR=1
-COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$$"`..HEAD --count)
-CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
-OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
+include boilerplate/generated-includes.mk
+
 KUBECTL ?= kubectl
+
+# for boilerplate
+OPERATOR_NAME=route-monitor-operator
+MAINPACKAGE=.
+TESTTARGETS=$(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | grep -v /int)
+
+# need to override boilerplate targets which are not working on this operator
+op-generate openapi-generate: ;
 
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
@@ -19,8 +23,6 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -36,8 +38,9 @@ OPERATOR_SDK ?= operator-sdk
 all: manager
 
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet manifests 
 	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
@@ -88,23 +91,8 @@ vet:
 	go vet ./...
 
 # Generate code
-generate: controller-gen
+generate: mockgen controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-go-generate: mockgen
-	go generate ./...
-
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-
-# Build the image with podman
-podman-build:
-	podman build . -t ${IMG}
-
-# Push the image with podman
-podman-push:
-	podman push ${IMG} --tls-verify=false
 
 test-integration:
 	hack/test-integration.sh
@@ -211,3 +199,7 @@ syncset-uninstall:
 			IMAGE_TAG=$(VERSION) \
 		| jq '{"kind": "List", "apiVersion": "v1", "items": .items[].spec.resources}' \
 		| kubectl delete -f -
+
+.PHONY: boilerplate-update
+boilerplate-update:
+	@boilerplate/update
