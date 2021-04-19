@@ -18,9 +18,10 @@ BUNDLE_DIR="$SAAS_OPERATOR_DIR/route-monitor-operator/"
 
 rm -rf "$SAAS_OPERATOR_DIR"
 
+SAAS_BUNDLE_URI=${SAAS_BUNDLE_URI:-https://app:${APP_SRE_BOT_PUSH_TOKEN}@gitlab.cee.redhat.com/service/saas-route-monitor-operator-bundle.git}
 git clone \
     --branch "$BRANCH_CHANNEL" \
-    https://app:"${APP_SRE_BOT_PUSH_TOKEN}"@gitlab.cee.redhat.com/service/saas-route-monitor-operator-bundle.git \
+    "$SAAS_BUNDLE_URI" \
     "$SAAS_OPERATOR_DIR"
 
 # remove any versions more recent than deployed hash

@@ -18,8 +18,7 @@ CURRENT_COMMIT=$GIT_HASH
 
 # build the image
 OPERATOR_IMAGE_URI=${QUAY_IMAGE}:${GIT_HASH}
-BUILD_CMD="docker build" IMG="$OPERATOR_IMAGE_URI" make docker-build
-REGISTRY_IMAGE="quay.io/app-sre/route-monitor-operator-registry"
+REGISTRY_IMAGE="${REGISTRY_IMAGE:-${QUAY_IMAGE}-registry}"
 
 
 # Don't rebuild the image if it already exists in the repository
@@ -27,6 +26,7 @@ if image_exists_in_repo "${OPERATOR_IMAGE_URI}"; then
     echo "Skipping operator image build/push"
 else
     # build and push the operator image
+    BUILD_CMD="docker build" IMG="$OPERATOR_IMAGE_URI" make docker-build
     if [[ ${DRY_RUN} != 'y' ]] ; then
       skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
         "docker-daemon:${OPERATOR_IMAGE_URI}" \
