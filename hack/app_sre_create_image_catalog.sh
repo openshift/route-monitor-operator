@@ -68,10 +68,10 @@ PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 # build the registry image
 IMAGE_DIGEST=$(skopeo inspect docker://$QUAY_IMAGE:$GIT_HASH | jq -r .Digest)
 if [[ -z "$IMAGE_DIGEST" ]]; then
-    echo "Couldn't discover IMAGE_DIGEST for docker://${operator_image}:v${operator_version}!"
+    echo "Couldn't discover IMAGE_DIGEST for docker://${QUAY_IMAGE}:${GIT_HASH}!"
     exit 1
 fi
-REPO_DIGEST=${operator_image}@${IMAGE_DIGEST}
+REPO_DIGEST=${QUAY_IMAGE}@${IMAGE_DIGEST}
 
 # Build an image locally that has all tools we need
 #
