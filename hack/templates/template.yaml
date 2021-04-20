@@ -5,6 +5,8 @@ parameters:
   required: true
 - name: IMAGE_TAG
   required: true
+- name: REPO_DIGEST
+  required: true
 - name: NAMESPACE # a new flag as Route Monitor Operator operates in openshift-monitoring namespace
   value: openshift-route-monitor-operator
 - name: REGISTRY_IMG
