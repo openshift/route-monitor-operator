@@ -2,6 +2,7 @@ package clusterurlmonitor
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
@@ -112,34 +113,35 @@ func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (util
 		return utilreconcile.ContinueReconcile()
 	}
 
+	res, err := s.updateErrorStatus(err)
+	if err != nil || res.RequeueOrStop() {
+		return res, err
+	}
+
+	if !shouldCreate {
+		err = s.EnsurePrometheusRuleResourceAbsent()
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return s.addPrometheusRuleRefToStatus(types.NamespacedName{})
+	}
+
 	clusterDomain, err := s.getClusterDomain()
 	if err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
 
 	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
-
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	sourceCRName := "ClusterUrlMonitor"
-	prometheusRuleResource := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName, sourceCRName)
+	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName, s.ClusterUrlMonitor.Kind+"Url")
 
-	// Does the resource already exist?
-	if err := s.Client.Get(s.Ctx, namespacedName, &prometheusRuleResource); err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		// populate the resource with the template
-		// and create it
-		err = s.Client.Create(s.Ctx, &prometheusRuleResource)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
+	err = s.createOrUpdatePrometheusRule(template)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	res, err := s.addPrometheusRuleRefToStatus(namespacedName)
+	res, err = s.addPrometheusRuleRefToStatus(namespacedName)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -148,6 +150,25 @@ func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (util
 	}
 
 	return utilreconcile.ContinueReconcile()
+}
+
+func (s *ClusterUrlMonitorSupplement) createOrUpdatePrometheusRule(template monitoringv1.PrometheusRule) error {
+	resource := &monitoringv1.PrometheusRule{}
+	err := s.Client.Get(s.Ctx, types.NamespacedName{Namespace: template.Namespace, Name: template.Name}, resource)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	}
+
+	if !k8serrors.IsNotFound(err) {
+		if reflect.DeepEqual(template.Spec, resource.Spec) {
+			return nil
+		}
+		// Update PrometheusRule if the specs are different
+		resource.Spec = template.Spec
+		return s.Client.Update(s.Ctx, resource)
+	}
+	// Create the PrometheusRule if it does not exist
+	return s.Client.Create(s.Ctx, &template)
 }
 
 func (s *ClusterUrlMonitorSupplement) shouldCreatePrometheusRule() (bool, error, string) {
@@ -261,6 +282,40 @@ func (s *ClusterUrlMonitorSupplement) doesServiceMonitorExist(namespacedName typ
 		return false, nil
 	}
 	return true, err
+}
+
+func (s *ClusterUrlMonitorSupplement) updateErrorStatus(err error) (utilreconcile.Result, error) {
+	// If an error has already been flagged and still occurs
+	if s.ClusterUrlMonitor.Status.ErrorStatus != "" && err != nil {
+		// Skip as the resource should not be created
+		return utilreconcile.ContinueReconcile()
+	}
+
+	// If the error was flagged but stopped firing
+	if s.ClusterUrlMonitor.Status.ErrorStatus != "" && err == nil {
+		// Clear the error and restart
+		s.ClusterUrlMonitor.Status.ErrorStatus = ""
+		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	// If the error was not flagged but has started firing
+	if s.ClusterUrlMonitor.Status.ErrorStatus == "" && err != nil {
+		// Raise the alert and restart
+		s.ClusterUrlMonitor.Status.ErrorStatus = err.Error()
+		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	// only case left is ErrorStatus == "" && err == nil
+	// so there is no need to check if err != nil
+	return utilreconcile.ContinueReconcile()
 }
 
 func ProcessRequest(blackboxExporter *blackboxexporter.BlackBoxExporter, sup *ClusterUrlMonitorSupplement) (ctrl.Result, error) {

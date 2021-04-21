@@ -58,6 +58,8 @@ spec:
         status:
           description: ClusterUrlMonitorStatus defines the observed state of ClusterUrlMonitor
           properties:
+            errorStatus:
+              type: string
             prometheusRuleRef:
               description: NamespacedName contains the name of a object and its namespace
               properties:

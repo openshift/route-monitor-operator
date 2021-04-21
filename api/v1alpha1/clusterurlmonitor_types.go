@@ -41,6 +41,7 @@ type ClusterUrlMonitorStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
 	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
+	ErrorStatus       string         `json:"errorStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

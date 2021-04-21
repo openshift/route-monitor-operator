@@ -167,7 +167,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 
 			It("creates a ServiceMonitor with the service URL", func() {
-				err := sup.EnsureServiceMonitorExists()
+				_, err := sup.EnsureServiceMonitorExists()
 				expectedUrl := prefix + clusterDomain + ":" + port + suffix
 				Expect(err).NotTo(HaveOccurred())
 				Expect(serviceMonitorMatcher.Actual.Spec.Endpoints[0].Params["target"][0]).To(Equal(expectedUrl))
@@ -183,7 +183,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 
 			It("doesn't update the ServiceMonitor", func() {
-				err := sup.EnsureServiceMonitorExists()
+				_, err := sup.EnsureServiceMonitorExists()
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
