@@ -1,26 +1,24 @@
 package adder
 
 import (
-	"reflect"
+	"context"
 
 	"github.com/go-logr/logr"
 
-	"context"
-
 	// k8s packages
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	//api's used
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	//local packages
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
@@ -34,6 +32,8 @@ type RouteMonitorAdder struct {
 	Log                       logr.Logger
 	Scheme                    *runtime.Scheme
 	BlackBoxExporterNamespace string
+	ClusterID                 string
+	util.UtilCollection 
 }
 
 func New(r routemonitor.RouteMonitorReconciler, blackBoxExporterNamespace string) *RouteMonitorAdder {
@@ -50,54 +50,35 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 	if routeMonitor.Status.RouteURL == "" {
 		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
 	}
+	if r.ClusterID == "" {
+		r.ClusterID = util.GetClusterID(r.Client)
+	}
 
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
-	resource := &monitoringv1.ServiceMonitor{}
-	template := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName)
+	serviceMonitorTemplate := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName, r.ClusterID)
 
-	// Does the resource already exist?
-	err := r.Get(ctx, namespacedName, resource)
-	switch {
-	case err == nil:
-		if !reflect.DeepEqual(template.Spec, resource.Spec) {
-			//Update service monitor if the specs are differentlmao
-			resource.Spec = template.Spec
-			err := r.Update(ctx, resource)
-			if err != nil {
-				utilreconcile.RequeueReconcileWith(err)
-			}
-		}
-	case k8serrors.IsNotFound(err):
-		err = r.Create(ctx, &template)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-	case err != nil:
+	err := r.UpdateServiceMonitorDeplyoment(r.Client, serviceMonitorTemplate)
+	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	//Update status with serviceMonitorRef
+	//Update RouteMonitor serviceMonitorRef
 	desiredRef := v1alpha1.NamespacedName{
-		Name:      namespacedName.Name,
-		Namespace: namespacedName.Namespace,
-	}
-	emptyRef := v1alpha1.NamespacedName{}
-
-	currentRef := routeMonitor.Status.ServiceMonitorRef
-	if currentRef != emptyRef && desiredRef != currentRef {
-		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
+		Name:      routeMonitor.Name,
+		Namespace: routeMonitor.Namespace,
 	}
 
-	if currentRef == emptyRef && desiredRef != emptyRef {
+	if routeMonitor.Status.ServiceMonitorRef == (v1alpha1.NamespacedName{}) {
 		routeMonitor.Status.ServiceMonitorRef = desiredRef
-
 		err := r.Status().Update(ctx, &routeMonitor)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 		return utilreconcile.StopReconcile()
-
+	} else if routeMonitor.Status.ServiceMonitorRef != desiredRef {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
 	}
+
 	return utilreconcile.ContinueReconcile()
 }
 

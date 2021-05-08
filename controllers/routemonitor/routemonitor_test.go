@@ -26,6 +26,7 @@ import (
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
+	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 
@@ -41,7 +42,7 @@ var _ = Describe("Routemonitor", func() {
 		mockDeleter                  *routemonitormocks.MockRouteMonitorDeleter
 		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
 		mockBlackboxExporter         *routemonitormocks.MockBlackBoxExporter
-		mockResourceComparer         *routemonitormocks.MockResourceComparer
+		mockResourceComparer         *utilmocks.MockResourceComparer
 		ctx                          context.Context
 
 		update                                        helper.MockHelper
@@ -71,7 +72,7 @@ var _ = Describe("Routemonitor", func() {
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockDeleter = routemonitormocks.NewMockRouteMonitorDeleter(mockCtrl)
 		mockAdder = routemonitormocks.NewMockRouteMonitorAdder(mockCtrl)
-		mockResourceComparer = routemonitormocks.NewMockResourceComparer(mockCtrl)
+		mockResourceComparer = utilmocks.NewMockResourceComparer(mockCtrl)
 
 		mockSupplement = routemonitormocks.NewMockRouteMonitorSupplement(mockCtrl)
 		mockBlackboxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)

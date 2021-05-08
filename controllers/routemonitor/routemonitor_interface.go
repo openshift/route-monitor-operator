@@ -28,7 +28,3 @@ type RouteMonitorAdder interface {
 	EnsureFinalizerSet(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 	EnsureServiceMonitorResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error)
 }
-
-type ResourceComparer interface {
-	DeepEqual(x, y interface{}) bool
-}

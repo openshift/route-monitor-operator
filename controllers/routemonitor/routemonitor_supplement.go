@@ -2,13 +2,10 @@ package routemonitor
 
 import (
 	"context"
-	"reflect"
 
 	// k8s packages
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	//api's used
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
@@ -83,7 +80,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
 	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
 
-	err = r.createOrUpdatePrometheusRule(ctx, template)
+	err = r.UpdatePrometheusRuleDeployment(ctx, r.Client, template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -97,28 +94,6 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.
 	}
 
 	return utilreconcile.ContinueReconcile()
-}
-
-func (r *RouteMonitorReconciler) createOrUpdatePrometheusRule(ctx context.Context, template monitoringv1.PrometheusRule) error {
-	resource := &monitoringv1.PrometheusRule{}
-	err := r.Get(ctx, types.NamespacedName{Namespace: template.Namespace, Name: template.Name}, resource)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return err
-	}
-
-	if k8serrors.IsNotFound(err) {
-		// Create the PrometheusRule if it does not exist
-		return r.Create(ctx, &template)
-
-	}
-
-	if !r.DeepEqual(template.Spec, resource.Spec) {
-		// Update PrometheusRule if the specs are different
-		resource.Spec = template.Spec
-		return r.Update(ctx, resource)
-	}
-
-	return nil
 }
 
 func (r *RouteMonitorReconciler) updateErrorStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, err error) (utilreconcile.Result, error) {
@@ -187,10 +162,4 @@ func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error
 		return false, customerrors.InvalidSLO, ""
 	}
 	return true, nil, parsedSlo
-}
-
-type ResourceComparerStruct struct{}
-
-func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
-	return reflect.DeepEqual(x, y)
 }

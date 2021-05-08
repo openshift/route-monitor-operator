@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
@@ -38,16 +39,17 @@ type RouteMonitorReconciler struct {
 	RouteMonitorSupplement
 	RouteMonitorAdder
 	RouteMonitorDeleter
-	ResourceComparer
+	util.Util
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;delete
-// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;delete;update
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;
+// +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
