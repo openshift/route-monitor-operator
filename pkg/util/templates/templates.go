@@ -20,7 +20,7 @@ const (
 )
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
-func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
+func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string) monitoringv1.ServiceMonitor {
 
 	routeMonitorLabels := blackboxexporter.GenerateBlackBoxExporterLables()
 
@@ -55,6 +55,10 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 						{
 							Replacement: url,
 							TargetLabel: UrlLabelName,
+						},
+						{
+							Replacement: clusterID,
+							TargetLabel: "ClusterID",
 						},
 					},
 				}},
@@ -187,4 +191,10 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		},
 	}
 	return resource
+}
+func sampleTemplateLabelsWithSev(url, severity string, sourceCRName string) map[string]string {
+	return map[string]string{
+		"severity":   severity,
+		sourceCRName: url,
+	}
 }

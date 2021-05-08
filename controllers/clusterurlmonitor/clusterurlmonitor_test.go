@@ -167,6 +167,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				)
 				mockClient.EXPECT().Create(gomock.Any(), serviceMonitorMatcher).Times(1)
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				//mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockStatusWriter.EXPECT().Update(gomock.Any(), clusterUrlMonitorMatcher).Times(1).Return(nil)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 			})
@@ -187,7 +188,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 					SetArg(2, serviceMonitor)
 			})
 
-			It("doesn't update the ServiceMonitor", func() {
+			FIt("doesn't update the ServiceMonitor", func() {
 				err := sup.EnsureServiceMonitorExists()
 				Expect(err).NotTo(HaveOccurred())
 			})

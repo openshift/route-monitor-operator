@@ -21,9 +21,12 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 )
@@ -33,8 +36,11 @@ var _ = Describe("Adder", func() {
 		scheme = constinit.Scheme
 	)
 	var (
-		mockClient *clientmocks.MockClient
-		mockCtrl   *gomock.Controller
+		mockClient           *clientmocks.MockClient
+		mockCtrl             *gomock.Controller
+		mockResourceComparer *utilmocks.MockResourceComparer
+		deepEqualCalledTimes int
+		deepEqualResponse    bool
 
 		routeMonitorAdder       adder.RouteMonitorAdder
 		routeMonitorAdderClient client.Client
@@ -58,8 +64,11 @@ var _ = Describe("Adder", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+		mockResourceComparer = utilmocks.NewMockResourceComparer(mockCtrl)
 
 		routeMonitorAdderClient = mockClient
+		deepEqualCalledTimes = 0
+		deepEqualResponse = true
 
 		ctx = constinit.Context
 
@@ -79,9 +88,11 @@ var _ = Describe("Adder", func() {
 	})
 	JustBeforeEach(func() {
 		routeMonitorAdder = adder.RouteMonitorAdder{
-			Log:    constinit.Logger,
-			Client: routeMonitorAdderClient,
-			Scheme: constinit.Scheme,
+			Log:              constinit.Logger,
+			Client:           routeMonitorAdderClient,
+			Scheme:           constinit.Scheme,
+			ClusterID:        "test-cluster",
+			ResourceComparer: mockResourceComparer,
 		}
 
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -99,6 +110,10 @@ var _ = Describe("Adder", func() {
 		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
 			Return(create.ErrorResponse).
 			Times(create.CalledTimes)
+
+		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
+			Return(deepEqualResponse).
+			Times(deepEqualCalledTimes)
 
 		routeMonitor = v1alpha1.RouteMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -171,11 +186,11 @@ var _ = Describe("Adder", func() {
 				// Arrange
 				get = helper.NotFoundErrorHappensOnce()
 				create.CalledTimes = 1
+				get.CalledTimes = 1
 				routeMonitorStatus = v1alpha1.RouteMonitorStatus{
 					RouteURL: "fake-route-url",
 				}
 				routeMonitorFinalizers = routemonitorconst.FinalizerList
-
 			})
 			When("the resource Get fails unexpectedly", func() {
 				// Arrange
@@ -210,6 +225,8 @@ var _ = Describe("Adder", func() {
 					// Arrange
 					get.ErrorResponse = nil
 					create.CalledTimes = 0
+					deepEqualResponse = true
+					deepEqualCalledTimes = 1
 				})
 				JustBeforeEach(func() {
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
@@ -217,7 +234,6 @@ var _ = Describe("Adder", func() {
 						Namespace: routeMonitor.Namespace,
 					}
 				})
-
 				It("should pass all checks and continue", func() {
 					//Act
 					_, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
@@ -225,13 +241,14 @@ var _ = Describe("Adder", func() {
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
-
 			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
 				JustBeforeEach(func() {
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
 						Namespace: routeMonitor.Namespace,
 					}
+					deepEqualCalledTimes = 1
+					deepEqualResponse = true
 				})
 				// Arrange
 				It("Work correctly and continue processing", func() {
@@ -243,22 +260,31 @@ var _ = Describe("Adder", func() {
 					Expect(res).To(Equal(utilreconcile.ContinueOperation()))
 				})
 			})
-
-			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
-				JustBeforeEach(func() {
-					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
-						Name:      routeMonitor.Name,
-						Namespace: routeMonitor.Namespace,
-					}
-				})
-				// Arrange
-				It("Work correctly and continue processing", func() {
-					//Act
-					res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
-					//Assert
-					Expect(err).NotTo(HaveOccurred())
-					Expect(res).NotTo(BeNil())
-					Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			Describe("Testing ServiceMonitor update", func() {
+				When("the ServiceMonitor template specs were updated", func() {
+					// Arrange
+					BeforeEach(func() {
+						get.ErrorResponse = nil
+						get.CalledTimes = 1
+						create.CalledTimes = 0
+						update.CalledTimes = 1
+						deepEqualCalledTimes = 1
+						deepEqualResponse = false
+					})
+					JustBeforeEach(func() {
+						routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
+							Name:      routeMonitor.Name,
+							Namespace: routeMonitor.Namespace,
+						}
+					})
+					It("should update the deployed ServiceMonitor", func() {
+						//Act
+						res, err := routeMonitorAdder.EnsureServiceMonitorResourceExists(ctx, routeMonitor)
+						//Assert
+						Expect(err).NotTo(HaveOccurred())
+						Expect(res).NotTo(BeNil())
+						Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+					})
 				})
 			})
 		})
@@ -272,6 +298,8 @@ var _ = Describe("Adder", func() {
 					}
 					routeMonitorFinalizers = routemonitorconst.FinalizerList
 					get.CalledTimes = 1
+					deepEqualResponse = true
+					deepEqualCalledTimes = 1
 				})
 
 				JustBeforeEach(func() {
@@ -297,8 +325,9 @@ var _ = Describe("Adder", func() {
 					}
 					routeMonitorFinalizers = routemonitorconst.FinalizerList
 					get.CalledTimes = 1
+					deepEqualResponse = true
+					deepEqualCalledTimes = 1
 					mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-
 				})
 
 				JustBeforeEach(func() {
@@ -325,6 +354,8 @@ var _ = Describe("Adder", func() {
 					}
 					routeMonitorFinalizers = routemonitorconst.FinalizerList
 					get.CalledTimes = 1
+					deepEqualResponse = true
+					deepEqualCalledTimes = 1
 				})
 
 				JustBeforeEach(func() {

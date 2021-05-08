@@ -36,11 +36,10 @@ import (
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/adder"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
+	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -104,7 +103,6 @@ func main() {
 	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler, blackboxExporterNamespace)
 	routeMonitorReconciler.BlackBoxExporter = blackboxexporter.New(routeMonitorReconciler.Client,
 		routeMonitorReconciler.Log, context.Background(), blackboxExporterImage, blackboxExporterNamespace)
-	routeMonitorReconciler.ResourceComparer = routemonitor.ResourceComparerStruct{}
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)

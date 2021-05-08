@@ -2,19 +2,17 @@ package clusterurlmonitor
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/go-logr/logr"
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/util/templates"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,21 +36,17 @@ type ClusterUrlMonitorSupplement struct {
 	Log               logr.Logger
 	Ctx               context.Context
 	BlackBoxExporter  BlackBoxExporter
-	ResourceComparer  ResourceComparer
+	ClusterID         string
 }
 
-type ResourceComparerStruct struct{}
-
-func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
-	return reflect.DeepEqual(x, y)
-}
-
-func DeepEqual(x, y interface{}) bool {
-	return reflect.DeepEqual(x, y)
-}
-
-func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter, resourceComparer ResourceComparer) *ClusterUrlMonitorSupplement {
-	return &ClusterUrlMonitorSupplement{ClusterUrlMonitor, Client, log, context.Background(), blackBoxExporter, resourceComparer}
+func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter, ClusterID string) *ClusterUrlMonitorSupplement {
+	return &ClusterUrlMonitorSupplement{
+		ClusterUrlMonitor: ClusterUrlMonitor,
+		Client:            Client,
+		Log:               log,
+		Ctx:               context.Background(),
+		BlackBoxExporter:  blackBoxExporter,
+		ClusterID:         ClusterID}
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error) {
@@ -66,21 +60,23 @@ func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error
 
 func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
+	clusterDomain, err := util.GetClusterDomain(s.Client, s.Ctx)
+	if err != nil {
+		return err
+	}
+
 	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
+	spec := s.ClusterUrlMonitor.Spec
+	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
+	serviceMonitorTemplate := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.ClusterID)
+
+	// Does a ServiceMonitor already exist?
 	exists, err := s.doesServiceMonitorExist(namespacedName)
 	if exists || err != nil {
 		return err
 	}
 
-	clusterDomain, err := s.getClusterDomain()
-	if err != nil {
-		return err
-	}
-
-	spec := s.ClusterUrlMonitor.Spec
-	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName)
-	err = s.Client.Create(s.Ctx, &serviceMonitor)
+	err = s.Client.Create(s.Ctx, &serviceMonitorTemplate)
 	if err != nil {
 		return err
 	}
@@ -187,14 +183,23 @@ func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedNam
 	return utilreconcile.ContinueReconcile()
 }
 
-func (s *ClusterUrlMonitorSupplement) getClusterDomain() (string, error) {
-	clusterConfig := configv1.DNS{}
-	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterConfig)
-	if err != nil {
-		return "", err
+func (s *ClusterUrlMonitorSupplement) addServiceMonitorRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
+	desiredRef := v1alpha1.NamespacedName{
+		Namespace: namespacedName.Namespace,
+		Name:      namespacedName.Name,
 	}
+	if s.ClusterUrlMonitor.Status.ServiceMonitorRef != desiredRef {
+		// Update status with ServiceMonitorRef
+		s.ClusterUrlMonitor.Status.ServiceMonitorRef = desiredRef
 
-	return clusterConfig.Spec.BaseDomain, nil
+		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+
+	}
+	return utilreconcile.ContinueReconcile()
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Result, error) {
@@ -203,7 +208,7 @@ func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Resul
 	}
 
 	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
-	serviceMonitor, err := s.getServiceMonitor(namespacedName)
+	serviceMonitor, err := util.GetServiceMonitor(s.Client, namespacedName)
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return reconcile.RequeueReconcileWith(err)
 	}
@@ -272,7 +277,7 @@ func (s *ClusterUrlMonitorSupplement) getServiceMonitor(namespacedName types.Nam
 }
 
 func (s *ClusterUrlMonitorSupplement) doesServiceMonitorExist(namespacedName types.NamespacedName) (bool, error) {
-	_, err := s.getServiceMonitor(namespacedName)
+	_, err := util.GetServiceMonitor(s.Client, namespacedName)
 	if k8serrors.IsNotFound(err) {
 		return false, nil
 	}

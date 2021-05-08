@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
@@ -39,6 +40,7 @@ type ClusterUrlMonitorReconciler struct {
 	Scheme                    *runtime.Scheme
 	BlackBoxExporterImage     string
 	BlackBoxExporterNamespace string
+	ClusterID				  string
 	ResourceComparer
 }
 
@@ -50,6 +52,7 @@ const (
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=dnses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 
 func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -60,12 +63,16 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return utilreconcile.RequeueWith(err)
 	}
 
+	if r.ClusterID == "" {
+		r.ClusterID = util.GetClusterID(r.Client)
+	}
+
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
 
 	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxExporterImage, r.BlackBoxExporterNamespace)
-	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter, r.ResourceComparer)
+	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter, r.ClusterID)
 
 	return ProcessRequest(blackboxExporter, sup)
 }
