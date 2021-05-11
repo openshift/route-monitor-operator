@@ -2,6 +2,10 @@ package templates
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
+	prometheus "github.com/prometheus/common/model"
 
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -9,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+var serviceMonitorPeriod string = "30s"
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
 func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
@@ -38,7 +44,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 				{
 					Port: blackboxexporter.BlackBoxExporterPortName,
 					// Probe every 30s
-					Interval: "30s",
+					Interval: serviceMonitorPeriod,
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
 					Path:          "/probe",
@@ -70,25 +76,41 @@ type multiWindowMultiBurnAlertRule struct {
 	burnRate    string
 }
 
+
+func alertThreshold(windowSize, percent, label, burnRate string) string {
+
+	rule := "1-(sum(sum_over_time(probe_success{" + label + "}[" + windowSize + "]))" +
+		"/ sum(count_over_time(probe_success{" + label + "}[" + windowSize + "])))" +
+		"> (" + burnRate + "*(1-" + percent + "))"
+
+	return rule
+}
+
+func sufficientProbes(windowSize, label string) string {
+	window, _ := prometheus.ParseDuration(windowSize)
+	window_duration := time.Duration(window)
+	mPeriod, _ := prometheus.ParseDuration(serviceMonitorPeriod)
+	mPeriod_duration := time.Duration(mPeriod) 
+	necessaryProbesInWindow := int(window_duration.Minutes()/mPeriod_duration.Minutes() * 0.5)
+
+	rule := "sum(count_over_time(probe_success{" + label + "}[" + windowSize + "]))" +
+		" > " + strconv.Itoa(necessaryProbesInWindow)
+
+	return rule
+}
+
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
-// Sample result as yaml
-/*
-	 - alert: ErrorBudgetBurn
-		 annotations:
-			 message: 'High error budget burn for targeturl=getmeright (current value: {{ $value }})'
-		 expr: |
-			 1-rate(probe_success{targeturl="getmeright"}[5m]) > (14.40 * (1-0.95000))
-			 and
-			 1-rate(probe_success{targeturl="getmeright"}[1h]) > (14.40 * (1-0.95000))
-		 for: 2m
-		 labels:
-			 severity: critical
-			 targeturl: getmeright
-*/
 func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string) monitoringv1.Rule {
-	alertString := "1-avg_over_time(probe_success{" + label + "}[" + r.shortWindow + "]) > (" + r.burnRate + "*(1-" + percent + "))\n" +
-		"and\n" +
-		"1-avg_over_time(probe_success{" + label + "}[" + r.longWindow + "]) > (" + r.burnRate + "*(1-" + percent + " ))"
+
+	alertString := "" +
+		alertThreshold(r.shortWindow, percent, label, r.burnRate) +
+		" and " +
+		sufficientProbes(r.shortWindow, label) +
+		"\nand\n" +
+		alertThreshold(r.longWindow, percent, label, r.burnRate) +
+		" and " +
+		sufficientProbes(r.longWindow, label)
+
 	return monitoringv1.Rule{
 		Alert:  alertName,
 		Expr:   intstr.FromString(alertString),
