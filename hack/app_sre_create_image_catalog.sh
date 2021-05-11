@@ -18,14 +18,15 @@ BUNDLE_DIR="$SAAS_OPERATOR_DIR/route-monitor-operator/"
 
 rm -rf "$SAAS_OPERATOR_DIR"
 
+SAAS_BUNDLE_URI=${SAAS_BUNDLE_URI:-https://app:${APP_SRE_BOT_PUSH_TOKEN}@gitlab.cee.redhat.com/service/saas-route-monitor-operator-bundle.git}
 git clone \
     --branch "$BRANCH_CHANNEL" \
-    https://app:"${APP_SRE_BOT_PUSH_TOKEN}"@gitlab.cee.redhat.com/service/saas-route-monitor-operator-bundle.git \
+    "$SAAS_BUNDLE_URI" \
     "$SAAS_OPERATOR_DIR"
 
 # remove any versions more recent than deployed hash
 REMOVED_VERSIONS=""
-if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
+if [[ "$BRANCH_CHANNEL" == "production" ]]; then
     DEPLOYED_HASH=$(
         curl -s "https://gitlab.cee.redhat.com/service/app-interface/raw/master/data/services/osd-operators/cicd/saas/saas-${_OPERATOR_NAME}.yaml" | \
             docker run --rm -i quay.io/app-sre/yq:3.4.1 yq r - "resourceTemplates[*].targets(namespace.\$ref==/services/osd-operators/namespaces/hivep01ue1/cluster-scope.yml).ref"
@@ -65,7 +66,12 @@ fi
 PREV_VERSION=$(ls "$BUNDLE_DIR" | sort -t . -k 3 -g | tail -n 1)
 
 # build the registry image
-REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
+IMAGE_DIGEST=$(skopeo inspect docker://$QUAY_IMAGE:$GIT_HASH | jq -r .Digest)
+if [[ -z "$IMAGE_DIGEST" ]]; then
+    echo "Couldn't discover IMAGE_DIGEST for docker://${QUAY_IMAGE}:${GIT_HASH}!"
+    exit 1
+fi
+REPO_DIGEST=${QUAY_IMAGE}@${IMAGE_DIGEST}
 
 # Build an image locally that has all tools we need
 #
@@ -77,10 +83,10 @@ REGISTRY_IMG="quay.io/app-sre/route-monitor-operator-registry"
 docker rm route-monitor-operator-pipeline || true
 docker build -f hack/pipeline.dockerfile -t pipelinebuilder:latest .
 docker run  \
--e CHANNELS=$BRANCH_CHANNEL \
--e IMG=$QUAY_IMAGE:$GIT_HASH \
--e PREV_VERSION=$PREV_VERSION \
--e BUNDLE_DIR=$BUNDLE_DIR \
+-e "CHANNELS=$BRANCH_CHANNEL" \
+-e "IMG=$REPO_DIGEST" \
+-e "PREV_VERSION=$PREV_VERSION" \
+-e "BUNDLE_DIR=$BUNDLE_DIR" \
 --name route-monitor-operator-pipeline \
 pipelinebuilder:latest
 docker cp "route-monitor-operator-pipeline:/pipeline/route-monitor-operator/$BUNDLE_DIR" packagemanifests
@@ -88,7 +94,7 @@ docker rm route-monitor-operator-pipeline
 rsync -a packagemanifests/* $BUNDLE_DIR/
 rm -rf packagemanifests
 
-BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" PREV_VERSION="$PREV_VERSION" make packagemanifests-build
+BUNDLE_DIR=$BUNDLE_DIR BUNDLE_IMG="${REGISTRY_IMAGE}:${BRANCH_CHANNEL}-latest" PREV_VERSION="$PREV_VERSION" make packagemanifests-build
 
 pushd $SAAS_OPERATOR_DIR
 
@@ -118,12 +124,11 @@ pushd $SAAS_OPERATOR_DIR
   git push origin "$BRANCH_CHANNEL"
 popd
 
-
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
-    "docker://${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest"
+    "docker-daemon:${REGISTRY_IMAGE}:${BRANCH_CHANNEL}-latest" \
+    "docker://${REGISTRY_IMAGE}:${BRANCH_CHANNEL}-latest"
 
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
-    "docker://${REGISTRY_IMG}:${BRANCH_CHANNEL}-${GIT_HASH}"
+    "docker-daemon:${REGISTRY_IMAGE}:${BRANCH_CHANNEL}-latest" \
+    "docker://${REGISTRY_IMAGE}:${BRANCH_CHANNEL}-${GIT_HASH}"

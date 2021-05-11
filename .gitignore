@@ -19,6 +19,7 @@ bin/manager
 
 # vim tmp files
 *.swp
+*.orig
 
 # the location the 'make bundle' command saves it's files
 bundle
@@ -34,3 +35,7 @@ build/_output
 hack/olm-base-resources
 bundle/
 packagemanifests/
+
+# Local appsre pipeline testing
+.docker/
+saas-route-monitor-operator-bundle/
