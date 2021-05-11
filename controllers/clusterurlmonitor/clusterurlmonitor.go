@@ -39,6 +39,7 @@ type ClusterUrlMonitorReconciler struct {
 	Scheme                    *runtime.Scheme
 	BlackBoxExporterImage     string
 	BlackBoxExporterNamespace string
+	ResourceComparer
 }
 
 const (
@@ -64,7 +65,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 	}
 
 	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxExporterImage, r.BlackBoxExporterNamespace)
-	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter)
+	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter, r.ResourceComparer)
 
 	return ProcessRequest(blackboxExporter, sup)
 }

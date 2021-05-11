@@ -28,16 +28,31 @@ type BlackBoxExporter interface {
 	GetBlackBoxExporterNamespace() string
 }
 
+type ResourceComparer interface {
+	DeepEqual(x, y interface{}) bool
+}
+
 type ClusterUrlMonitorSupplement struct {
 	ClusterUrlMonitor v1alpha1.ClusterUrlMonitor
 	Client            client.Client
 	Log               logr.Logger
 	Ctx               context.Context
 	BlackBoxExporter  BlackBoxExporter
+	ResourceComparer  ResourceComparer
 }
 
-func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter) *ClusterUrlMonitorSupplement {
-	return &ClusterUrlMonitorSupplement{ClusterUrlMonitor, Client, log, context.Background(), blackBoxExporter}
+type ResourceComparerStruct struct{}
+
+func (_ ResourceComparerStruct) DeepEqual(x, y interface{}) bool {
+	return reflect.DeepEqual(x, y)
+}
+
+func DeepEqual(x, y interface{}) bool {
+	return reflect.DeepEqual(x, y)
+}
+
+func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter, resourceComparer ResourceComparer) *ClusterUrlMonitorSupplement {
+	return &ClusterUrlMonitorSupplement{ClusterUrlMonitor, Client, log, context.Background(), blackBoxExporter, resourceComparer}
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error) {
@@ -107,11 +122,6 @@ func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() (reconcile.Re
 
 func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (utilreconcile.Result, error) {
 	shouldCreate, err, parsedSlo := s.shouldCreatePrometheusRule()
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	} else if !shouldCreate {
-		return utilreconcile.ContinueReconcile()
-	}
 
 	res, err := s.updateErrorStatus(err)
 	if err != nil || res.RequeueOrStop() {
@@ -153,19 +163,22 @@ func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (util
 }
 
 func (s *ClusterUrlMonitorSupplement) createOrUpdatePrometheusRule(template monitoringv1.PrometheusRule) error {
-	resource := &monitoringv1.PrometheusRule{}
-	err := s.Client.Get(s.Ctx, types.NamespacedName{Namespace: template.Namespace, Name: template.Name}, resource)
+	resource := monitoringv1.PrometheusRule{}
+	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Name,
+		Namespace: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Namespace}
+	err := s.Client.Get(s.Ctx, namespacedName, &resource)
+
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 
 	if !k8serrors.IsNotFound(err) {
-		if reflect.DeepEqual(template.Spec, resource.Spec) {
+		if s.ResourceComparer.DeepEqual(template.Spec, resource.Spec) {
 			return nil
 		}
 		// Update PrometheusRule if the specs are different
 		resource.Spec = template.Spec
-		return s.Client.Update(s.Ctx, resource)
+		return s.Client.Update(s.Ctx, &resource)
 	}
 	// Create the PrometheusRule if it does not exist
 	return s.Client.Create(s.Ctx, &template)
@@ -184,15 +197,27 @@ func (s *ClusterUrlMonitorSupplement) shouldCreatePrometheusRule() (bool, error,
 }
 
 func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
-	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
+	desiredRef := v1alpha1.NamespacedName{
 		Namespace: namespacedName.Namespace,
 		Name:      namespacedName.Name,
 	}
-	if s.ClusterUrlMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
+	emptyRef := v1alpha1.NamespacedName{}
+	currentRef := s.ClusterUrlMonitor.Status.PrometheusRuleRef
+
+	if currentRef != emptyRef && desiredRef != currentRef {
+		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
+	}
+
+	if currentRef == emptyRef && desiredRef != emptyRef {
 		// Update status with PrometheusRuleRef
-		s.ClusterUrlMonitor.Status.PrometheusRuleRef = desiredPrometheusRuleRef
+		s.ClusterUrlMonitor.Status.PrometheusRuleRef = desiredRef
+
 		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		return utilreconcile.RequeueReconcileWith(err)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+
 	}
 	return utilreconcile.ContinueReconcile()
 }
@@ -234,6 +259,11 @@ func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Resul
 		if err != nil {
 			return reconcile.RequeueReconcileWith(err)
 		}
+	}
+
+	err = s.EnsurePrometheusRuleResourceAbsent()
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	if utilfinalizer.Contains(s.ClusterUrlMonitor.GetFinalizers(), FinalizerKey) {
@@ -325,11 +355,6 @@ func ProcessRequest(blackboxExporter *blackboxexporter.BlackBoxExporter, sup *Cl
 	}
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
-	}
-
-	err = sup.EnsurePrometheusRuleResourceAbsent()
-	if err != nil {
-		return utilreconcile.RequeueWith(err)
 	}
 
 	res, err = sup.EnsureFinalizer()

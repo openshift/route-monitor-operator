@@ -116,6 +116,7 @@ func main() {
 		Scheme:                    mgr.GetScheme(),
 		BlackBoxExporterImage:     blackboxExporterImage,
 		BlackBoxExporterNamespace: blackboxExporterNamespace,
+		ResourceComparer:          clusterurlmonitor.ResourceComparerStruct{},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterUrlMonitor")
 		os.Exit(1)
