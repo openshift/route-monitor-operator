@@ -5,7 +5,7 @@ parameters:
   required: true
 - name: IMAGE_TAG
   required: true
-- name: REPO_DIGEST
+- name: IMAGE_DIGEST
   required: true
 - name: NAMESPACE
   value: openshift-route-monitor-operator
@@ -50,7 +50,7 @@ objects:
         icon:
           base64data: ''
           mediatype: ''
-        image: ${REPO_DIGEST}
+        image: ${REGISTRY_IMG}@${IMAGE_DIGEST}
         publisher: Red Hat
         sourceType: grpc
     - apiVersion: operators.coreos.com/v1alpha1
