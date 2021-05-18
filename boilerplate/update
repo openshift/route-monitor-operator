@@ -19,6 +19,16 @@ fi
 export CONVENTION_ROOT="$(realpath $(cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd ))"
 CONFIG_FILE="${CONVENTION_ROOT}/update.cfg"
 
+# Set SED variable
+if LANG=C sed --help 2>&1 | grep -q GNU; then
+  SED="sed"
+elif command -v gsed &>/dev/null; then
+  SED="gsed"
+else
+  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+  exit 1
+fi
+
 # scrubbed_conventions
 # Parses the $CONFIG_FILE and outputs a space-delimited list of conventions.
 scrubbed_conventions() {
@@ -100,6 +110,12 @@ EOF
   echo "Updating the update script."
   rsync -a "${BP_CLONE}/boilerplate/update" "$0"
   echo "Copying utilities"
+  # HACK: Delete the utility dirs first because, in CI, rsync will fail
+  # to set things like mod times and permissions on the directories
+  # themselves, which have uid=gid=0.
+  for d in $(/bin/ls -d ${BP_CLONE}/boilerplate/_*); do
+    rm -fr $CONVENTION_ROOT/${d##*/}
+  done
   rsync -a -r --delete ${BP_CLONE}/boilerplate/_* $CONVENTION_ROOT
   echo "Reinvoking..."
   echo ""
@@ -122,7 +138,7 @@ trap "rm -fr $BP_CLONE" EXIT
 # repo doesn't have an `origin` remote.
 if [ -z "$REPO_NAME" ]; then
   # This is a tad ambitious, but it should usually work.
-  export REPO_NAME=$(git config --get remote.origin.url | sed 's,.*/,,; s/\.git$//')
+  export REPO_NAME=$(git config --get remote.origin.url | ${SED?} 's,.*/,,; s/\.git$//')
   # If that still didn't work, warn (but proceed)
   if [ -z "$REPO_NAME" ]; then
     echo 'Failed to discover repository name! $REPO_NAME not set!'
@@ -185,6 +201,35 @@ for convention in $(scrubbed_conventions $CONFIG_FILE); do
   echo "***********************************************************************************"
   echo ""
 done
+
+# (Create and) edit .gitattributes to
+# - override hiding boilerplate files related to freeze-check (so they
+#   can't be hacked without you seeing it in the PR by default)
+# - unhide .gitattributes itself (so these rules can't be changed
+#   without you seeing it in the PR by default)
+echo "Processing .gitattributes"
+gitattributes=${REPO_ROOT}/.gitattributes
+if [[ -f "${gitattributes}" ]]; then
+    # Delete the previously generated section
+    ${SED?} -i '/BEGIN BOILERPLATE GENERATED/,/END BOILERPLATE GENERATED/d' "${gitattributes}"
+fi
+# .gitattributes is processed in top-down order. Putting these entries at the
+# end ensures they take precedence over earlier, manual entries.
+cat <<EOF>>"${gitattributes}"
+### BEGIN BOILERPLATE GENERATED -- DO NOT EDIT    ###
+### This block must be the last thing in your     ###
+### .gitattributes file; otherwise the 'validate' ###
+### CI check will fail.                           ###
+# Used to ensure nobody mucked with boilerplate files.
+boilerplate/_lib/freeze-check linguist-generated=false
+# Show the boilerplate commit hash update. It's only one line anyway.
+boilerplate/_data/last-boilerplate-commit linguist-generated=false
+# Used by freeze-check. Good place for attackers to inject badness.
+boilerplate/update linguist-generated=false
+# Make sure attackers can't hide changes to this configuration
+.gitattributes linguist-generated=false
+### END BOILERPLATE GENERATED ###
+EOF
 
 # If all that went well, record some metadata.
 mkdir -p ${CONVENTION_ROOT}/_data
