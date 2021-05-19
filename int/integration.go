@@ -3,12 +3,13 @@ package int
 import (
 	"context"
 	"fmt"
-	"time"
 	"reflect"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -207,14 +208,14 @@ func (i *Integration) WaitForPrometheusRuleCorrectSLO(name types.NamespacedName,
 		return err
 	}
 
-	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
+	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name, routeMonitor.Kind)
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)
 		if errors.IsNotFound(err) {
 			return fmt.Errorf("PrometheusRule wasn't found")
 		}
-		if reflect.DeepEqual(template.Spec, prometheusRule.Spec){
+		if reflect.DeepEqual(template.Spec, prometheusRule.Spec) {
 			break
 		}
 		time.Sleep(1 * time.Second)
