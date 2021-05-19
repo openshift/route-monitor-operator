@@ -141,10 +141,10 @@ func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (util
 		return reconcile.RequeueReconcileWith(err)
 	}
 
-	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
+	namespacedName := types.NamespacedName{Namespace: s.ClusterUrlMonitor.Namespace, Name: s.ClusterUrlMonitor.Name}
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName, s.ClusterUrlMonitor.Kind+"Url")
+	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName, s.ClusterUrlMonitor.Kind)
 
 	err = s.createOrUpdatePrometheusRule(template)
 	if err != nil {
@@ -201,14 +201,7 @@ func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedNam
 		Namespace: namespacedName.Namespace,
 		Name:      namespacedName.Name,
 	}
-	emptyRef := v1alpha1.NamespacedName{}
-	currentRef := s.ClusterUrlMonitor.Status.PrometheusRuleRef
-
-	if currentRef != emptyRef && desiredRef != currentRef {
-		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
-	}
-
-	if currentRef == emptyRef && desiredRef != emptyRef {
+	if s.ClusterUrlMonitor.Status.PrometheusRuleRef != desiredRef {
 		// Update status with PrometheusRuleRef
 		s.ClusterUrlMonitor.Status.PrometheusRuleRef = desiredRef
 

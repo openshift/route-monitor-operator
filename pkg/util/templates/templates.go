@@ -124,8 +124,7 @@ func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName st
 // TemplateForPrometheusRuleResource returns a PrometheusRule
 func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName, sourceCRName string) monitoringv1.PrometheusRule {
 
-	routeURL := url
-	routeURLLabel := fmt.Sprintf(`%s="%s"`, sourceCRName, routeURL)
+	routeURLLabel := fmt.Sprintf(`%s="%s"`, sourceCRName, url)
 	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
 		{
@@ -181,12 +180,6 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 func sampleTemplateLabelsWithSev(url, severity string, sourceCRName string) map[string]string {
 	return map[string]string{
 		"severity":   severity,
-		sourceCRName: url,
-	}
-}
-
-func sampleTemplateLabels(url string, sourceCRName string) map[string]string {
-	return map[string]string{
 		sourceCRName: url,
 	}
 }
