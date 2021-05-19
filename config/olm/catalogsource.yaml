@@ -6,7 +6,7 @@ metadata:
     opsrc-provider: redhat
   name: ${REPO_NAME}-registry
 spec:
-  image: ${REPO_DIGEST}
+  image: ${REGISTRY_IMG}@${IMAGE_DIGEST}
   displayName: ${REPO_NAME}
   icon:
     base64data: ''
