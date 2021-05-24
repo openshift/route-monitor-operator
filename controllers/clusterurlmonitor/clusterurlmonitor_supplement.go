@@ -64,60 +64,32 @@ func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error
 	return reconcile.ContinueReconcile()
 }
 
-func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() (reconcile.Result, error) {
+func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
 
 	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
 	exists, err := s.doesServiceMonitorExist(namespacedName)
 	if exists || err != nil {
-		return reconcile.RequeueReconcileWith(err)
+		return err
 	}
 
 	clusterDomain, err := s.getClusterDomain()
 	if err != nil {
-		return reconcile.RequeueReconcileWith(err)
+		return err
 	}
 
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
 	serviceMonitor := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName)
-
-	// Does the resource already exist?
-	if err := s.Client.Get(s.Ctx, namespacedName, &serviceMonitor); err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		// and create it
-		err = s.Client.Create(s.Ctx, &serviceMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
+	err = s.Client.Create(s.Ctx, &serviceMonitor)
+	if err != nil {
+		return err
 	}
 
-	//Update status with serviceMonitorRef
-	desiredRef := v1alpha1.NamespacedName{
-		Name:      namespacedName.Name,
-		Namespace: namespacedName.Namespace,
-	}
-	emptyRef := v1alpha1.NamespacedName{}
+	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
+	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
+	err = s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
+	return err
 
-	currentRef := s.ClusterUrlMonitor.Status.ServiceMonitorRef
-	if currentRef != emptyRef && desiredRef != currentRef {
-		return utilreconcile.RequeueReconcileWith(customerrors.InvalidReferenceUpdate)
-	}
-
-	if currentRef == emptyRef && desiredRef != emptyRef {
-		s.ClusterUrlMonitor.Status.ServiceMonitorRef = desiredRef
-
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-
-	}
-	return utilreconcile.ContinueReconcile()
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (utilreconcile.Result, error) {
@@ -204,6 +176,25 @@ func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedNam
 	if s.ClusterUrlMonitor.Status.PrometheusRuleRef != desiredRef {
 		// Update status with PrometheusRuleRef
 		s.ClusterUrlMonitor.Status.PrometheusRuleRef = desiredRef
+
+		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		return utilreconcile.StopReconcile()
+
+	}
+	return utilreconcile.ContinueReconcile()
+}
+
+func (s *ClusterUrlMonitorSupplement) addServiceMonitorRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
+	desiredRef := v1alpha1.NamespacedName{
+		Namespace: namespacedName.Namespace,
+		Name:      namespacedName.Name,
+	}
+	if s.ClusterUrlMonitor.Status.ServiceMonitorRef != desiredRef {
+		// Update status with ServiceMonitorRef
+		s.ClusterUrlMonitor.Status.ServiceMonitorRef = desiredRef
 
 		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
 		if err != nil {
@@ -363,20 +354,14 @@ func ProcessRequest(blackboxExporter *blackboxexporter.BlackBoxExporter, sup *Cl
 		return utilreconcile.RequeueWith(err)
 	}
 
+	err = sup.EnsureServiceMonitorExists()
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+
 	res, err = sup.EnsurePrometheusRuleResourceExists()
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
-	}
-
-	res, err = sup.EnsureServiceMonitorExists()
-	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
 	}
 
 	return utilreconcile.Stop()
