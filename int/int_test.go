@@ -410,6 +410,7 @@ var _ = Describe("Integrationtests", func() {
 				Expect(err).NotTo(HaveOccurred())
 				_, parsedSlo := latestRouteMonitor.Spec.Slo.IsValid()
 				err = i.RouteMonitorWaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20, routeMonitor.Kind)
+				err = i.WaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

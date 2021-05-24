@@ -99,7 +99,7 @@ func sufficientProbes(windowSize, label string) string {
 }
 
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
-func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string) monitoringv1.Rule {
+func (r *multiWindowMultiBurnAlertRule) render(url, percent, label string, namespacedName types.NamespacedName, alertNameSuffix string) monitoringv1.Rule {
 
 	alertString := "" +
 		alertThreshold(r.shortWindow, percent, label, r.burnRate) +
@@ -111,9 +111,9 @@ func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName st
 		sufficientProbes(r.longWindow, label)
 
 	return monitoringv1.Rule{
-		Alert:  alertName,
+		Alert:  namespacedName.Namespace + alertNameSuffix,
 		Expr:   intstr.FromString(alertString),
-		Labels: sampleTemplateLabelsWithSev(url, r.severity),
+		Labels: sampleTemplateLabels(url, r.severity, namespacedName.Namespace),
 		Annotations: map[string]string{
 			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", label),
 		},
@@ -158,7 +158,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 
 	for _, alertrule := range alertRules { // Create all the alerts
-		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName.Name+"-ErrorBudgetBurn"))
+		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName, "-ErrorBudgetBurn"))
 	}
 
 	resource := monitoringv1.PrometheusRule{
@@ -177,9 +177,10 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 	return resource
 }
-func sampleTemplateLabelsWithSev(url, severity string) map[string]string {
+func sampleTemplateLabels(url, severity, namespace string) map[string]string {
 	return map[string]string{
-		"severity":        severity,
-		"RouteMonitorUrl": url,
+		"monitoredUrl": url,
+		"namespace":    namespace,
+		"severity":     severity,
 	}
 }
