@@ -164,7 +164,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 				gomock.InOrder(
 					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeNotFound),
 					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress),
-					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeNotFound),
 				)
 				mockClient.EXPECT().Create(gomock.Any(), serviceMonitorMatcher).Times(1)
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
