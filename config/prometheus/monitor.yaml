@@ -10,6 +10,12 @@ spec:
   endpoints:
     - path: /metrics
       port: https
+# patch required, but not all the resources are used
+# see patch request here https://sdk.operatorframework.io/docs/upgrading-sdk-version/v1.6.1/#gov2-gov3-ansiblev1-helmv1-add-scheme-token-and-tls-config-to-the-prometheus-servicemonitor-metrics-endpoint
+#      scheme: https
+#      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+#      tlsConfig:
+#        insecureSkipVerify: true
   selector:
     matchLabels:
       control-plane: controller-manager
