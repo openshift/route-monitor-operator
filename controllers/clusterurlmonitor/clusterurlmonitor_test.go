@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +21,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
+	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
 )
@@ -68,6 +70,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		sup                      ClusterUrlMonitorSupplement
 		mockClient               *clientmocks.MockClient
 		mockBlackBoxExporter     *routemonitormocks.MockBlackBoxExporter
+		mockResourceComparer     *routemonitormocks.MockResourceComparer
 		mockStatusWriter         *clientmocks.MockStatusWriter
 		mockCtrl                 *gomock.Controller
 		clusterUrlMonitorMatcher *ClusterUrlMonitorMatcher
@@ -84,6 +87,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockBlackBoxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
+		mockResourceComparer = routemonitormocks.NewMockResourceComparer(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -106,6 +110,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			BlackBoxExporter:  mockBlackBoxExporter,
 			Ctx:               context.TODO(),
 			ClusterUrlMonitor: clusterUrlMonitor,
+			ResourceComparer:  mockResourceComparer,
 		}
 	})
 
@@ -185,6 +190,186 @@ var _ = Describe("Clusterurlmonitor", func() {
 			It("doesn't update the ServiceMonitor", func() {
 				err := sup.EnsureServiceMonitorExists()
 				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("EnsurePrometheusRuleResourceExists", func() {
+		var (
+			mockStatusWriter     *clientmocks.MockStatusWriter
+			errorToPopulate      error
+			shouldPopulateError  bool
+			deepEqualCalledTimes int
+			deepEqualResponse    bool
+		)
+		BeforeEach(func() {
+			// Why bellow code?
+			// routeMonitorSlo = v1alpha1.SloSpec{}
+			// clusterUrlMonitorSlo = v1alpha1.SloSpec{
+			// 	TargetAvailabilityPercent: "99.95",
+			// }
+			// clusterUrlMonitor.Spec = v1alpha1.clusterUrlMonitor{
+			// 	Slo: clusterUrlMonitorSlo,
+			// }
+
+			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
+			errorToPopulate = nil
+			shouldPopulateError = false
+			deepEqualCalledTimes = 0
+			deepEqualResponse = true
+			port = "1337"
+			prefix = "prefix."
+			suffix = "/suffix"
+
+			clusterUrlMonitor.Name = "fake-clusterurlmonitor"
+			clusterUrlMonitor.Namespace = "fake-namespace"
+			clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = "99.95"
+		})
+		JustBeforeEach(func() {
+			mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).Return(deepEqualResponse).Times(deepEqualCalledTimes)
+
+			expectedClusterUrlMonitor := clusterUrlMonitor
+
+			if shouldPopulateError {
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				expectedClusterUrlMonitor.Status.ErrorStatus = errorToPopulate.Error()
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedClusterUrlMonitor)).
+					Times(1).
+					Return(nil)
+			}
+		})
+		When("the ClusterUrlMonitor has an empty slo value", func() {
+			// Arrange
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = ""
+			})
+			It("should skip processing and continue", func() {
+				// Act
+				res, err := sup.EnsurePrometheusRuleResourceExists()
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+		When("the ClusterUrlMonitor has a slo spec but percent is too low", func() {
+			// Arrange
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = "-0/10"
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := sup.EnsurePrometheusRuleResourceExists()
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("the ClusterUrlMonitor has a slo spec but percent is too high", func() {
+			// Arrange
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = "101"
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := sup.EnsurePrometheusRuleResourceExists()
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("the ClusterUrlMonitor has an invalid slo type", func() {
+			// Arrange
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = "fake-slo-type"
+				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
+			})
+			It("should Throw an error", func() {
+				// Act
+				_, err := sup.EnsurePrometheusRuleResourceExists()
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		Describe("the PrometheusRuleResource exists but...", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
+				deepEqualCalledTimes = 1
+			})
+			JustBeforeEach(func() {
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+				//Act
+				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+			When("deepEqual is true (they are the same)", func() {
+				It("should stop operation", func() {})
+			})
+			When("deepEqual is false (they are different)", func() {
+				BeforeEach(func() {
+					deepEqualResponse = false
+					mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1)
+				})
+				It("should stop operation", func() {})
+			})
+		})
+		When("the resource Exists but not the same as the generated template", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
+
+				deepEqualResponse = false
+				deepEqualCalledTimes = 1
+
+				mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1)
+			})
+
+			JustBeforeEach(func() {
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(nil)
+			})
+			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
+				//Act
+				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
+			BeforeEach(func() {
+				ingress := configv1.Ingress{
+					Spec: configv1.IngressSpec{
+						Domain: "fake.test",
+					},
+				}
+				clusterUrlMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
+					Namespace: clusterUrlMonitor.Namespace,
+					Name:      clusterUrlMonitor.Name,
+				}
+
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+
+				deepEqualResponse = true
+				deepEqualCalledTimes = 1
+			})
+
+			It("should continue reconciling", func() {
+				//Act
+				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp).NotTo(BeNil())
+				Expect(resp).To(Equal(utilreconcile.ContinueOperation()))
 			})
 		})
 	})

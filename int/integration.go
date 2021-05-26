@@ -3,12 +3,13 @@ package int
 import (
 	"context"
 	"fmt"
-	"time"
 	"reflect"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -156,7 +157,7 @@ func (i *Integration) WaitForPrometheusRule(name types.NamespacedName, seconds i
 	return prometheusRule, nil
 }
 
-func (i *Integration) WaitForPrometheusRuleRef(name types.NamespacedName, seconds int) (v1alpha1.RouteMonitor, error) {
+func (i *Integration) RouteMonitorWaitForPrometheusRuleRef(name types.NamespacedName, seconds int) (v1alpha1.RouteMonitor, error) {
 	routeMonitor := v1alpha1.RouteMonitor{}
 	t := 0
 	for ; t < seconds; t++ {
@@ -170,6 +171,22 @@ func (i *Integration) WaitForPrometheusRuleRef(name types.NamespacedName, second
 		return routeMonitor, fmt.Errorf("PrometheusRuleRef didn't appear after %d seconds", seconds)
 	}
 	return routeMonitor, nil
+}
+
+func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleRef(name types.NamespacedName, seconds int) (v1alpha1.ClusterUrlMonitor, error) {
+	clusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &clusterUrlMonitor)
+		if clusterUrlMonitor.Status.PrometheusRuleRef.Name != "" || err != nil {
+			return clusterUrlMonitor, err
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return clusterUrlMonitor, fmt.Errorf("PrometheusRuleRef didn't appear after %d seconds", seconds)
+	}
+	return clusterUrlMonitor, nil
 }
 
 func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, seconds int) error {
@@ -188,7 +205,7 @@ func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, se
 	return nil
 }
 
-func (i *Integration) WaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int) error {
+func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int, kind string) error {
 	prometheusRule := monitoringv1.PrometheusRule{}
 	err := i.Client.Get(context.TODO(), name, &prometheusRule)
 	if errors.IsNotFound(err) {
@@ -207,14 +224,14 @@ func (i *Integration) WaitForPrometheusRuleCorrectSLO(name types.NamespacedName,
 		return err
 	}
 
-	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
+	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name, "RouteMonitor")
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)
 		if errors.IsNotFound(err) {
 			return fmt.Errorf("PrometheusRule wasn't found")
 		}
-		if reflect.DeepEqual(template.Spec, prometheusRule.Spec){
+		if reflect.DeepEqual(template.Spec, prometheusRule.Spec) {
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -223,5 +240,41 @@ func (i *Integration) WaitForPrometheusRuleCorrectSLO(name types.NamespacedName,
 		return fmt.Errorf("PrometheusRule wasn't updated with the correct SLO after %d seconds", seconds)
 	}
 	return nil
+}
 
+func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int, expectedUrl string, kind string) error {
+	prometheusRule := monitoringv1.PrometheusRule{}
+	err := i.Client.Get(context.TODO(), name, &prometheusRule)
+	if errors.IsNotFound(err) {
+		return fmt.Errorf("PrometheusRule wasn't found")
+	}
+	if err != nil {
+		return err
+	}
+
+	clusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
+	err = i.Client.Get(context.TODO(), name, &clusterUrlMonitor)
+	if errors.IsNotFound(err) {
+		return fmt.Errorf("ClusterUrlMonitor wasn't found")
+	}
+	if err != nil {
+		return err
+	}
+
+	template := templates.TemplateForPrometheusRuleResource(expectedUrl, targetSlo, name, "ClusterUrlMonitor")
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &prometheusRule)
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("PrometheusRule wasn't found")
+		}
+		if reflect.DeepEqual(template.Spec, prometheusRule.Spec) {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return fmt.Errorf("PrometheusRule wasn't updated with the correct SLO after %d seconds", seconds)
+	}
+	return nil
 }

@@ -39,6 +39,7 @@ type ClusterUrlMonitorReconciler struct {
 	Scheme                    *runtime.Scheme
 	BlackBoxExporterImage     string
 	BlackBoxExporterNamespace string
+	ResourceComparer
 }
 
 const (
@@ -48,6 +49,7 @@ const (
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=ingresses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;delete
 
 func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -63,7 +65,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 	}
 
 	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxExporterImage, r.BlackBoxExporterNamespace)
-	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter)
+	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter, r.ResourceComparer)
 
 	return ProcessRequest(blackboxExporter, sup)
 }
