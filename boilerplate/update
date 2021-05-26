@@ -73,12 +73,14 @@ scrubbed_conventions() {
 # This function ignores uncommitted changes to:
 # - Makefile: Editing this file is part of bootstrapping, and we don't
 #   want to force an additional commit in the bootstrapping process.
+# - .gitattributes: This file is created as part of the bootstrapping
+#   process. See above.
 # - ?? boilerplate/: I.e. the boilerplate subdirectory is brand new,
 #   meaning you're bootstrapping. See above.
 # - boilerplate/update.cfg: Changing this file prior to an update is
 #   part of the process of subscribing to new conventions.
 unacceptable_deltas() {
-  ignores="Makefile|boilerplate/(update\.cfg)?"
+  ignores="Makefile|.gitattributes|boilerplate/(update\.cfg)?"
   git status --porcelain | grep -E -v $1 " ($ignores)$"
 }
 
