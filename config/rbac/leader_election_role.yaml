@@ -25,13 +25,6 @@ rules:
   - update
   - patch
 - apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
   - coordination.k8s.io
   resources:
   - leases
@@ -43,3 +36,10 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
