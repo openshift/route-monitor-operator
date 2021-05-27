@@ -9,7 +9,7 @@ import (
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
+	"github.com/openshift/route-monitor-operator/pkg/alert"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,7 +23,6 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 )
 
 type Integration struct {
@@ -225,7 +224,7 @@ func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.Nam
 		return err
 	}
 
-	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
+	template := alert.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)
@@ -262,7 +261,7 @@ func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(name type
 		return err
 	}
 
-	template := templates.TemplateForPrometheusRuleResource(expectedUrl, targetSlo, name)
+	template := alert.TemplateForPrometheusRuleResource(expectedUrl, targetSlo, name)
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)

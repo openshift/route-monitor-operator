@@ -1,354 +1,150 @@
 package clusterurlmonitor
 
 import (
-	"context"
+	"reflect"
 
-	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/util"
-	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
-	utilfinalizer "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
-	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type BlackBoxExporter interface {
-	EnsureBlackBoxExporterResourcesExist() error
-	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporterconsts.ShouldDeleteBlackBoxExporter, error)
-	GetBlackBoxExporterNamespace() string
-}
-
-type ResourceComparer interface {
-	DeepEqual(x, y interface{}) bool
-}
-
-type ClusterUrlMonitorSupplement struct {
-	ClusterUrlMonitor v1alpha1.ClusterUrlMonitor
-	Client            client.Client
-	Log               logr.Logger
-	Ctx               context.Context
-	BlackBoxExporter  BlackBoxExporter
-	ClusterID         string
-}
-
-func NewSupplement(ClusterUrlMonitor v1alpha1.ClusterUrlMonitor, Client client.Client, log logr.Logger, blackBoxExporter *blackboxexporter.BlackBoxExporter, ClusterID string) *ClusterUrlMonitorSupplement {
-	return &ClusterUrlMonitorSupplement{
-		ClusterUrlMonitor: ClusterUrlMonitor,
-		Client:            Client,
-		Log:               log,
-		Ctx:               context.Background(),
-		BlackBoxExporter:  blackBoxExporter,
-		ClusterID:         ClusterID}
-}
-
-func (s *ClusterUrlMonitorSupplement) EnsureFinalizer() (reconcile.Result, error) {
-	if !utilfinalizer.Contains(s.ClusterUrlMonitor.GetFinalizers(), FinalizerKey) {
-		utilfinalizer.Add(&s.ClusterUrlMonitor, FinalizerKey)
-		err := s.Client.Update(s.Ctx, &s.ClusterUrlMonitor)
-		return reconcile.RequeueReconcileWith(err)
-	}
-	return reconcile.ContinueReconcile()
-}
-
-func (s *ClusterUrlMonitorSupplement) EnsureServiceMonitorExists() error {
-
-	clusterDomain, err := util.GetClusterDomain(s.Client, s.Ctx)
-	if err != nil {
-		return err
-	}
-
-	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
-	spec := s.ClusterUrlMonitor.Spec
-	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitorTemplate := templates.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.ClusterID)
-
-	// Does a ServiceMonitor already exist?
-	exists, err := s.doesServiceMonitorExist(namespacedName)
-	if exists || err != nil {
-		return err
-	}
-
-	err = s.Client.Create(s.Ctx, &serviceMonitorTemplate)
-	if err != nil {
-		return err
-	}
-
-	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Namespace = namespacedName.Namespace
-	s.ClusterUrlMonitor.Status.ServiceMonitorRef.Name = namespacedName.Name
-	err = s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-	return err
-
-}
-
-func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (utilreconcile.Result, error) {
-	shouldCreate, err, parsedSlo := s.shouldCreatePrometheusRule()
-
-	res, err := s.updateErrorStatus(err)
-	if err != nil || res.RequeueOrStop() {
-		return res, err
-	}
-
-	if !shouldCreate {
-		err = s.EnsurePrometheusRuleResourceAbsent()
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return s.addPrometheusRuleRefToStatus(types.NamespacedName{})
-	}
-
-	clusterDomain, err := s.getClusterDomain()
-	if err != nil {
-		return reconcile.RequeueReconcileWith(err)
-	}
-
-	namespacedName := types.NamespacedName{Namespace: s.ClusterUrlMonitor.Namespace, Name: s.ClusterUrlMonitor.Name}
-	spec := s.ClusterUrlMonitor.Spec
-	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
-
-	err = s.createOrUpdatePrometheusRule(template)
+// Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
+func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	clusterDomain, err := s.GetClusterDomain()
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	res, err = s.addPrometheusRuleRefToStatus(namespacedName)
+	spec := clusterUrlMonitor.Spec
+	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
+	parsedSlo, err := s.Common.ParseSLOMonitorSpecs(clusterUrl, clusterUrlMonitor.Spec.Slo)
+
+	if s.Common.SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err) {
+		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+	}
+	if parsedSlo == "" {
+		err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
+		if updated {
+			return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	namespacedName := types.NamespacedName{Namespace: clusterUrlMonitor.Namespace, Name: clusterUrlMonitor.Name}
+	template := alert.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
+	err = s.Prom.UpdatePrometheusRuleDeployment(template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
-	}
 
-	return utilreconcile.ContinueReconcile()
-}
-
-func (s *ClusterUrlMonitorSupplement) createOrUpdatePrometheusRule(template monitoringv1.PrometheusRule) error {
-	resource := monitoringv1.PrometheusRule{}
-	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Name,
-		Namespace: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Namespace}
-	err := s.Client.Get(s.Ctx, namespacedName, &resource)
-
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return err
-	}
-
-	if !k8serrors.IsNotFound(err) {
-		if s.ResourceComparer.DeepEqual(template.Spec, resource.Spec) {
-			return nil
-		}
-		// Update PrometheusRule if the specs are different
-		resource.Spec = template.Spec
-		return s.Client.Update(s.Ctx, &resource)
-	}
-	// Create the PrometheusRule if it does not exist
-	return s.Client.Create(s.Ctx, &template)
-}
-
-func (s *ClusterUrlMonitorSupplement) shouldCreatePrometheusRule() (bool, error, string) {
-	// Is the SloSpec configured on this CR?
-	if s.ClusterUrlMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
-		return false, nil, ""
-	}
-	isValid, parsedSlo := s.ClusterUrlMonitor.Spec.Slo.IsValid()
-	if !isValid {
-		return false, customerrors.InvalidSLO, ""
-	}
-	return true, nil, parsedSlo
-}
-
-func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
-	desiredRef := v1alpha1.NamespacedName{
-		Namespace: namespacedName.Namespace,
-		Name:      namespacedName.Name,
-	}
-	if s.ClusterUrlMonitor.Status.PrometheusRuleRef != desiredRef {
-		// Update status with PrometheusRuleRef
-		s.ClusterUrlMonitor.Status.PrometheusRuleRef = desiredRef
-
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-
+	// Update PrometheusRuleReference in ClusterUrlMonitor if necessary
+	updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, namespacedName)
+	if updated {
+		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
 
-func (s *ClusterUrlMonitorSupplement) addServiceMonitorRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
-	desiredRef := v1alpha1.NamespacedName{
-		Namespace: namespacedName.Namespace,
-		Name:      namespacedName.Name,
+// Takes care that right ServiceMonitor for the defined ClusterURLMonitor are in place
+func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	clusterDomain, err := s.GetClusterDomain()
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
-	if s.ClusterUrlMonitor.Status.ServiceMonitorRef != desiredRef {
-		// Update status with ServiceMonitorRef
-		s.ClusterUrlMonitor.Status.ServiceMonitorRef = desiredRef
 
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
+	namespacedName := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
+	spec := clusterUrlMonitor.Spec
+	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
+	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.ClusterID)
+	err = s.ServiceMonitor.UpdateServiceMonitorDeployment(serviceMonitorTemplate)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
 
+	//Update RouteMonitor ServiceMonitorRef if required
+	updated, err := s.Common.SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, namespacedName)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+	if updated {
+		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
 
-func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Result, error) {
-	if s.ClusterUrlMonitor.DeletionTimestamp == nil {
-		return reconcile.ContinueReconcile()
+// Ensures that all dependencies related to a ClusterUrlMonitor are deleted
+func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	if clusterUrlMonitor.DeletionTimestamp == nil {
+		return utilreconcile.ContinueReconcile()
 	}
 
-	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Name, Namespace: s.ClusterUrlMonitor.Namespace}
-	serviceMonitor, err := util.GetServiceMonitor(s.Client, namespacedName)
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return reconcile.RequeueReconcileWith(err)
-	}
-
-	if err == nil {
-		err = s.Client.Delete(s.Ctx, &serviceMonitor)
-		if err != nil {
-			return reconcile.RequeueReconcileWith(err)
-		}
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
 	if err != nil {
-		return reconcile.RequeueReconcileWith(err)
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
 		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
 		if err != nil {
-			return reconcile.RequeueReconcileWith(err)
+			return utilreconcile.RequeueReconcileWith(err)
 		}
 	}
 
-	err = s.EnsurePrometheusRuleResourceAbsent()
+	err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	if utilfinalizer.Contains(s.ClusterUrlMonitor.GetFinalizers(), FinalizerKey) {
-		utilfinalizer.Remove(&s.ClusterUrlMonitor, FinalizerKey)
-		err = s.Client.Update(s.Ctx, &s.ClusterUrlMonitor)
-		return reconcile.RequeueReconcileWith(err)
-	}
-	return reconcile.ContinueReconcile()
-}
-
-func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceAbsent() error {
-	// nothing to delete, stopping early
-	if s.ClusterUrlMonitor.Status.PrometheusRuleRef == *new(v1alpha1.NamespacedName) {
-		return nil
-	}
-	namespacedName := types.NamespacedName{Name: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Name,
-		Namespace: s.ClusterUrlMonitor.Status.PrometheusRuleRef.Namespace}
-	resource := &monitoringv1.PrometheusRule{}
-	// Does the resource already exist?
-	err := s.Client.Get(s.Ctx, namespacedName, resource)
-	if err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return err
-		}
-		// Resource doesn't exist, nothing to do
-		return nil
-	}
-	err = s.Client.Delete(s.Ctx, resource)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *ClusterUrlMonitorSupplement) getServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
-	serviceMonitor := monitoringv1.ServiceMonitor{}
-	err := s.Client.Get(s.Ctx, namespacedName, &serviceMonitor)
-	return serviceMonitor, err
-}
-
-func (s *ClusterUrlMonitorSupplement) doesServiceMonitorExist(namespacedName types.NamespacedName) (bool, error) {
-	_, err := util.GetServiceMonitor(s.Client, namespacedName)
-	if k8serrors.IsNotFound(err) {
-		return false, nil
-	}
-	return true, err
-}
-
-func (s *ClusterUrlMonitorSupplement) updateErrorStatus(err error) (utilreconcile.Result, error) {
-	// If an error has already been flagged and still occurs
-	if s.ClusterUrlMonitor.Status.ErrorStatus != "" && err != nil {
-		// Skip as the resource should not be created
-		return utilreconcile.ContinueReconcile()
+	if s.Common.DeleteFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		return s.Common.UpdateReconciledMonitor(&clusterUrlMonitor)
 	}
 
-	// If the error was flagged but stopped firing
-	if s.ClusterUrlMonitor.Status.ErrorStatus != "" && err == nil {
-		// Clear the error and restart
-		s.ClusterUrlMonitor.Status.ErrorStatus = ""
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-	}
-
-	// If the error was not flagged but has started firing
-	if s.ClusterUrlMonitor.Status.ErrorStatus == "" && err != nil {
-		// Raise the alert and restart
-		s.ClusterUrlMonitor.Status.ErrorStatus = err.Error()
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-	}
-
-	// only case left is ErrorStatus == "" && err == nil
-	// so there is no need to check if err != nil
 	return utilreconcile.ContinueReconcile()
 }
 
-func ProcessRequest(blackboxExporter *blackboxexporter.BlackBoxExporter, sup *ClusterUrlMonitorSupplement) (ctrl.Result, error) {
-	res, err := sup.EnsureDeletionProcessed()
+// GetClusterUrlMonitor return the ClusterUrlMonitor that is tested
+func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1alpha1.ClusterUrlMonitor, utilreconcile.Result, error) {
+	ClusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
+	err := s.Client.Get(s.Ctx, req.NamespacedName, &ClusterUrlMonitor)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			res, err := utilreconcile.RequeueReconcileWith(err)
+			return v1alpha1.ClusterUrlMonitor{}, res, err
+		}
+		s.Log.V(2).Info("StopRequeue", "As ClusterUrlMonitor is 'NotFound', stopping requeue", nil)
+
+		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
 	}
 
-	res, err = sup.EnsureFinalizer()
-	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
+	// if the resource is empty, we should terminate
+	emptyClustUrlMonitor := v1alpha1.ClusterUrlMonitor{}
+	if reflect.DeepEqual(ClusterUrlMonitor, emptyClustUrlMonitor) {
+		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
 	}
 
-	err = blackboxExporter.EnsureBlackBoxExporterResourcesExist()
-	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
+	return ClusterUrlMonitor, utilreconcile.ContinueOperation(), nil
+}
 
-	err = sup.EnsureServiceMonitorExists()
+func (s *ClusterUrlMonitorReconciler) GetClusterDomain() (string, error) {
+	clusterConfig := configv1.DNS{}
+	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterConfig)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
+		return "", err
 	}
-
-	res, err = sup.EnsurePrometheusRuleResourceExists()
-	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
-
-	return utilreconcile.Stop()
+	return clusterConfig.Spec.BaseDomain, nil
 }

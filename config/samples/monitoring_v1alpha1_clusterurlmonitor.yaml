@@ -2,7 +2,6 @@ apiVersion: monitoring.openshift.io/v1alpha1
 kind: ClusterUrlMonitor
 metadata:
   name: clusterurlmonitor-sample
-  namespace: openshift-route-monitor-operator
 spec:
   prefix: https://api.
   port: "6443"

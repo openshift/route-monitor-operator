@@ -1,29 +1,90 @@
 package routemonitor
 
 import (
-	"context"
+	"errors"
+	"fmt"
+	"reflect"
 
-	// k8s packages
-
-	//api's used
-
+	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+
+	"github.com/openshift/route-monitor-operator/pkg/alert"
+	"github.com/openshift/route-monitor-operator/pkg/consts"
+	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
+
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-//go:generate mockgen -source $GOFILE -destination ../../pkg/util/test/generated/mocks/$GOPACKAGE/blackboxexporter.go -package $GOPACKAGE BlackBoxExporter
-type BlackBoxExporter interface {
-	EnsureBlackBoxExporterResourcesExist() error
-	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
-	GetBlackBoxExporterNamespace() string
+// Ensures that all PrometheusRules CR are created according to the RouteMonitor
+func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	parsedSlo, err := r.Common.ParseSLOMonitorSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo)
+	if r.Common.SetErrorStatus(&routeMonitor.Status.ErrorStatus, err) {
+		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+	}
+	if parsedSlo == "" {
+		// Delete existing PrometheusRules if required
+		err = r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
+		if updated {
+			return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+		}
+		return utilreconcile.StopReconcile()
+	}
+
+	// Update PrometheusRule from templates
+	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
+	template := alert.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
+	err = r.Prom.UpdatePrometheusRuleDeployment(template)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+
+	// Update PrometheusRuleReference in RouteMonitor if necessary
+	updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, namespacedName)
+	if updated {
+		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+	}
+	return utilreconcile.ContinueReconcile()
 }
 
-func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+// Ensures that a ServiceMonitor is created from the RouteMonitor CR
+func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	if r.ClusterID == "" {
+		r.ClusterID = r.Common.GetClusterID()
+	}
+	// Was the RouteURL populated by a previous step?
+	if routeMonitor.Status.RouteURL == "" {
+		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+	}
+
+	// update ServiceMonitor if requiredctrl
+	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, r.ClusterID)
+	err := r.ServiceMonitor.UpdateServiceMonitorDeployment(serviceMonitorTemplate)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+
+	// update ServiceMonitorRef if required
+	updated, err := r.Common.SetResourceReference(&routeMonitor.Status.ServiceMonitorRef, namespacedName)
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+	if updated {
+		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+	}
+	return utilreconcile.ContinueReconcile()
+}
+
+// Ensures that all dependencies related to a RouteMonitor are deleted
+func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
 	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
@@ -41,125 +102,89 @@ func (r *RouteMonitorReconciler) EnsureRouteMonitorAndDependenciesAbsent(ctx con
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
-	err = r.EnsureServiceMonitorResourceAbsent(ctx, routeMonitor)
+	err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	log.V(2).Info("Entering ensurePrometheusRuleResourceAbsent")
-	err = r.EnsurePrometheusRuleResourceAbsent(ctx, routeMonitor)
+	err = r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")
-	// only the last command can throw the result (as no matter what happens it will stop)
-	_, err = r.EnsureFinalizerAbsent(ctx, routeMonitor)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
+	if r.Common.DeleteFinalizer(&routeMonitor, consts.FinalizerKey) {
+		return r.Common.UpdateReconciledMonitor(&routeMonitor)
 	}
 	return utilreconcile.StopReconcile()
 }
 
-func (r *RouteMonitorReconciler) EnsurePrometheusRuleResourceExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	shouldHave, err, parsedSlo := shouldCreatePrometheusRule(routeMonitor)
+// GetRouteMonitor return the RouteMonitor that is tested
+func (r *RouteMonitorReconciler) GetRouteMonitor(req ctrl.Request) (v1alpha1.RouteMonitor, utilreconcile.Result, error) {
+	routeMonitor := v1alpha1.RouteMonitor{}
+	err := r.Client.Get(r.Ctx, req.NamespacedName, &routeMonitor)
+	if err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			res, err := utilreconcile.RequeueReconcileWith(err)
+			return v1alpha1.RouteMonitor{}, res, err
+		}
+		r.Log.V(2).Info("StopRequeue", "As RouteMonitor is 'NotFound', stopping requeue", nil)
+		return v1alpha1.RouteMonitor{}, utilreconcile.StopOperation(), nil
+	}
 
-	res, err := r.updateErrorStatus(ctx, routeMonitor, err)
-	if err != nil || res.RequeueOrStop() {
+	// if the resource is empty, we should terminate
+	emptyRouteMonitor := v1alpha1.RouteMonitor{}
+	if reflect.DeepEqual(routeMonitor, emptyRouteMonitor) {
+		return v1alpha1.RouteMonitor{}, utilreconcile.StopOperation(), nil
+	}
+
+	return routeMonitor, utilreconcile.ContinueOperation(), nil
+}
+
+// GetRoute returns the Route from the RouteMonitor spec
+func (r *RouteMonitorReconciler) GetRoute(routeMonitor v1alpha1.RouteMonitor) (routev1.Route, error) {
+	res := routev1.Route{}
+	nsName := types.NamespacedName{
+		Name:      routeMonitor.Spec.Route.Name,
+		Namespace: routeMonitor.Spec.Route.Namespace,
+	}
+	if nsName.Name == "" || nsName.Namespace == "" {
+		err := errors.New("Invalid CR: Cannot retrieve route if one of the fields is empty")
 		return res, err
 	}
 
-	if !shouldHave {
-		err = r.EnsurePrometheusRuleResourceAbsent(ctx, routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return r.addPrometheusRuleRefToStatus(ctx, routeMonitor, types.NamespacedName{})
-	}
-
-	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
-	template := templates.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
-
-	err = r.UpdatePrometheusRuleDeployment(ctx, r.Client, template)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-
-	res, err = r.addPrometheusRuleRefToStatus(ctx, routeMonitor, namespacedName)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.StopReconcile()
-	}
-
-	return utilreconcile.ContinueReconcile()
+	err := r.Client.Get(r.Ctx, nsName, &res)
+	return res, err
 }
 
-func (r *RouteMonitorReconciler) updateErrorStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, err error) (utilreconcile.Result, error) {
-	// If an error has already been flagged and still occurs
-	if routeMonitor.Status.ErrorStatus != "" && err != nil {
-		// Skip as the resource should not be created
+// EnsureRouteURLExists verifies that the .spec.RouteURL has the Route URL inside
+func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	amountOfIngress := len(route.Status.Ingress)
+	if amountOfIngress == 0 {
+		err := errors.New("No Ingress: cannot extract route url from the Route resource")
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+	extractedRouteURL := route.Status.Ingress[0].Host
+	if amountOfIngress > 1 {
+		r.Log.V(1).Info(fmt.Sprintf("Too many Ingress: assuming first ingress is the correct, chosen ingress '%s'", extractedRouteURL))
+	}
+
+	if extractedRouteURL == "" {
+		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+	}
+
+	currentRouteURL := routeMonitor.Status.RouteURL
+	if currentRouteURL == extractedRouteURL {
+		r.Log.V(3).Info("Same RouteURL: currentRouteURL and extractedRouteURL are equal, update not required")
 		return utilreconcile.ContinueReconcile()
 	}
 
-	// If the error was flagged but stopped firing
-	if routeMonitor.Status.ErrorStatus != "" && err == nil {
-		// Clear the error and restart
-		routeMonitor.Status.ErrorStatus = ""
-		err := r.Status().Update(ctx, &routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
+	if currentRouteURL != "" && extractedRouteURL != currentRouteURL {
+		r.Log.V(3).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
 	}
 
-	// If the error was not flagged but has started firing
-	if routeMonitor.Status.ErrorStatus == "" && err != nil {
-		// Raise the alert and restart
-		routeMonitor.Status.ErrorStatus = err.Error()
-		err := r.Status().Update(ctx, &routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-	}
-
-	// only case left is ErrorStatus == "" && err == nil
-	// so there is no need to check if err != nil
-	return utilreconcile.ContinueReconcile()
-}
-
-func (r *RouteMonitorReconciler) addPrometheusRuleRefToStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, namespacedName types.NamespacedName) (utilreconcile.Result, error) {
-	desiredPrometheusRuleRef := v1alpha1.NamespacedName{
-		Namespace: namespacedName.Namespace,
-		Name:      namespacedName.Name,
-	}
-	if routeMonitor.Status.PrometheusRuleRef != desiredPrometheusRuleRef {
-		// Update status with PrometheusRuleRef
-		routeMonitor.Status.PrometheusRuleRef = desiredPrometheusRuleRef
-		err := r.Status().Update(ctx, &routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-	}
-	return utilreconcile.ContinueReconcile()
-}
-
-func shouldCreatePrometheusRule(routeMonitor v1alpha1.RouteMonitor) (bool, error, string) {
-	// Was the RouteURL populated by a previous step?
-	if routeMonitor.Status.RouteURL == "" {
-		return false, customerrors.NoHost, ""
-	}
-
-	// Is the SloSpec configured on this CR?
-	if routeMonitor.Spec.Slo == *new(v1alpha1.SloSpec) {
-		return false, nil, ""
-	}
-	isValid, parsedSlo := routeMonitor.Spec.Slo.IsValid()
-	if !isValid {
-		return false, customerrors.InvalidSLO, ""
-	}
-	return true, nil, parsedSlo
+	routeMonitor.Status.RouteURL = extractedRouteURL
+	return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
 }

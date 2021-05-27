@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"os"
 
@@ -36,10 +35,6 @@ import (
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
-	"github.com/openshift/route-monitor-operator/controllers/routemonitor/adder"
-	"github.com/openshift/route-monitor-operator/controllers/routemonitor/deleter"
-	"github.com/openshift/route-monitor-operator/controllers/routemonitor/supplement"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -92,35 +87,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	routeMonitorReconciler := &routemonitor.RouteMonitorReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("RouteMonitor"),
-		Scheme: mgr.GetScheme(),
-	}
+	routeMonitorReconciler := routemonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace)
 
-	routeMonitorReconciler.RouteMonitorSupplement = supplement.New(*routeMonitorReconciler)
-	routeMonitorReconciler.RouteMonitorDeleter = deleter.New(*routeMonitorReconciler)
-	routeMonitorReconciler.RouteMonitorAdder = adder.New(*routeMonitorReconciler, blackboxExporterNamespace)
-	routeMonitorReconciler.BlackBoxExporter = blackboxexporter.New(routeMonitorReconciler.Client,
-		routeMonitorReconciler.Log, context.Background(), blackboxExporterImage, blackboxExporterNamespace)
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
 
-	if err = (&clusterurlmonitor.ClusterUrlMonitorReconciler{
-		Client:                    mgr.GetClient(),
-		Log:                       ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor"),
-		Scheme:                    mgr.GetScheme(),
-		BlackBoxExporterImage:     blackboxExporterImage,
-		BlackBoxExporterNamespace: blackboxExporterNamespace,
-		ResourceComparer:          clusterurlmonitor.ResourceComparerStruct{},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterUrlMonitor")
+	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace)
+
+	if err = clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "clusterUrlMonitorReconciler")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
 
+	// +kubebuilder:scaffold:builder
 	setupLog.V(2).Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
