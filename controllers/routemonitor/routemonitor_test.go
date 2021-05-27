@@ -25,8 +25,8 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
 	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
-	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 

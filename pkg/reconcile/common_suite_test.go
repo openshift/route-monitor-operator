@@ -1,4 +1,4 @@
-package adder_test
+package reconcileCommon_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDeleter(t *testing.T) {
+func TestReconcileCommon(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Adder Suite")
+	RunSpecs(t, "Reconcile Common Suite")
 }

@@ -32,16 +32,17 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+GOFLAGS ?= ""
 
 OPERATOR_SDK ?= operator-sdk
 
 all: manager
 
-TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+TESTS=$(shell go -mod=vendor list ./... | grep -v /int | tr '\n' ' ')
 
 # Run tests
 test: generate fmt vet manifests 
-	go test $(TESTS) -coverprofile cover.out
+	go test $(TESTS) $(GOFLAGS) -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet

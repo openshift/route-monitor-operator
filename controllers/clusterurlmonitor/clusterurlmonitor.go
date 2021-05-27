@@ -28,20 +28,20 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/util"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
 type ClusterUrlMonitorReconciler struct {
-	client.Client
+	Client                    client.Client
 	Log                       logr.Logger
 	Scheme                    *runtime.Scheme
 	BlackBoxExporterImage     string
 	BlackBoxExporterNamespace string
-	ClusterID				  string
-	ResourceComparer
+	ClusterID                 string
+	controllers.MonitorReconcileCommon
 }
 
 const (
@@ -63,12 +63,12 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return utilreconcile.RequeueWith(err)
 	}
 
-	if r.ClusterID == "" {
-		r.ClusterID = util.GetClusterID(r.Client)
-	}
-
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
+	}
+
+	if r.ClusterID == "" {
+		r.ClusterID = r.GetClusterID(r.Client)
 	}
 
 	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxExporterImage, r.BlackBoxExporterNamespace)
@@ -82,6 +82,7 @@ func (r *ClusterUrlMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&monitoringv1alpha1.ClusterUrlMonitor{}).
 		Complete(r)
 }
+
 
 // GetClusterUrlMonitor return the ClusterUrlMonitor that is tested
 func (r *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request, ctx context.Context) (v1alpha1.ClusterUrlMonitor, utilreconcile.Result, error) {

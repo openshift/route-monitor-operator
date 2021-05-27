@@ -23,7 +23,6 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 )
 
 type Integration struct {

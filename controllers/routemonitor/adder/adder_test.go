@@ -21,7 +21,7 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/util"
+	utilmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

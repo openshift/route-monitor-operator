@@ -23,7 +23,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
+	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
 )
 
 type ClusterUrlMonitorMatcher struct {
@@ -69,8 +69,8 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor        v1alpha1.ClusterUrlMonitor
 		sup                      ClusterUrlMonitorSupplement
 		mockClient               *clientmocks.MockClient
-		mockBlackBoxExporter     *routemonitormocks.MockBlackBoxExporter
-		mockResourceComparer     *routemonitormocks.MockResourceComparer
+		mockBlackBoxExporter     *controllermocks.MockBlackBoxExporter
+		mockUtils                *controllermocks.MockUtilInterface
 		mockStatusWriter         *clientmocks.MockStatusWriter
 		mockCtrl                 *gomock.Controller
 		clusterUrlMonitorMatcher *ClusterUrlMonitorMatcher
@@ -86,8 +86,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockBlackBoxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
-		mockResourceComparer = routemonitormocks.NewMockResourceComparer(mockCtrl)
+		mockBlackBoxExporter = controllermocks.NewMockBlackBoxExporter(mockCtrl)
 		mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 			ObjectMeta: metav1.ObjectMeta{
@@ -105,12 +104,12 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor.Spec.Suffix = suffix
 		clusterUrlMonitor.Spec.Port = port
 		sup = ClusterUrlMonitorSupplement{
-			Log:               constinit.Logger,
-			Client:            mockClient,
-			BlackBoxExporter:  mockBlackBoxExporter,
-			Ctx:               context.TODO(),
-			ClusterUrlMonitor: clusterUrlMonitor,
-			ResourceComparer:  mockResourceComparer,
+			Log:                    constinit.Logger,
+			Client:                 mockClient,
+			BlackBoxExporter:       mockBlackBoxExporter,
+			Ctx:                    context.TODO(),
+			ClusterUrlMonitor:      clusterUrlMonitor,
+			MonitorReconcileCommon: mockUtils,
 		}
 	})
 
@@ -197,11 +196,9 @@ var _ = Describe("Clusterurlmonitor", func() {
 
 	Describe("EnsurePrometheusRuleResourceExists", func() {
 		var (
-			mockStatusWriter     *clientmocks.MockStatusWriter
-			errorToPopulate      error
-			shouldPopulateError  bool
-			deepEqualCalledTimes int
-			deepEqualResponse    bool
+			mockStatusWriter    *clientmocks.MockStatusWriter
+			errorToPopulate     error
+			shouldPopulateError bool
 		)
 		BeforeEach(func() {
 			// Why bellow code?
@@ -216,8 +213,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
 			errorToPopulate = nil
 			shouldPopulateError = false
-			deepEqualCalledTimes = 0
-			deepEqualResponse = true
 			port = "1337"
 			prefix = "prefix."
 			suffix = "/suffix"
@@ -227,8 +222,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 			clusterUrlMonitor.Spec.Slo.TargetAvailabilityPercent = "99.95"
 		})
 		JustBeforeEach(func() {
-			mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).Return(deepEqualResponse).Times(deepEqualCalledTimes)
-
 			expectedClusterUrlMonitor := clusterUrlMonitor
 
 			if shouldPopulateError {
@@ -246,7 +239,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			It("should skip processing and continue", func() {
 				// Act
-				res, err := sup.EnsurePrometheusRuleResourceExists()
+				res, err := sup.EnsurePrometheusRuleExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).NotTo(BeNil())
@@ -261,7 +254,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			It("should Throw an error", func() {
 				// Act
-				_, err := sup.EnsurePrometheusRuleResourceExists()
+				_, err := sup.EnsurePrometheusRuleExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -274,7 +267,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			It("should Throw an error", func() {
 				// Act
-				_, err := sup.EnsurePrometheusRuleResourceExists()
+				_, err := sup.EnsurePrometheusRuleExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -287,7 +280,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			It("should Throw an error", func() {
 				// Act
-				_, err := sup.EnsurePrometheusRuleResourceExists()
+				_, err := sup.EnsurePrometheusRuleExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -295,7 +288,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 		Describe("the PrometheusRuleResource exists but...", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
-				deepEqualCalledTimes = 1
 			})
 			JustBeforeEach(func() {
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
@@ -303,7 +295,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 					Times(1).
 					Return(nil)
 				//Act
-				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				resp, err := sup.EnsurePrometheusRuleExists()
 				//Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
@@ -314,7 +306,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			When("deepEqual is false (they are different)", func() {
 				BeforeEach(func() {
-					deepEqualResponse = false
 					mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1)
 				})
 				It("should stop operation", func() {})
@@ -324,10 +315,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
-
-				deepEqualResponse = false
-				deepEqualCalledTimes = 1
-
 				mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1)
 			})
 
@@ -338,7 +325,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
 				//Act
-				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				resp, err := sup.EnsurePrometheusRuleExists()
 				//Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
@@ -356,17 +343,13 @@ var _ = Describe("Clusterurlmonitor", func() {
 					Namespace: clusterUrlMonitor.Namespace,
 					Name:      clusterUrlMonitor.Name,
 				}
-
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, dns)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress)
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-
-				deepEqualResponse = true
-				deepEqualCalledTimes = 1
 			})
 
 			It("should continue reconciling", func() {
 				//Act
-				resp, err := sup.EnsurePrometheusRuleResourceExists()
+				resp, err := sup.EnsurePrometheusRuleExists()
 				//Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp).NotTo(BeNil())
