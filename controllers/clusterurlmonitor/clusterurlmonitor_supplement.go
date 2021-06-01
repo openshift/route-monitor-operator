@@ -116,7 +116,7 @@ func (s *ClusterUrlMonitorSupplement) EnsurePrometheusRuleResourceExists() (util
 	namespacedName := types.NamespacedName{Namespace: s.ClusterUrlMonitor.Namespace, Name: s.ClusterUrlMonitor.Name}
 	spec := s.ClusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName, s.ClusterUrlMonitor.Kind)
+	template := templates.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
 
 	err = s.createOrUpdatePrometheusRule(template)
 	if err != nil {

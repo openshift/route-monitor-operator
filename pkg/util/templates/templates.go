@@ -99,7 +99,7 @@ func sufficientProbes(windowSize, label string) string {
 }
 
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
-func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string, sourceCRName string) monitoringv1.Rule {
+func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName string) monitoringv1.Rule {
 
 	alertString := "" +
 		alertThreshold(r.shortWindow, percent, label, r.burnRate) +
@@ -113,7 +113,7 @@ func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName st
 	return monitoringv1.Rule{
 		Alert:  alertName,
 		Expr:   intstr.FromString(alertString),
-		Labels: sampleTemplateLabelsWithSev(url, r.severity, sourceCRName),
+		Labels: sampleTemplateLabelsWithSev(url, r.severity),
 		Annotations: map[string]string{
 			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", label),
 		},
@@ -122,9 +122,9 @@ func (r *multiWindowMultiBurnAlertRule) render(url, percent, label, alertName st
 }
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
-func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName, sourceCRName string) monitoringv1.PrometheusRule {
+func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
 
-	routeURLLabel := fmt.Sprintf(`%s="%s"`, sourceCRName, url)
+	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, url)
 	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
 		{
@@ -158,7 +158,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 
 	for _, alertrule := range alertRules { // Create all the alerts
-		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName.Name+"-ErrorBudgetBurn", sourceCRName))
+		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName.Name+"-ErrorBudgetBurn"))
 	}
 
 	resource := monitoringv1.PrometheusRule{
@@ -177,9 +177,9 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 	return resource
 }
-func sampleTemplateLabelsWithSev(url, severity string, sourceCRName string) map[string]string {
+func sampleTemplateLabelsWithSev(url, severity string) map[string]string {
 	return map[string]string{
-		"severity":   severity,
-		sourceCRName: url,
+		"severity":        severity,
+		"RouteMonitorUrl": url,
 	}
 }
