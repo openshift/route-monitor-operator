@@ -179,7 +179,7 @@ var _ = Describe("Integrationtests", func() {
 				Expect(err).NotTo(HaveOccurred())
 				spec := clusterUrlMonitor.Spec
 				expectedUrl := spec.Prefix + clusterConfig.Spec.Domain + ":" + spec.Port + spec.Suffix
-				err = i.ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(expectedServiceMonitorName, parsedSlo, 20, expectedUrl, "ClusterUrlMonitor")
+				err = i.ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(expectedServiceMonitorName, parsedSlo, 20, expectedUrl)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -409,8 +409,7 @@ var _ = Describe("Integrationtests", func() {
 				err = i.Client.Update(context.TODO(), &latestRouteMonitor)
 				Expect(err).NotTo(HaveOccurred())
 				_, parsedSlo := latestRouteMonitor.Spec.Slo.IsValid()
-				err = i.RouteMonitorWaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20, routeMonitor.Kind)
-				err = i.WaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20)
+				err = i.RouteMonitorWaitForPrometheusRuleCorrectSLO(expectedDependentResource, parsedSlo, 20)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

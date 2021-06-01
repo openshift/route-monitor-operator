@@ -205,7 +205,7 @@ func (i *Integration) WaitForPrometheusRuleToClear(name types.NamespacedName, se
 	return nil
 }
 
-func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int, kind string) error {
+func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int) error {
 	prometheusRule := monitoringv1.PrometheusRule{}
 	err := i.Client.Get(context.TODO(), name, &prometheusRule)
 	if errors.IsNotFound(err) {
@@ -242,7 +242,7 @@ func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.Nam
 	return nil
 }
 
-func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int, expectedUrl string, kind string) error {
+func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(name types.NamespacedName, targetSlo string, seconds int, expectedUrl string) error {
 	prometheusRule := monitoringv1.PrometheusRule{}
 	err := i.Client.Get(context.TODO(), name, &prometheusRule)
 	if errors.IsNotFound(err) {
