@@ -187,25 +187,6 @@ func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedNam
 	return utilreconcile.ContinueReconcile()
 }
 
-func (s *ClusterUrlMonitorSupplement) addServiceMonitorRefToStatus(namespacedName types.NamespacedName) (utilreconcile.Result, error) {
-	desiredRef := v1alpha1.NamespacedName{
-		Namespace: namespacedName.Namespace,
-		Name:      namespacedName.Name,
-	}
-	if s.ClusterUrlMonitor.Status.ServiceMonitorRef != desiredRef {
-		// Update status with ServiceMonitorRef
-		s.ClusterUrlMonitor.Status.ServiceMonitorRef = desiredRef
-
-		err := s.Client.Status().Update(s.Ctx, &s.ClusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-		return utilreconcile.StopReconcile()
-
-	}
-	return utilreconcile.ContinueReconcile()
-}
-
 func (s *ClusterUrlMonitorSupplement) getClusterDomain() (string, error) {
 	clusterConfig := configv1.Ingress{}
 	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterConfig)

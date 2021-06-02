@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	//nolint:typecheck // this import is used for general prettines, and currently kept
 	. "github.com/openshift/route-monitor-operator/int"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 )
