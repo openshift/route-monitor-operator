@@ -19,8 +19,6 @@ var serviceMonitorPeriod string = "30s"
 // TemplateForServiceMonitorResource returns a ServiceMonitor
 func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
 
-	routeURL := url
-
 	routeMonitorLabels := blackboxexporter.GenerateBlackBoxExporterLables()
 
 	labelSelector := metav1.LabelSelector{MatchLabels: routeMonitorLabels}
@@ -31,7 +29,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 
 	params := map[string][]string{
 		"module": modules,
-		"target": {routeURL},
+		"target": {url},
 	}
 
 	serviceMonitor := monitoringv1.ServiceMonitor{
@@ -52,7 +50,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 					Params:        params,
 					MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
 						{
-							Replacement: routeURL,
+							Replacement: url,
 							TargetLabel: "RouteMonitorUrl",
 						},
 					},
@@ -179,8 +177,8 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 }
 func sampleTemplateLabels(url, severity, namespace string) map[string]string {
 	return map[string]string{
-		"monitoredUrl": url,
-		"namespace":    namespace,
-		"severity":     severity,
+		"RouteMonitorUrl": url,
+		"namespace":       namespace,
+		"severity":        severity,
 	}
 }
