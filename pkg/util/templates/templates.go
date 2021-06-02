@@ -14,7 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-var serviceMonitorPeriod string = "30s"
+const (
+	serviceMonitorPeriod string = "30s"
+	UrlLabelName         string = "RouteMonitorUrl"
+)
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
 func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
@@ -51,7 +54,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 					MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
 						{
 							Replacement: url,
-							TargetLabel: "RouteMonitorUrl",
+							TargetLabel: UrlLabelName,
 						},
 					},
 				}},
@@ -97,23 +100,24 @@ func sufficientProbes(windowSize, label string) string {
 }
 
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
-func (r *multiWindowMultiBurnAlertRule) render(url, percent, label string, namespacedName types.NamespacedName, alertNameSuffix string) monitoringv1.Rule {
+func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, namespacedName types.NamespacedName) monitoringv1.Rule {
+	labelSelector := fmt.Sprintf(`%s="%s"`, UrlLabelName, url)
 
 	alertString := "" +
-		alertThreshold(r.shortWindow, percent, label, r.burnRate) +
+		alertThreshold(r.shortWindow, percent, labelSelector, r.burnRate) +
 		" and " +
-		sufficientProbes(r.shortWindow, label) +
+		sufficientProbes(r.shortWindow, labelSelector) +
 		"\nand\n" +
-		alertThreshold(r.longWindow, percent, label, r.burnRate) +
+		alertThreshold(r.longWindow, percent, labelSelector, r.burnRate) +
 		" and " +
-		sufficientProbes(r.longWindow, label)
+		sufficientProbes(r.longWindow, labelSelector)
 
 	return monitoringv1.Rule{
-		Alert:  namespacedName.Namespace + alertNameSuffix,
+		Alert:  namespacedName.Name + "-ErrorBudgetBurn",
 		Expr:   intstr.FromString(alertString),
 		Labels: sampleTemplateLabels(url, r.severity, namespacedName.Namespace),
 		Annotations: map[string]string{
-			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", label),
+			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", url),
 		},
 		For: r.duration,
 	}
@@ -122,7 +126,6 @@ func (r *multiWindowMultiBurnAlertRule) render(url, percent, label string, names
 // TemplateForPrometheusRuleResource returns a PrometheusRule
 func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
 
-	routeURLLabel := fmt.Sprintf(`RouteMonitorUrl="%s"`, url)
 	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
 		{
@@ -156,7 +159,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 	}
 
 	for _, alertrule := range alertRules { // Create all the alerts
-		rules = append(rules, alertrule.render(url, percent, routeURLLabel, namespacedName, "-ErrorBudgetBurn"))
+		rules = append(rules, alertrule.render(url, percent, namespacedName))
 	}
 
 	resource := monitoringv1.PrometheusRule{
@@ -177,8 +180,8 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 }
 func sampleTemplateLabels(url, severity, namespace string) map[string]string {
 	return map[string]string{
-		"RouteMonitorUrl": url,
-		"namespace":       namespace,
-		"severity":        severity,
+		UrlLabelName: url,
+		"namespace":  namespace,
+		"severity":   severity,
 	}
 }
