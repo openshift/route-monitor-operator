@@ -38,6 +38,15 @@ Getting prefix and suffix right is in the users' responsibility.
 In most cases the `prefix` will end with a `.` while the suffix will start with a `/` but this is not checked or fixed by the controller.
 `ClusterUrlMonitors` are namespace scoped.
 
+### Alerting
+The operator implements  [Multiwindow, Multi-Burn-Rate Alerts](https://sre.google/workbook/alerting-on-slos/) in a unique way.
+
+The official calculation for Multiwindow Multi-burn alerting will only successfully work on services and applications that already have
+a sufficient baseline of metrics to work and calculate availability upon.
+In a case of newly created services, alerts will fire immediately and will only be remediated once there's enough data present.
+In some cases a user might want to create a Monitor for a newly created Route or ClusterUrl.
+To support this, the operator [takes into account](https://github.com/openshift/route-monitor-operator/blob/c707066cf74b129a64e362fe4c3c99a7d7f36f88/pkg/util/templates/templates.go#L105) the overall number of existing probes, in a way that if there are no sufficient probes (yet), an alert will not fire.
+
 ## Caveats
 
 Currently the blackbox exporter deployment is only using the default config file which only allows a limit set of probes.
