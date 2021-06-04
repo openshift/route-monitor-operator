@@ -115,11 +115,21 @@ func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, names
 	return monitoringv1.Rule{
 		Alert:  namespacedName.Name + "-ErrorBudgetBurn",
 		Expr:   intstr.FromString(alertString),
-		Labels: sampleTemplateLabels(url, r.severity, namespacedName.Namespace),
+		Labels: r.renderLabels(url, namespacedName.Namespace),
 		Annotations: map[string]string{
 			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", url),
 		},
 		For: r.duration,
+	}
+}
+
+func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[string]string {
+	return map[string]string{
+		UrlLabelName:   url,
+		"namespace":    namespace,
+		"severity":     r.severity,
+		"long_window":  r.longWindow,
+		"short_window": r.shortWindow,
 	}
 }
 
@@ -177,11 +187,4 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		},
 	}
 	return resource
-}
-func sampleTemplateLabels(url, severity, namespace string) map[string]string {
-	return map[string]string{
-		UrlLabelName: url,
-		"namespace":  namespace,
-		"severity":   severity,
-	}
 }
