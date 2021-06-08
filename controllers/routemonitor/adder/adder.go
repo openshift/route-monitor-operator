@@ -1,6 +1,8 @@
 package adder
 
 import (
+	"reflect"
+
 	"github.com/go-logr/logr"
 
 	"context"
@@ -51,24 +53,27 @@ func (r *RouteMonitorAdder) EnsureServiceMonitorResourceExists(ctx context.Conte
 
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	resource := &monitoringv1.ServiceMonitor{}
-	populationFunc := func() monitoringv1.ServiceMonitor {
-		return templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName)
-	}
+	template := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporterNamespace, namespacedName)
 
 	// Does the resource already exist?
-	if err := r.Get(ctx, namespacedName, resource); err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			// return unexpectedly
-			return utilreconcile.RequeueReconcileWith(err)
+	err := r.Get(ctx, namespacedName, resource)
+	switch {
+	case err == nil:
+		if !reflect.DeepEqual(template.Spec, resource.Spec) {
+			//Update service monitor if the specs are differentlmao
+			resource.Spec = template.Spec
+			err := r.Update(ctx, resource)
+			if err != nil {
+				utilreconcile.RequeueReconcileWith(err)
+			}
 		}
-		// populate the resource with the template
-		resource := populationFunc()
-		// and create it
-		err = r.Create(ctx, &resource)
+	case k8serrors.IsNotFound(err):
+		err = r.Create(ctx, &template)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
+	case err != nil:
+		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	//Update status with serviceMonitorRef
