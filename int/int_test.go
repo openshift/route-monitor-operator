@@ -81,11 +81,11 @@ var _ = Describe("Integrationtests", func() {
 				Expect(prometheusRule.Name).To(Equal(expectedServiceMonitorName.Name))
 				Expect(prometheusRule.Namespace).To(Equal(expectedServiceMonitorName.Namespace))
 
-				clusterConfig := configv1.Ingress{}
+				clusterConfig := configv1.DNS{}
 				err = i.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, &clusterConfig)
 				Expect(err).NotTo(HaveOccurred())
 				spec := clusterUrlMonitor.Spec
-				expectedUrl := spec.Prefix + clusterConfig.Spec.Domain + ":" + spec.Port + spec.Suffix
+				expectedUrl := spec.Prefix + clusterConfig.Spec.BaseDomain + ":" + spec.Port + spec.Suffix
 				Expect(len(serviceMonitor.Spec.Endpoints)).To(Equal(1))
 				Expect(len(serviceMonitor.Spec.Endpoints[0].Params["target"])).To(Equal(1))
 				Expect(serviceMonitor.Spec.Endpoints[0].Params["target"][0]).To(Equal(expectedUrl))
@@ -174,11 +174,11 @@ var _ = Describe("Integrationtests", func() {
 				Expect(err).NotTo(HaveOccurred())
 				_, parsedSlo := latestClusterUrlMonitor.Spec.Slo.IsValid()
 
-				clusterConfig := configv1.Ingress{}
+				clusterConfig := configv1.DNS{}
 				err = i.Client.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, &clusterConfig)
 				Expect(err).NotTo(HaveOccurred())
 				spec := clusterUrlMonitor.Spec
-				expectedUrl := spec.Prefix + clusterConfig.Spec.Domain + ":" + spec.Port + spec.Suffix
+				expectedUrl := spec.Prefix + clusterConfig.Spec.BaseDomain + ":" + spec.Port + spec.Suffix
 				err = i.ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(expectedServiceMonitorName, parsedSlo, 20, expectedUrl)
 				Expect(err).NotTo(HaveOccurred())
 			})

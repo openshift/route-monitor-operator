@@ -3,7 +3,7 @@ kind: ClusterUrlMonitor
 metadata:
   name: clusterurlmonitor-sample
 spec:
-  prefix: api.
+  prefix: https://api.
   port: "6443"
   suffix: /
   slo:
