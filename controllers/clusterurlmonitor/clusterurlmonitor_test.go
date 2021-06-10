@@ -156,14 +156,14 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
-				ingress := configv1.Ingress{
-					Spec: configv1.IngressSpec{
-						Domain: clusterDomain,
+				dns := configv1.DNS{
+					Spec: configv1.DNSSpec{
+						BaseDomain: clusterDomain,
 					},
 				}
 				gomock.InOrder(
 					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeNotFound),
-					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress),
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, dns),
 				)
 				mockClient.EXPECT().Create(gomock.Any(), serviceMonitorMatcher).Times(1)
 				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
@@ -346,9 +346,9 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
 			BeforeEach(func() {
-				ingress := configv1.Ingress{
-					Spec: configv1.IngressSpec{
-						Domain: "fake.test",
+				dns := configv1.DNS{
+					Spec: configv1.DNSSpec{
+						BaseDomain: "fake.test",
 					},
 				}
 				clusterUrlMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
@@ -356,7 +356,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 					Name:      clusterUrlMonitor.Name,
 				}
 
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, ingress)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, dns)
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 
 				deepEqualResponse = true

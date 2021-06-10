@@ -188,13 +188,13 @@ func (s *ClusterUrlMonitorSupplement) addPrometheusRuleRefToStatus(namespacedNam
 }
 
 func (s *ClusterUrlMonitorSupplement) getClusterDomain() (string, error) {
-	clusterConfig := configv1.Ingress{}
+	clusterConfig := configv1.DNS{}
 	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterConfig)
 	if err != nil {
 		return "", err
 	}
 
-	return clusterConfig.Spec.Domain, nil
+	return clusterConfig.Spec.BaseDomain, nil
 }
 
 func (s *ClusterUrlMonitorSupplement) EnsureDeletionProcessed() (reconcile.Result, error) {
