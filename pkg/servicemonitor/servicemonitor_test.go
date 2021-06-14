@@ -41,6 +41,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		serviceMonitorRef v1alpha1.NamespacedName
 		serviceMonitor    monitoringv1.ServiceMonitor
 		sm                servicemonitor.ServiceMonitor
+		err               error
 	)
 	BeforeEach(func() {
 		ctx = constinit.Context
@@ -58,7 +59,9 @@ var _ = Describe("CR Deployment Handling", func() {
 		serviceMonitor = monitoringv1.ServiceMonitor{}
 
 		sm = servicemonitor.ServiceMonitor{
-			Rc: mockResourceComparer,
+			Client:   mockClient,
+			Ctx:      ctx,
+			Comparer: mockResourceComparer,
 		}
 	})
 	JustBeforeEach(func() {
@@ -91,12 +94,14 @@ var _ = Describe("CR Deployment Handling", func() {
 		BeforeEach(func() {
 			get.CalledTimes = 1
 		})
+		JustBeforeEach(func() {
+			err = sm.UpdateServiceMonitorDeployment(serviceMonitor)
+		})
 		When("The Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
 				get.ErrorResponse = consterror.CustomError
 			})
 			It("should return the received error", func() {
-				err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 				Expect(err).To(Equal(consterror.CustomError))
 			})
 		})
@@ -106,7 +111,6 @@ var _ = Describe("CR Deployment Handling", func() {
 				create.CalledTimes = 1
 			})
 			It("tryies to creates one", func() {
-				err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			When("an error appeared during the creation", func() {
@@ -114,7 +118,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					create.ErrorResponse = consterror.CustomError
 				})
 				It("returns the received error", func() {
-					err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 					Expect(err).To(Equal(consterror.CustomError))
 				})
 			})
@@ -129,7 +132,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					update.CalledTimes = 1
 				})
 				It("updates the existing deployment", func() {
-					err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("The Client failed to update the existing deployments", func() {
@@ -137,7 +139,6 @@ var _ = Describe("CR Deployment Handling", func() {
 						update.ErrorResponse = consterror.CustomError
 					})
 					It("should return the received error", func() {
-						err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 						Expect(err).To(Equal(consterror.CustomError))
 					})
 				})
@@ -147,19 +148,20 @@ var _ = Describe("CR Deployment Handling", func() {
 					deepEqual.ReturnValue = true
 				})
 				It("does nothing", func() {
-					err := sm.UpdateServiceMonitorDeployment(ctx, mockClient, serviceMonitor)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
 		})
 	})
 	Describe("DeleteServiceMonitorDeployment", func() {
+		JustBeforeEach(func() {
+			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef)
+		})
 		When("The ServiceMonitorRef is not set", func() {
 			BeforeEach(func() {
 				serviceMonitorRef = v1alpha1.NamespacedName{}
 			})
 			It("does nothing", func() {
-				err := sm.DeleteServiceMonitorDeployment(ctx, mockClient, serviceMonitorRef)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -173,7 +175,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					get.ErrorResponse = consterror.CustomError
 				})
 				It("returns the received error", func() {
-					err := sm.DeleteServiceMonitorDeployment(ctx, mockClient, serviceMonitorRef)
 					Expect(err).To(Equal(consterror.CustomError))
 				})
 			})
@@ -182,7 +183,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					get.ErrorResponse = consterror.NotFoundErr
 				})
 				It("does nothing", func() {
-					err := sm.DeleteServiceMonitorDeployment(ctx, mockClient, serviceMonitorRef)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
@@ -191,7 +191,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					delete.CalledTimes = 1
 				})
 				It("deletes the Deployment", func() {
-					err := sm.DeleteServiceMonitorDeployment(ctx, mockClient, serviceMonitorRef)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("the client failed to delete the deployment", func() {
@@ -199,7 +198,6 @@ var _ = Describe("CR Deployment Handling", func() {
 						delete.ErrorResponse = consterror.CustomError
 					})
 					It("returns the received error", func() {
-						err := sm.DeleteServiceMonitorDeployment(ctx, mockClient, serviceMonitorRef)
 						Expect(err).To(Equal(consterror.CustomError))
 					})
 				})

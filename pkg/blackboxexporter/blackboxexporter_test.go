@@ -24,7 +24,7 @@ var _ = Describe("Blackboxexporter", func() {
 		mockClient *clientmocks.MockClient
 		mockCtrl   *gomock.Controller
 
-		blackboxExporter BlackBoxExporterHandler
+		blackboxExporter BlackBoxExporter
 
 		ctx context.Context
 
@@ -45,7 +45,7 @@ var _ = Describe("Blackboxexporter", func() {
 		list = helper.MockHelper{}
 	})
 	JustBeforeEach(func() {
-		blackboxExporter = BlackBoxExporterHandler{
+		blackboxExporter = BlackBoxExporter{
 			Log:    constinit.Logger,
 			Client: mockClient,
 			Ctx:    ctx,

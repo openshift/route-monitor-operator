@@ -18,35 +18,55 @@ package clusterurlmonitor
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/go-logr/logr"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers"
+	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
+	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
-
-// ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
-type ClusterUrlMonitorReconciler struct {
-	Client                    client.Client
-	Log                       logr.Logger
-	Scheme                    *runtime.Scheme
-	BlackBoxExporterImage     string
-	BlackBoxExporterNamespace string
-	ClusterID                 string
-	controllers.MonitorReconcileCommon
-}
 
 const (
 	FinalizerKey string = "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller"
 )
+
+// ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
+type ClusterUrlMonitorReconciler struct {
+	Client    client.Client
+	Ctx       context.Context
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	ClusterID string
+
+	BlackBoxExporter controllers.BlackBoxExporterHandler
+	ServiceMonitor   controllers.ServiceMonitorHandler
+	Prom             controllers.PrometheusRuleHandler
+	Common           controllers.ResourceMonitorHandler
+}
+
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *ClusterUrlMonitorReconciler {
+	log := ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor")
+	client := mgr.GetClient()
+	ctx := context.Background()
+	return &ClusterUrlMonitorReconciler{
+		Client:           client,
+		Ctx:              ctx,
+		Log:              log,
+		Scheme:           mgr.GetScheme(),
+		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		Prom:             alert.NewPrometheusRule(ctx, client),
+		Common:           reconcileCommon.NewMonitorReconcileCommon(ctx, client),
+	}
+}
 
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors/status,verbs=get;update;patch
@@ -55,55 +75,58 @@ const (
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 
 func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	log := r.Log.WithValues("clusterurlmonitor", req.NamespacedName)
 
-	clusterUrlMonitor, res, err := r.GetClusterUrlMonitor(req, ctx)
+	clusterUrlMonitor, res, err := r.GetClusterUrlMonitor(req)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
 	}
-
 	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
 
 	if r.ClusterID == "" {
-		r.ClusterID = r.GetClusterID(r.Client)
+		r.ClusterID = r.Common.GetClusterID()
 	}
 
-	blackboxExporter := blackboxexporter.New(r.Client, log, ctx, r.BlackBoxExporterImage, r.BlackBoxExporterNamespace)
-	sup := NewSupplement(clusterUrlMonitor, r.Client, r.Log, blackboxExporter, r.ClusterID)
+	res, err = r.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.Stop()
+	}
 
-	return ProcessRequest(blackboxExporter, sup)
+	if r.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		_, err := r.Common.UpdateReconciledMonitor(&clusterUrlMonitor)
+		if err != nil {
+			return utilreconcile.RequeueWith(err)
+		}
+		return utilreconcile.Stop()
+	}
+
+	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+
+	res, err = r.EnsureServiceMonitorExists(clusterUrlMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
+		return utilreconcile.Stop()
+	}
+
+	res, err = r.EnsurePrometheusRuleExists(clusterUrlMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+
+	return utilreconcile.Stop()
 }
 
 func (r *ClusterUrlMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&monitoringv1alpha1.ClusterUrlMonitor{}).
 		Complete(r)
-}
-
-
-// GetClusterUrlMonitor return the ClusterUrlMonitor that is tested
-func (r *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request, ctx context.Context) (v1alpha1.ClusterUrlMonitor, utilreconcile.Result, error) {
-	ClusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
-	err := r.Client.Get(ctx, req.NamespacedName, &ClusterUrlMonitor)
-	if err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			res, err := utilreconcile.RequeueReconcileWith(err)
-			return v1alpha1.ClusterUrlMonitor{}, res, err
-		}
-		r.Log.V(2).Info("StopRequeue", "As ClusterUrlMonitor is 'NotFound', stopping requeue", nil)
-
-		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
-	}
-
-	// if the resource is empty, we should terminate
-	emptyClustUrlMonitor := v1alpha1.ClusterUrlMonitor{}
-	if reflect.DeepEqual(ClusterUrlMonitor, emptyClustUrlMonitor) {
-		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
-	}
-
-	return ClusterUrlMonitor, utilreconcile.ContinueOperation(), nil
 }

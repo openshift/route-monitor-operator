@@ -18,34 +18,54 @@ package routemonitor
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	interfaces "github.com/openshift/route-monitor-operator/controllers"
+	"github.com/openshift/route-monitor-operator/controllers"
+	"github.com/openshift/route-monitor-operator/pkg/alert"
+	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
+	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
-	Client           client.Client
-	Ctx              context.Context
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
-	BlackBoxExporter interfaces.BlackBoxExporter
-	ClusterID        string
-	common           interfaces.MonitorReconcileCommon
-	serviceMonitor   interfaces.ServiceMonitor
-	prom             interfaces.PrometheusRule
+	Client    client.Client
+	Ctx       context.Context
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	ClusterID string
+
+	BlackBoxExporter controllers.BlackBoxExporterHandler
+	ServiceMonitor   controllers.ServiceMonitorHandler
+	Prom             controllers.PrometheusRuleHandler
+	Common           controllers.ResourceMonitorHandler
 }
 
-// Utils struct   interfaces.UtilInterface
-// MockUtils 	  interfaces.UtilInterface
+// TODO rename Struct
+
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *RouteMonitorReconciler {
+	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
+	client := mgr.GetClient()
+	ctx := context.Background()
+	return &RouteMonitorReconciler{
+		Client:           client,
+		Ctx:              ctx,
+		Log:              log,
+		Scheme:           mgr.GetScheme(),
+		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		Prom:             alert.NewPrometheusRule(ctx, client),
+		Common:           reconcileCommon.NewMonitorReconcileCommon(ctx, client),
+	}
+}
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;delete
@@ -57,7 +77,6 @@ type RouteMonitorReconciler struct {
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	fmt.Println("Reconcile")
 	r.Ctx = context.Background()
 	log := r.Log.WithName("Reconcile")
 
@@ -76,21 +95,20 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
-		res, err := r.EnsureRouteMonitorAndDependenciesAbsent(routeMonitor)
+		_, err := r.EnsureMonitorAndDependenciesAbsent(routeMonitor)
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
-		}
-
-		if res.ShouldStop() {
-			return utilreconcile.Stop()
 		}
 		return utilreconcile.Stop()
 	}
 
 	log.V(2).Info("Entering EnsureFinalizerSet")
-	if r.common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
-		result, err := r.common.UpdateReconciledMonitor(r.Ctx, r.Client, &routeMonitor)
-		return result.Convert(), err
+	if r.Common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
+		_, err := r.Common.UpdateReconciledMonitor(&routeMonitor)
+		if err != nil {
+			return utilreconcile.RequeueWith(err)
+		}
+		return utilreconcile.Stop()
 	}
 
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
@@ -115,7 +133,7 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering EnsureServiceMonitorResourceExists")
+	log.V(2).Info("Entering EnsureServiceMonitorExists")
 	res, err = r.EnsureServiceMonitorExists(routeMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)

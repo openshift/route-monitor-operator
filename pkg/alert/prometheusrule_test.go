@@ -41,6 +41,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		prometheusRuleRef v1alpha1.NamespacedName
 		prometheusRule    monitoringv1.PrometheusRule
 		pr                alert.PrometheusRule
+		err               error
 	)
 	BeforeEach(func() {
 		ctx = constinit.Context
@@ -58,7 +59,9 @@ var _ = Describe("CR Deployment Handling", func() {
 		prometheusRule = monitoringv1.PrometheusRule{}
 
 		pr = alert.PrometheusRule{
-			Rc: mockResourceComparer,
+			Client:   mockClient,
+			Ctx:      ctx,
+			Comparer: mockResourceComparer,
 		}
 	})
 	JustBeforeEach(func() {
@@ -91,12 +94,14 @@ var _ = Describe("CR Deployment Handling", func() {
 		BeforeEach(func() {
 			get.CalledTimes = 1
 		})
+		JustBeforeEach(func() {
+			err = pr.UpdatePrometheusRuleDeployment(prometheusRule)
+		})
 		When("the Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
 				get.ErrorResponse = consterror.CustomError
 			})
 			It("should return the received error", func() {
-				err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 				Expect(err).To(Equal(consterror.CustomError))
 			})
 		})
@@ -106,7 +111,6 @@ var _ = Describe("CR Deployment Handling", func() {
 				create.CalledTimes = 1
 			})
 			It("tryies to creates one", func() {
-				err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			When("an error appeared during the creation", func() {
@@ -114,7 +118,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					create.ErrorResponse = consterror.CustomError
 				})
 				It("returns the received error", func() {
-					err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 					Expect(err).To(Equal(consterror.CustomError))
 				})
 			})
@@ -129,7 +132,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					update.CalledTimes = 1
 				})
 				It("updates the existing deployment", func() {
-					err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("the client failed to update the existing deployments", func() {
@@ -137,7 +139,6 @@ var _ = Describe("CR Deployment Handling", func() {
 						update.ErrorResponse = consterror.CustomError
 					})
 					It("should return the received error", func() {
-						err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 						Expect(err).To(Equal(consterror.CustomError))
 					})
 				})
@@ -147,19 +148,20 @@ var _ = Describe("CR Deployment Handling", func() {
 					deepEqual.ReturnValue = true
 				})
 				It("does nothing", func() {
-					err := pr.UpdatePrometheusRuleDeployment(ctx, mockClient, prometheusRule)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
 		})
 	})
 	Describe("DeletePrometheusRuleDeployment", func() {
+		JustBeforeEach(func() {
+			err = pr.DeletePrometheusRuleDeployment(prometheusRuleRef)
+		})
 		When("The PrometheusRuleRef is not set", func() {
 			BeforeEach(func() {
 				prometheusRuleRef = v1alpha1.NamespacedName{}
 			})
 			It("does nothing", func() {
-				err := pr.DeletePrometheusRuleDeployment(ctx, mockClient, prometheusRuleRef)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -173,7 +175,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					get.ErrorResponse = consterror.CustomError
 				})
 				It("returns the received error", func() {
-					err := pr.DeletePrometheusRuleDeployment(ctx, mockClient, prometheusRuleRef)
 					Expect(err).To(Equal(consterror.CustomError))
 				})
 			})
@@ -182,7 +183,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					get.ErrorResponse = consterror.NotFoundErr
 				})
 				It("does nothing", func() {
-					err := pr.DeletePrometheusRuleDeployment(ctx, mockClient, prometheusRuleRef)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
@@ -191,7 +191,6 @@ var _ = Describe("CR Deployment Handling", func() {
 					delete.CalledTimes = 1
 				})
 				It("deletes the PrometheusRule", func() {
-					err := pr.DeletePrometheusRuleDeployment(ctx, mockClient, prometheusRuleRef)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				When("the client failed to delete the deployment", func() {
@@ -199,7 +198,6 @@ var _ = Describe("CR Deployment Handling", func() {
 						delete.ErrorResponse = consterror.CustomError
 					})
 					It("returns the received error", func() {
-						err := pr.DeletePrometheusRuleDeployment(ctx, mockClient, prometheusRuleRef)
 						Expect(err).To(Equal(consterror.CustomError))
 					})
 				})

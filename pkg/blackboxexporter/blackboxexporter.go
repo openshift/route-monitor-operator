@@ -19,7 +19,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type BlackBoxExporterHandler struct {
+type BlackBoxExporter struct {
 	Client         client.Client
 	Log            logr.Logger
 	Ctx            context.Context
@@ -27,16 +27,16 @@ type BlackBoxExporterHandler struct {
 	NamespacedName types.NamespacedName
 }
 
-func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporterHandler {
+func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
 	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
-	return &BlackBoxExporterHandler{client, log, ctx, blackBoxImage, blackboxNamespacedName}
+	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName}
 }
 
-func (b *BlackBoxExporterHandler) GetBlackBoxExporterNamespace() string {
+func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 	return b.NamespacedName.Namespace
 }
 
-func (b *BlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	objectsDependingOnExporter := []v1.Object{}
 
 	routeMonitors := &v1alpha1.RouteMonitorList{}
@@ -63,7 +63,7 @@ func (b *BlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (black
 	return blackboxexporter.KeepBlackBoxExporter, nil
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterDeploymentExists() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
 	populationFunc := func() appsv1.Deployment {
 		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
@@ -88,7 +88,7 @@ func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterDeploymentExists() error
 	return nil
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterServiceExists() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 	resource := corev1.Service{}
 	populationFunc := func() corev1.Service { return templateForBlackBoxExporterService(b.NamespacedName) }
 
@@ -187,7 +187,7 @@ func templateForBlackBoxExporterService(blackboxNamespacedName types.NamespacedN
 	return svc
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterDeploymentAbsent() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentAbsent() error {
 	resource := &appsv1.Deployment{}
 
 	// Does the resource already exist?
@@ -208,7 +208,7 @@ func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterDeploymentAbsent() error
 	return nil
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterServiceAbsent() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceAbsent() error {
 	resource := &corev1.Service{}
 
 	// Does the resource already exist?
@@ -229,7 +229,7 @@ func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterServiceAbsent() error {
 	return nil
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
 	b.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
 	if err := b.EnsureBlackBoxExporterServiceAbsent(); err != nil {
 		return err
@@ -241,7 +241,7 @@ func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent() error 
 	return nil
 }
 
-func (b *BlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesExist() error {
 	if err := b.EnsureBlackBoxExporterDeploymentExists(); err != nil {
 		return err
 	}
