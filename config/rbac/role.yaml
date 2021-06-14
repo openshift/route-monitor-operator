@@ -29,7 +29,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - ingresses
+  - dnses
   verbs:
   - get
   - list
