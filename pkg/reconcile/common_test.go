@@ -9,10 +9,12 @@ import (
 
 	// tested package
 
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 
 	reconcilecommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	utilmock "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
@@ -36,7 +38,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		update    testhelper.MockHelper
 		delete    testhelper.MockHelper
 
-		rc reconcilecommon.MonitorReconcileCommon
+		rc reconcilecommon.MonitorResourceCommon
 	)
 	BeforeEach(func() {
 		ctx = constinit.Context
@@ -50,7 +52,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		update = testhelper.MockHelper{}
 		delete = testhelper.MockHelper{}
 
-		rc = reconcilecommon.MonitorReconcileCommon{
+		rc = reconcilecommon.MonitorResourceCommon{
 			Client:   mockClient,
 			Ctx:      ctx,
 			Comparer: mockResourceComparer,
@@ -114,6 +116,46 @@ var _ = Describe("CR Deployment Handling", func() {
 				res := rc.SetErrorStatus(&errorStatusString, consterror.CustomError)
 				Expect(res).To(Equal(false))
 				Expect(errorStatusString).To(Equal("PreviousErrorState"))
+			})
+		})
+	})
+	Describe("ParseMonitorSLOSpecs", func() {
+		var (
+			sloSpec v1alpha1.SloSpec
+			url     string
+			res     string
+			err     error
+		)
+		BeforeEach(func() {
+			sloSpec = v1alpha1.SloSpec{}
+			url = "test.domain"
+		})
+		JustBeforeEach(func() {
+			res, err = rc.ParseMonitorSLOSpecs(url, sloSpec)
+		})
+		When("No SloSpec is empty", func() {
+			It("should not return an error as this is a valid setup", func() {
+				Expect(res).To(Equal(""))
+				Expect(err).To(Not(HaveOccurred()))
+			})
+		})
+		When("the SLO spec contains some wired formated string", func() {
+			BeforeEach(func() {
+				sloSpec.TargetAvailabilityPercent = "1%!§2"
+			})
+			It("should return an empty string and an error", func() {
+				Expect(res).To(Equal(""))
+				Expect(err).To(Equal(customerrors.InvalidSLO))
+			})
+		})
+		When("the url is empty", func() {
+			BeforeEach(func() {
+				sloSpec.TargetAvailabilityPercent = "99.5"
+				url = ""
+			})
+			It("should return an empty string and an error", func() {
+				Expect(res).To(Equal(""))
+				Expect(err).To(Equal(customerrors.NoHost))
 			})
 		})
 	})

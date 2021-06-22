@@ -29,14 +29,15 @@ func (_ *ResourceComparer) DeepEqual(x, y interface{}) bool {
 	return reflect.DeepEqual(x, y)
 }
 
-type MonitorReconcileCommon struct {
-	Client   client.Client
-	Ctx      context.Context
-	Comparer ResourceComparerInterface
+type MonitorResourceCommon struct {
+	Client    client.Client
+	Ctx       context.Context
+	ClusterID string
+	Comparer  ResourceComparerInterface
 }
 
-func NewMonitorReconcileCommon(ctx context.Context, c client.Client) *MonitorReconcileCommon {
-	return &MonitorReconcileCommon{
+func NewMonitorResourceCommon(ctx context.Context, c client.Client) *MonitorResourceCommon {
+	return &MonitorResourceCommon{
 		Client:   c,
 		Ctx:      ctx,
 		Comparer: &ResourceComparer{},
@@ -44,7 +45,7 @@ func NewMonitorReconcileCommon(ctx context.Context, c client.Client) *MonitorRec
 }
 
 // returns whether the errorStatus has changed
-func (u *MonitorReconcileCommon) SetErrorStatus(errorStatus *string, err error) bool {
+func (u *MonitorResourceCommon) SetErrorStatus(errorStatus *string, err error) bool {
 	switch {
 	case u.areErrorAndErrorStatusFull(errorStatus, err):
 		return false
@@ -59,39 +60,36 @@ func (u *MonitorReconcileCommon) SetErrorStatus(errorStatus *string, err error) 
 }
 
 // If an error has already been flagged and still occurs
-func (u *MonitorReconcileCommon) areErrorAndErrorStatusFull(errorStatus *string, err error) bool {
+func (u *MonitorResourceCommon) areErrorAndErrorStatusFull(errorStatus *string, err error) bool {
 	return *errorStatus != "" && err != nil
 }
 
 // If the error was flagged but stopped firing
-func (u *MonitorReconcileCommon) needsErrorStatusToBeFlushed(errorStatus *string, err error) bool {
+func (u *MonitorResourceCommon) needsErrorStatusToBeFlushed(errorStatus *string, err error) bool {
 	return *errorStatus != "" && err == nil
 }
 
 // If the error was not flagged but has started firing
-func (u *MonitorReconcileCommon) needsErrorStatusToBeSet(errorStatus *string, err error) bool {
+func (u *MonitorResourceCommon) needsErrorStatusToBeSet(errorStatus *string, err error) bool {
 	return *errorStatus == "" && err != nil
 }
 
-func (u *MonitorReconcileCommon) SetResourceReference(reference *v1alpha1.NamespacedName, targetNamespace types.NamespacedName) (bool, error) {
+func (u *MonitorResourceCommon) SetResourceReference(reference *v1alpha1.NamespacedName, targetNamespace types.NamespacedName) (bool, error) {
 	desiredRef := v1alpha1.NamespacedName{Name: targetNamespace.Name, Namespace: targetNamespace.Namespace}
-	if *reference == (v1alpha1.NamespacedName{}) {
+	if *reference == (v1alpha1.NamespacedName{}) ||
+		desiredRef == (v1alpha1.NamespacedName{}) {
 		*reference = desiredRef
 		return true, nil
-	} else if desiredRef == (v1alpha1.NamespacedName{}) {
-		*reference = desiredRef
-		return true, nil
-	} else if *reference != desiredRef {
+	}
+	if *reference != desiredRef {
 		// TODO Check when this is really required
 		return false, customerrors.InvalidReferenceUpdate
-	} else {
-		return false, nil
 	}
+	return false, nil
 }
 
-// TODO rename ParseSLOMonitorSpecs (string, error)
 // remove boolean
-func (u *MonitorReconcileCommon) ParseSLOMonitorSpecs(routeURL string, sloSpec v1alpha1.SloSpec) (string, error) {
+func (u *MonitorResourceCommon) ParseMonitorSLOSpecs(routeURL string, sloSpec v1alpha1.SloSpec) (string, error) {
 	if routeURL == "" {
 		return "", customerrors.NoHost
 	}
@@ -106,9 +104,9 @@ func (u *MonitorReconcileCommon) ParseSLOMonitorSpecs(routeURL string, sloSpec v
 }
 
 // Deletes Finalizer on object if defined
-func (u *MonitorReconcileCommon) DeleteFinalizer(o v1.Object, finalizerKey string) bool {
+func (u *MonitorResourceCommon) DeleteFinalizer(o v1.Object, finalizerKey string) bool {
 	if finalizer.HasFinalizer(o, finalizerKey) {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer	fmt.Println("DeleteServiceMonitorDeployment")
+		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
 		finalizer.Remove(o, finalizerKey)
 		return true
 	}
@@ -116,7 +114,7 @@ func (u *MonitorReconcileCommon) DeleteFinalizer(o v1.Object, finalizerKey strin
 }
 
 // Attaches Finalizer to object
-func (u *MonitorReconcileCommon) SetFinalizer(o v1.Object, finalizerKey string) bool {
+func (u *MonitorResourceCommon) SetFinalizer(o v1.Object, finalizerKey string) bool {
 	if !finalizer.HasFinalizer(o, finalizerKey) {
 		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
 		finalizer.Add(o, finalizerKey)
@@ -126,7 +124,7 @@ func (u *MonitorReconcileCommon) SetFinalizer(o v1.Object, finalizerKey string) 
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR in reconcile loops
-func (u *MonitorReconcileCommon) UpdateReconciledMonitor(cr runtime.Object) (reconcile.Result, error) {
+func (u *MonitorResourceCommon) UpdateMonitorResource(cr runtime.Object) (reconcile.Result, error) {
 	if err := u.Client.Update(u.Ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
@@ -135,7 +133,7 @@ func (u *MonitorReconcileCommon) UpdateReconciledMonitor(cr runtime.Object) (rec
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR Status in reconcile loops
-func (u *MonitorReconcileCommon) UpdateReconciledMonitorStatus(cr runtime.Object) (reconcile.Result, error) {
+func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr runtime.Object) (reconcile.Result, error) {
 	if err := u.Client.Status().Update(u.Ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
@@ -143,16 +141,19 @@ func (u *MonitorReconcileCommon) UpdateReconciledMonitorStatus(cr runtime.Object
 	return reconcile.StopReconcile()
 }
 
-func (u *MonitorReconcileCommon) GetClusterID() string {
-	var version configv1.ClusterVersion
-	err := u.Client.Get(u.Ctx, client.ObjectKey{Name: "version"}, &version)
-	if err != nil {
-		return ""
+func (u *MonitorResourceCommon) GetClusterID() string {
+	if u.ClusterID == "" {
+		var version configv1.ClusterVersion
+		err := u.Client.Get(u.Ctx, client.ObjectKey{Name: "version"}, &version)
+		if err != nil {
+			return ""
+		}
+		u.ClusterID = string(version.Spec.ClusterID)
 	}
-	return string(version.Spec.ClusterID)
+	return u.ClusterID
 }
 
-func (u *MonitorReconcileCommon) GetServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
+func (u *MonitorResourceCommon) GetServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
 	serviceMonitor := monitoringv1.ServiceMonitor{}
 	err := u.Client.Get(u.Ctx, namespacedName, &serviceMonitor)
 	return serviceMonitor, err

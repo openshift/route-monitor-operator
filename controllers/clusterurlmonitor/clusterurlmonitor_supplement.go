@@ -23,10 +23,10 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 
 	spec := clusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	parsedSlo, err := s.Common.ParseSLOMonitorSpecs(clusterUrl, clusterUrlMonitor.Spec.Slo)
+	parsedSlo, err := s.Common.ParseMonitorSLOSpecs(clusterUrl, clusterUrlMonitor.Spec.Slo)
 
 	if s.Common.SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err) {
-		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
 	}
 	if parsedSlo == "" {
 		err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
@@ -35,7 +35,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 		}
 		updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
 		if updated {
-			return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+			return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
 		}
 		return utilreconcile.StopReconcile()
 	}
@@ -50,7 +50,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	// Update PrometheusRuleReference in ClusterUrlMonitor if necessary
 	updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, namespacedName)
 	if updated {
-		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
@@ -65,7 +65,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	namespacedName := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 	spec := clusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.ClusterID)
+	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.Common.GetClusterID())
 	err = s.ServiceMonitor.UpdateServiceMonitorDeployment(serviceMonitorTemplate)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
@@ -77,7 +77,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if updated {
-		return s.Common.UpdateReconciledMonitorStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
@@ -110,9 +110,16 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 	}
 
 	if s.Common.DeleteFinalizer(&clusterUrlMonitor, FinalizerKey) {
-		return s.Common.UpdateReconciledMonitor(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
 	}
 
+	return utilreconcile.ContinueReconcile()
+}
+
+func (s *ClusterUrlMonitorReconciler) EnsureFinalizerSet(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	if s.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
+	}
 	return utilreconcile.ContinueReconcile()
 }
 

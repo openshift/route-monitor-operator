@@ -24,7 +24,6 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/consts"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
@@ -37,19 +36,16 @@ import (
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
-	Client    client.Client
-	Ctx       context.Context
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
-	ClusterID string
+	Client client.Client
+	Ctx    context.Context
+	Log    logr.Logger
+	Scheme *runtime.Scheme
 
 	BlackBoxExporter controllers.BlackBoxExporterHandler
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
-	Common           controllers.ResourceMonitorHandler
+	Common           controllers.MonitorResourceHandler
 }
-
-// TODO rename Struct
 
 func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *RouteMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
@@ -63,7 +59,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
 		Prom:             alert.NewPrometheusRule(ctx, client),
-		Common:           reconcileCommon.NewMonitorReconcileCommon(ctx, client),
+		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
 
@@ -103,11 +99,11 @@ func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.V(2).Info("Entering EnsureFinalizerSet")
-	if r.Common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
-		_, err := r.Common.UpdateReconciledMonitor(&routeMonitor)
-		if err != nil {
-			return utilreconcile.RequeueWith(err)
-		}
+	res, err = r.EnsureFinalizerSet(routeMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
 

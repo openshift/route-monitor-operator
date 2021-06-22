@@ -45,7 +45,8 @@ func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.Pr
 			return err
 		}
 		return u.Client.Create(u.Ctx, &template)
-	} else if !u.Comparer.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
+	}
+	if !u.Comparer.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
 		// Update existing PrometheuesRule for the case that the template changed
 		deployedPrometheusRule.Spec = template.Spec
 		return u.Client.Update(u.Ctx, deployedPrometheusRule)

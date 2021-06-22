@@ -40,16 +40,15 @@ const (
 
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
 type ClusterUrlMonitorReconciler struct {
-	Client    client.Client
-	Ctx       context.Context
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
-	ClusterID string
+	Client client.Client
+	Ctx    context.Context
+	Log    logr.Logger
+	Scheme *runtime.Scheme
 
 	BlackBoxExporter controllers.BlackBoxExporterHandler
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
-	Common           controllers.ResourceMonitorHandler
+	Common           controllers.MonitorResourceHandler
 }
 
 func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *ClusterUrlMonitorReconciler {
@@ -64,7 +63,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
 		Prom:             alert.NewPrometheusRule(ctx, client),
-		Common:           reconcileCommon.NewMonitorReconcileCommon(ctx, client),
+		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
 
@@ -84,10 +83,6 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return utilreconcile.Stop()
 	}
 
-	if r.ClusterID == "" {
-		r.ClusterID = r.Common.GetClusterID()
-	}
-
 	res, err = r.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueWith(err)
@@ -96,11 +91,11 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		return utilreconcile.Stop()
 	}
 
-	if r.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
-		_, err := r.Common.UpdateReconciledMonitor(&clusterUrlMonitor)
-		if err != nil {
-			return utilreconcile.RequeueWith(err)
-		}
+	res, err = r.EnsureFinalizerSet(clusterUrlMonitor)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
 		return utilreconcile.Stop()
 	}
 

@@ -26,7 +26,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		reconciler           ClusterUrlMonitorReconciler
 		mockClient           *clientmocks.MockClient
 		mockBlackBoxExporter *controllermocks.MockBlackBoxExporterHandler
-		mockCommon           *controllermocks.MockResourceMonitorHandler
+		mockCommon           *controllermocks.MockMonitorResourceHandler
 		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
 		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
 
@@ -46,7 +46,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		mockBlackBoxExporter = controllermocks.NewMockBlackBoxExporterHandler(mockCtrl)
 		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
 		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
-		mockCommon = controllermocks.NewMockResourceMonitorHandler(mockCtrl)
+		mockCommon = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
 		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "fake-clusterurlmonitor",
@@ -67,7 +67,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 			Common:           mockCommon,
 			ServiceMonitor:   mockServiceMonitor,
 			Prom:             mockPrometheusRule,
-			ClusterID:        "1234-5678-910",
 		}
 	})
 
@@ -89,9 +88,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
+				mockCommon.EXPECT().GetClusterID().Times(1)
 				mockServiceMonitor.EXPECT().UpdateServiceMonitorDeployment(gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, ns).Times(1).Return(true, nil)
-				mockCommon.EXPECT().UpdateReconciledMonitorStatus(&clusterUrlMonitor).Times(1)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1)
 
 			})
 
@@ -114,7 +114,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				err := customerrors.InvalidSLO
-				mockCommon.EXPECT().ParseSLOMonitorSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("", err)
+				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("", err)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err)
 				// It deletes old pormetheus rule deployment if still there
 				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(gomock.Any()).Times(1)
@@ -129,7 +129,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		When("the resource Exists but not the same as the generated template", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-				mockCommon.EXPECT().ParseSLOMonitorSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
+				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
 				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, gomock.Any()).Times(1).Return(false, nil)
@@ -143,12 +143,12 @@ var _ = Describe("Clusterurlmonitor", func() {
 		When("the resource doesn't exists", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-				mockCommon.EXPECT().ParseSLOMonitorSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
+				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
 				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, ns).Times(1).Return(true, nil)
-				mockCommon.EXPECT().UpdateReconciledMonitorStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)
 			})
 
 			It("should create one and update the clusterURLMonitor", func() {
@@ -186,7 +186,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef).Times(1)
 					mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller").Times(1).Return(true)
-					mockCommon.EXPECT().UpdateReconciledMonitor(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
+					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
 
 				})
 				When("the blackboxexporter needs to be cleaned up", func() {

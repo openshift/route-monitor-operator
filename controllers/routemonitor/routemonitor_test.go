@@ -38,7 +38,7 @@ var _ = Describe("Routemonitor", func() {
 		mockClient           *clientmocks.MockClient
 		mockCtrl             *gomock.Controller
 		mockBlackboxExporter *controllermocks.MockBlackBoxExporterHandler
-		mockUtils            *controllermocks.MockResourceMonitorHandler
+		mockUtils            *controllermocks.MockMonitorResourceHandler
 		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
 		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
 
@@ -57,7 +57,7 @@ var _ = Describe("Routemonitor", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockBlackboxExporter = controllermocks.NewMockBlackBoxExporterHandler(mockCtrl)
-		mockUtils = controllermocks.NewMockResourceMonitorHandler(mockCtrl)
+		mockUtils = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
 		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
 		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
 
@@ -69,7 +69,6 @@ var _ = Describe("Routemonitor", func() {
 			Common:           mockUtils,
 			ServiceMonitor:   mockServiceMonitor,
 			Prom:             mockPrometheusRule,
-			ClusterID:        "1234-5678-910",
 		}
 
 		update = helper.MockHelper{}
@@ -230,7 +229,7 @@ var _ = Describe("Routemonitor", func() {
 					deleteServiceMonitorDeployment.CalledTimes = 1
 					deletePrometheusRuleDeployment.CalledTimes = 1
 					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
-					mockUtils.EXPECT().UpdateReconciledMonitor(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("should bubble up the error", func() {
 					Expect(err).To(HaveOccurred())
@@ -244,7 +243,7 @@ var _ = Describe("Routemonitor", func() {
 					deletePrometheusRuleDeployment.CalledTimes = 1
 					deleteFinalizer.CalledTimes = 1
 					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
-					mockUtils.EXPECT().UpdateReconciledMonitor(gomock.Any())
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any())
 				})
 				It("should reconcile", func() {
 					Expect(err).NotTo(HaveOccurred())
@@ -281,7 +280,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the resource has a finalizer but 'Update' failed", func() {
 				BeforeEach(func() {
 					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
-					mockUtils.EXPECT().UpdateReconciledMonitor(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("Should bubble up the failure", func() {
 					Expect(err).To(HaveOccurred())
@@ -291,7 +290,7 @@ var _ = Describe("Routemonitor", func() {
 			When("the resource has a finalizer but 'Update' succeeds", func() {
 				BeforeEach(func() {
 					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
-					mockUtils.EXPECT().UpdateReconciledMonitor(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 				})
 				It("Should succeed and call for a requeue", func() {
 					Expect(err).NotTo(HaveOccurred())
@@ -549,7 +548,7 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 					"eddie",
 				}
-				mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Times(1).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				routeMonitorReconciler.Client = mockClient
 			})
 			JustBeforeEach(func() {
@@ -569,7 +568,7 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 					"eddie",
 				}
-				mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
 			})
 			JustBeforeEach(func() {
 				expectedRouteMonitor.Status.RouteURL = firstRouteURL
@@ -589,7 +588,7 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 				}
 
-				mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
 			})
 			JustBeforeEach(func() {
 				routeMonitor.Status.RouteURL = firstRouteURL + "but-different"
@@ -636,7 +635,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 		Describe("The RouteMonitor settings are INVALID", func() {
 			BeforeEach(func() {
-				mockUtils.EXPECT().ParseSLOMonitorSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("", customerrors.NoHost).Times(1)
+				mockUtils.EXPECT().ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("", customerrors.NoHost).Times(1)
 			})
 			Describe("It sets the Error state in the RouteMonitor the first time", func() {
 				BeforeEach(func() {
@@ -644,7 +643,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				When("updating the RouteMonitor with the new error State works", func() {
 					BeforeEach(func() {
-						mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+						mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 					})
 					It("stops reconcileing", func() {
 						Expect(err).NotTo(HaveOccurred())
@@ -653,7 +652,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				When("updating the RouteMonitor new error State failes", func() {
 					BeforeEach(func() {
-						mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+						mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 					})
 					It("requeues with the particular error", func() {
 						Expect(err).To(Equal(consterror.CustomError))
@@ -683,7 +682,7 @@ var _ = Describe("Routemonitor", func() {
 					When("updating PrometheusRuleRef in the RouteMonitor fails", func() {
 						BeforeEach(func() {
 							mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
-							mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 						})
 						It("should reconcile with the particular error", func() {
 							Expect(err).To(Equal(consterror.CustomError))
@@ -693,7 +692,7 @@ var _ = Describe("Routemonitor", func() {
 					When("updating PrometheusRuleRef in the RouteMonitor was successful", func() {
 						BeforeEach(func() {
 							mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
-							mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 						})
 						It("stops reconciling", func() {
 							Expect(err).NotTo(HaveOccurred())
@@ -705,7 +704,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 		Describe("The RouteMonitor settings are VALID", func() {
 			BeforeEach(func() {
-				mockUtils.EXPECT().ParseSLOMonitorSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("99.5", nil).Times(1)
+				mockUtils.EXPECT().ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("99.5", nil).Times(1)
 				mockUtils.EXPECT().SetErrorStatus(gomock.Any(), nil).Return(false)
 			})
 			When("the update the PrometheusRule failed", func() {
@@ -727,7 +726,7 @@ var _ = Describe("Routemonitor", func() {
 					})
 					When("the ServiceMonitor is updated successfully", func() {
 						BeforeEach(func() {
-							mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 						})
 						It("stops reconciling", func() {
 							Expect(err).NotTo(HaveOccurred())
@@ -736,7 +735,7 @@ var _ = Describe("Routemonitor", func() {
 					})
 					When("updating the reference fails", func() {
 						BeforeEach(func() {
-							mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 						})
 						It("requeus with error", func() {
 							Expect(err).To(Equal(consterror.CustomError))
@@ -758,14 +757,11 @@ var _ = Describe("Routemonitor", func() {
 		JustBeforeEach(func() {
 			resp, err = routeMonitorReconciler.EnsureServiceMonitorExists(routeMonitor)
 		})
-		When("The RouteUrl and ClusterID are not set", func() {
+		When("The RouteUrl is not set", func() {
 			BeforeEach(func() {
 				routeMonitor.Status.RouteURL = ""
-				routeMonitorReconciler.ClusterID = ""
-				mockUtils.EXPECT().GetClusterID().Return("test-cluster-id")
 			})
-			It("will fetch ClusterID and requeue with the NoHost error ", func() {
-				Expect(routeMonitorReconciler.ClusterID).To(Equal("test-cluster-id"))
+			It("will requeue with the NoHost error ", func() {
 				Expect(err).To(Equal(customerrors.NoHost))
 				Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
 			})
@@ -773,6 +769,7 @@ var _ = Describe("Routemonitor", func() {
 		Describe("It updates the ServiceMonitor targeting the blackbox Exporter Namespace", func() {
 			BeforeEach(func() {
 				mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
+				mockUtils.EXPECT().GetClusterID().Return("test-cluster-id")
 			})
 			When("the update of the ServiceMonitor fails", func() {
 				BeforeEach(func() {
@@ -802,7 +799,7 @@ var _ = Describe("Routemonitor", func() {
 					})
 					When("it updates the RouteMonitor", func() {
 						BeforeEach(func() {
-							mockUtils.EXPECT().UpdateReconciledMonitorStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 						})
 						It("stops reconciiling", func() {
 							Expect(err).NotTo(HaveOccurred())

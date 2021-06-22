@@ -16,31 +16,31 @@ import (
 	reflect "reflect"
 )
 
-// MockResourceMonitorHandler is a mock of ResourceMonitorHandler interface
-type MockResourceMonitorHandler struct {
+// MockMonitorResourceHandler is a mock of MonitorResourceHandler interface
+type MockMonitorResourceHandler struct {
 	ctrl     *gomock.Controller
-	recorder *MockResourceMonitorHandlerMockRecorder
+	recorder *MockMonitorResourceHandlerMockRecorder
 }
 
-// MockResourceMonitorHandlerMockRecorder is the mock recorder for MockResourceMonitorHandler
-type MockResourceMonitorHandlerMockRecorder struct {
-	mock *MockResourceMonitorHandler
+// MockMonitorResourceHandlerMockRecorder is the mock recorder for MockMonitorResourceHandler
+type MockMonitorResourceHandlerMockRecorder struct {
+	mock *MockMonitorResourceHandler
 }
 
-// NewMockResourceMonitorHandler creates a new mock instance
-func NewMockResourceMonitorHandler(ctrl *gomock.Controller) *MockResourceMonitorHandler {
-	mock := &MockResourceMonitorHandler{ctrl: ctrl}
-	mock.recorder = &MockResourceMonitorHandlerMockRecorder{mock}
+// NewMockMonitorResourceHandler creates a new mock instance
+func NewMockMonitorResourceHandler(ctrl *gomock.Controller) *MockMonitorResourceHandler {
+	mock := &MockMonitorResourceHandler{ctrl: ctrl}
+	mock.recorder = &MockMonitorResourceHandlerMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockResourceMonitorHandler) EXPECT() *MockResourceMonitorHandlerMockRecorder {
+func (m *MockMonitorResourceHandler) EXPECT() *MockMonitorResourceHandlerMockRecorder {
 	return m.recorder
 }
 
 // SetErrorStatus mocks base method
-func (m *MockResourceMonitorHandler) SetErrorStatus(errorStatus *string, err error) bool {
+func (m *MockMonitorResourceHandler) SetErrorStatus(errorStatus *string, err error) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetErrorStatus", errorStatus, err)
 	ret0, _ := ret[0].(bool)
@@ -48,28 +48,28 @@ func (m *MockResourceMonitorHandler) SetErrorStatus(errorStatus *string, err err
 }
 
 // SetErrorStatus indicates an expected call of SetErrorStatus
-func (mr *MockResourceMonitorHandlerMockRecorder) SetErrorStatus(errorStatus, err interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) SetErrorStatus(errorStatus, err interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetErrorStatus", reflect.TypeOf((*MockResourceMonitorHandler)(nil).SetErrorStatus), errorStatus, err)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetErrorStatus", reflect.TypeOf((*MockMonitorResourceHandler)(nil).SetErrorStatus), errorStatus, err)
 }
 
-// ParseSLOMonitorSpecs mocks base method
-func (m *MockResourceMonitorHandler) ParseSLOMonitorSpecs(routeURL string, sloSpec v1alpha1.SloSpec) (string, error) {
+// ParseMonitorSLOSpecs mocks base method
+func (m *MockMonitorResourceHandler) ParseMonitorSLOSpecs(routeURL string, sloSpec v1alpha1.SloSpec) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseSLOMonitorSpecs", routeURL, sloSpec)
+	ret := m.ctrl.Call(m, "ParseMonitorSLOSpecs", routeURL, sloSpec)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ParseSLOMonitorSpecs indicates an expected call of ParseSLOMonitorSpecs
-func (mr *MockResourceMonitorHandlerMockRecorder) ParseSLOMonitorSpecs(routeURL, sloSpec interface{}) *gomock.Call {
+// ParseMonitorSLOSpecs indicates an expected call of ParseMonitorSLOSpecs
+func (mr *MockMonitorResourceHandlerMockRecorder) ParseMonitorSLOSpecs(routeURL, sloSpec interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseSLOMonitorSpecs", reflect.TypeOf((*MockResourceMonitorHandler)(nil).ParseSLOMonitorSpecs), routeURL, sloSpec)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseMonitorSLOSpecs", reflect.TypeOf((*MockMonitorResourceHandler)(nil).ParseMonitorSLOSpecs), routeURL, sloSpec)
 }
 
 // SetResourceReference mocks base method
-func (m *MockResourceMonitorHandler) SetResourceReference(reference *v1alpha1.NamespacedName, target types.NamespacedName) (bool, error) {
+func (m *MockMonitorResourceHandler) SetResourceReference(reference *v1alpha1.NamespacedName, target types.NamespacedName) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetResourceReference", reference, target)
 	ret0, _ := ret[0].(bool)
@@ -78,57 +78,43 @@ func (m *MockResourceMonitorHandler) SetResourceReference(reference *v1alpha1.Na
 }
 
 // SetResourceReference indicates an expected call of SetResourceReference
-func (mr *MockResourceMonitorHandlerMockRecorder) SetResourceReference(reference, target interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) SetResourceReference(reference, target interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetResourceReference", reflect.TypeOf((*MockResourceMonitorHandler)(nil).SetResourceReference), reference, target)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetResourceReference", reflect.TypeOf((*MockMonitorResourceHandler)(nil).SetResourceReference), reference, target)
 }
 
-// UpdateReconciledMonitor mocks base method
-func (m *MockResourceMonitorHandler) UpdateReconciledMonitor(cr runtime.Object) (reconcile.Result, error) {
+// UpdateMonitorResource mocks base method
+func (m *MockMonitorResourceHandler) UpdateMonitorResource(cr runtime.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateReconciledMonitor", cr)
+	ret := m.ctrl.Call(m, "UpdateMonitorResource", cr)
 	ret0, _ := ret[0].(reconcile.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateReconciledMonitor indicates an expected call of UpdateReconciledMonitor
-func (mr *MockResourceMonitorHandlerMockRecorder) UpdateReconciledMonitor(cr interface{}) *gomock.Call {
+// UpdateMonitorResource indicates an expected call of UpdateMonitorResource
+func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResource(cr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateReconciledMonitor", reflect.TypeOf((*MockResourceMonitorHandler)(nil).UpdateReconciledMonitor), cr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResource", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResource), cr)
 }
 
-// UpdateReconciledMonitorStatus mocks base method
-func (m *MockResourceMonitorHandler) UpdateReconciledMonitorStatus(cr runtime.Object) (reconcile.Result, error) {
+// UpdateMonitorResourceStatus mocks base method
+func (m *MockMonitorResourceHandler) UpdateMonitorResourceStatus(cr runtime.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateReconciledMonitorStatus", cr)
+	ret := m.ctrl.Call(m, "UpdateMonitorResourceStatus", cr)
 	ret0, _ := ret[0].(reconcile.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateReconciledMonitorStatus indicates an expected call of UpdateReconciledMonitorStatus
-func (mr *MockResourceMonitorHandlerMockRecorder) UpdateReconciledMonitorStatus(cr interface{}) *gomock.Call {
+// UpdateMonitorResourceStatus indicates an expected call of UpdateMonitorResourceStatus
+func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResourceStatus(cr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateReconciledMonitorStatus", reflect.TypeOf((*MockResourceMonitorHandler)(nil).UpdateReconciledMonitorStatus), cr)
-}
-
-// DeleteFinalizer mocks base method
-func (m *MockResourceMonitorHandler) DeleteFinalizer(o v10.Object, finalizerKey string) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteFinalizer", o, finalizerKey)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// DeleteFinalizer indicates an expected call of DeleteFinalizer
-func (mr *MockResourceMonitorHandlerMockRecorder) DeleteFinalizer(o, finalizerKey interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFinalizer", reflect.TypeOf((*MockResourceMonitorHandler)(nil).DeleteFinalizer), o, finalizerKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResourceStatus", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResourceStatus), cr)
 }
 
 // SetFinalizer mocks base method
-func (m *MockResourceMonitorHandler) SetFinalizer(o v10.Object, finalizerKey string) bool {
+func (m *MockMonitorResourceHandler) SetFinalizer(o v10.Object, finalizerKey string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetFinalizer", o, finalizerKey)
 	ret0, _ := ret[0].(bool)
@@ -136,13 +122,27 @@ func (m *MockResourceMonitorHandler) SetFinalizer(o v10.Object, finalizerKey str
 }
 
 // SetFinalizer indicates an expected call of SetFinalizer
-func (mr *MockResourceMonitorHandlerMockRecorder) SetFinalizer(o, finalizerKey interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) SetFinalizer(o, finalizerKey interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFinalizer", reflect.TypeOf((*MockResourceMonitorHandler)(nil).SetFinalizer), o, finalizerKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFinalizer", reflect.TypeOf((*MockMonitorResourceHandler)(nil).SetFinalizer), o, finalizerKey)
+}
+
+// DeleteFinalizer mocks base method
+func (m *MockMonitorResourceHandler) DeleteFinalizer(o v10.Object, finalizerKey string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteFinalizer", o, finalizerKey)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DeleteFinalizer indicates an expected call of DeleteFinalizer
+func (mr *MockMonitorResourceHandlerMockRecorder) DeleteFinalizer(o, finalizerKey interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFinalizer", reflect.TypeOf((*MockMonitorResourceHandler)(nil).DeleteFinalizer), o, finalizerKey)
 }
 
 // GetClusterID mocks base method
-func (m *MockResourceMonitorHandler) GetClusterID() string {
+func (m *MockMonitorResourceHandler) GetClusterID() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetClusterID")
 	ret0, _ := ret[0].(string)
@@ -150,9 +150,9 @@ func (m *MockResourceMonitorHandler) GetClusterID() string {
 }
 
 // GetClusterID indicates an expected call of GetClusterID
-func (mr *MockResourceMonitorHandlerMockRecorder) GetClusterID() *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) GetClusterID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterID", reflect.TypeOf((*MockResourceMonitorHandler)(nil).GetClusterID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetClusterID))
 }
 
 // MockServiceMonitorHandler is a mock of ServiceMonitorHandler interface

@@ -30,7 +30,7 @@ func NewServiceMonitor(ctx context.Context, c client.Client) *ServiceMonitor {
 
 const (
 	ServiceMonitorPeriod string = "30s"
-	UrlLabelName         string = "RouteMonitorUrl"
+	UrlLabelName         string = "probe_url"
 )
 
 // Creates or Updates Service Monitor Deployment according to the template
@@ -44,7 +44,8 @@ func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template monitoringv1.Se
 			return err
 		}
 		return u.Client.Create(u.Ctx, &template)
-	} else if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
+	}
+	if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
 		// Update existing ServiceMonitor for the case that the template changed
 		deployedServiceMonitor.Spec = template.Spec
 		return u.Client.Update(u.Ctx, deployedServiceMonitor)

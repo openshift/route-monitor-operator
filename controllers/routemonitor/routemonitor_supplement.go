@@ -21,9 +21,9 @@ import (
 
 // Ensures that all PrometheusRules CR are created according to the RouteMonitor
 func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	parsedSlo, err := r.Common.ParseSLOMonitorSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo)
+	parsedSlo, err := r.Common.ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo)
 	if r.Common.SetErrorStatus(&routeMonitor.Status.ErrorStatus, err) {
-		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+		return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
 	}
 	if parsedSlo == "" {
 		// Delete existing PrometheusRules if required
@@ -33,7 +33,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 		}
 		updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
 		if updated {
-			return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+			return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
 		}
 		return utilreconcile.StopReconcile()
 	}
@@ -49,16 +49,14 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 	// Update PrometheusRuleReference in RouteMonitor if necessary
 	updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, namespacedName)
 	if updated {
-		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+		return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
 
 // Ensures that a ServiceMonitor is created from the RouteMonitor CR
 func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	if r.ClusterID == "" {
-		r.ClusterID = r.Common.GetClusterID()
-	}
+
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
 		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
@@ -66,7 +64,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 
 	// update ServiceMonitor if requiredctrl
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
-	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, r.ClusterID)
+	serviceMonitorTemplate := servicemonitor.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, r.Common.GetClusterID())
 	err := r.ServiceMonitor.UpdateServiceMonitorDeployment(serviceMonitorTemplate)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
@@ -78,7 +76,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if updated {
-		return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+		return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
@@ -115,9 +113,16 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")
 	if r.Common.DeleteFinalizer(&routeMonitor, consts.FinalizerKey) {
-		return r.Common.UpdateReconciledMonitor(&routeMonitor)
+		return r.Common.UpdateMonitorResource(&routeMonitor)
 	}
 	return utilreconcile.StopReconcile()
+}
+
+func (s *RouteMonitorReconciler) EnsureFinalizerSet(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	if s.Common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
+		return s.Common.UpdateMonitorResource(&routeMonitor)
+	}
+	return utilreconcile.ContinueReconcile()
 }
 
 // GetRouteMonitor return the RouteMonitor that is tested
@@ -186,5 +191,5 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 	}
 
 	routeMonitor.Status.RouteURL = extractedRouteURL
-	return r.Common.UpdateReconciledMonitorStatus(&routeMonitor)
+	return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
 }
