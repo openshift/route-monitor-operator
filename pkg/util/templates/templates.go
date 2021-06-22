@@ -16,7 +16,7 @@ import (
 
 const (
 	serviceMonitorPeriod string = "30s"
-	UrlLabelName         string = "RouteMonitorUrl"
+	UrlLabelName         string = "probe_url"
 )
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor

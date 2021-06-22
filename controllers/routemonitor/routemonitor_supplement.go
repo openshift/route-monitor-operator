@@ -106,16 +106,19 @@ func (r *RouteMonitorReconciler) createOrUpdatePrometheusRule(ctx context.Contex
 		return err
 	}
 
-	if !k8serrors.IsNotFound(err) {
-		if r.DeepEqual(template.Spec, resource.Spec) {
-			return nil
-		}
+	if k8serrors.IsNotFound(err) {
+		// Create the PrometheusRule if it does not exist
+		return r.Create(ctx, &template)
+
+	}
+
+	if !r.DeepEqual(template.Spec, resource.Spec) {
 		// Update PrometheusRule if the specs are different
 		resource.Spec = template.Spec
 		return r.Update(ctx, resource)
 	}
-	// Create the PrometheusRule if it does not exist
-	return r.Create(ctx, &template)
+
+	return nil
 }
 
 func (r *RouteMonitorReconciler) updateErrorStatus(ctx context.Context, routeMonitor v1alpha1.RouteMonitor, err error) (utilreconcile.Result, error) {

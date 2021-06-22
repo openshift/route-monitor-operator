@@ -39,3 +39,6 @@ packagemanifests/
 # Local appsre pipeline testing
 .docker/
 saas-route-monitor-operator-bundle/
+
+# Local Dev ENVS
+.vscode/

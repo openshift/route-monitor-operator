@@ -20,10 +20,12 @@ import (
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/util/templates"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 )
@@ -87,10 +89,6 @@ var _ = Describe("Adder", func() {
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(update.ErrorResponse).
 			Times(update.CalledTimes)
-
-		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(get.ErrorResponse).
-			Times(get.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
 			Return(delete.ErrorResponse).
@@ -181,6 +179,9 @@ var _ = Describe("Adder", func() {
 				// Arrange
 				BeforeEach(func() {
 					get.ErrorResponse = consterror.CustomError
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
 					create.CalledTimes = 0
 				})
 
@@ -195,6 +196,9 @@ var _ = Describe("Adder", func() {
 			When("the resource Create fails unexpectedly", func() {
 				BeforeEach(func() {
 					// Arrange
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
 					create.ErrorResponse = consterror.CustomError
 				})
 				It("should call `Get` Successfully and call `Create` but return the error", func() {
@@ -212,6 +216,11 @@ var _ = Describe("Adder", func() {
 					create.CalledTimes = 0
 				})
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
 						Namespace: routeMonitor.Namespace,
@@ -226,8 +235,14 @@ var _ = Describe("Adder", func() {
 				})
 			})
 
-			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
+			When("ServiceMonitorRef exists and is equal to the RouteMonitor name and is up to dated", func() {
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
+
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
 						Namespace: routeMonitor.Namespace,
@@ -246,6 +261,12 @@ var _ = Describe("Adder", func() {
 
 			When("ServiceMonitorRef exists and is equal to the RouteMonitor name", func() {
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
+
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
 						Namespace: routeMonitor.Namespace,
@@ -275,6 +296,12 @@ var _ = Describe("Adder", func() {
 				})
 
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
+
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name + "-but-different",
 						Namespace: routeMonitor.Namespace,
@@ -302,6 +329,12 @@ var _ = Describe("Adder", func() {
 				})
 
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
+
 					mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
 						Times(1).
 						Return(nil)
@@ -328,6 +361,12 @@ var _ = Describe("Adder", func() {
 				})
 
 				JustBeforeEach(func() {
+					namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
+					serviceMonintor := templates.TemplateForServiceMonitorResource(routeMonitor.Status.RouteURL, routeMonitorAdder.BlackBoxExporterNamespace, namespacedName)
+					mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).SetArg(2, serviceMonintor).
+						Return(get.ErrorResponse).
+						Times(get.CalledTimes)
+
 					routeMonitor.Status.ServiceMonitorRef = v1alpha1.NamespacedName{
 						Name:      routeMonitor.Name,
 						Namespace: routeMonitor.Namespace,
