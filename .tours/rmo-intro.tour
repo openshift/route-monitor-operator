@@ -9,57 +9,67 @@
     {
       "file": "main.go",
       "description": "RMO uses Operator SDK v1.0+. This line in main.go is where the control loop is started for the watched objects: RouteMonitors & ClusterUrlMonitors.",
-      "line": 127
+      "line": 106
     },
     {
       "file": "main.go",
       "description": "RouteMonitors use the RouteMonitor controller, which uses these internal structures to operate on. They are initialized once for the runtime of the application.",
-      "line": 102
+      "line": 90
     },
     {
       "file": "main.go",
-      "description": "The ClusterUrlMonitor controller is set up a bit differently. All depending structures are initialized during the reconciliation, so they live for only one run on Reconcile().",
-      "line": 113
+      "description": "Here the ClusterURL is initialized.",
+      "line": 97
     },
     {
       "file": "controllers/routemonitor/routemonitor.go",
       "description": "This is the entrypoint to Reconciling RouteMonitor resources. A RouteMonitor is used to specify an OpenShift route that will be observed by synthetic probes.\nThe `Reconcile` function will be called each time a RouteMonitor is created or updated.",
-      "line": 52
+      "line": 75
     },
     {
       "file": "controllers/routemonitor/routemonitor.go",
       "description": "the `Reconcile` function is split into idempotent subroutines which are executed for each run. This specific step makes sure the BlackBoxExporter, which is used for the synthetic probing, is deployed (i.e. the `Deployment` is created)",
-      "line": 93
+      "line": 112
     },
     {
       "file": "controllers/routemonitor/routemonitor.go",
-      "description": "The implementation of all steps related to RouteMonitors is split into 3 different parts:\n`RouteMonitorAdder` contains everything related to a new or updated RouteMonitor",
-      "line": 39
+      "description": "The implementation of all steps related to reconciling the RouteMonitors is split into Handlers that manage the creation of subresources.",
+      "line": 54
     },
     {
       "file": "controllers/routemonitor/routemonitor.go",
-      "description": "`RouteMonitorDeleter` contains everything related to cleaning up when a RouteMonitor is removed",
-      "line": 40
+      "description": "`BlackBoxExporter` contains everything related to manage the BlackBox exporter deployment, that needs to be set up according the configuration of the RouteMonitor.",
+      "line": 59
     },
     {
       "file": "controllers/routemonitor/routemonitor.go",
-      "description": "`RouteMonitorSupplement` is a generic supplement that contains everyting that's independent of creating or removing resources",
-      "line": 38
+      "description": "`ServiceMonitor` contains everything to create and update a ServiceMonitor CR. One ServiceMonitor needs to be created for each RouteMonitor.",
+      "line": 60
+    },
+    {
+      "file": "controllers/routemonitor/routemonitor.go",
+      "description": "`Prom` contains the functionality for creating a PrometheusRules that will trigger the alert in case the SLO configured in the RouteMonitor can not be fulfilled.",
+      "line": 61
     },
     {
       "file": "controllers/clusterurlmonitor/clusterurlmonitor.go",
-      "description": "The reconciliation of ClusterUrlMonitor resources is split up a bit different. Reconcile is again the entrypoint for a single request, but the actual processing is done in `ProcessRequest`. `Reconcile` only wraps this function and creates the depending resources.",
-      "line": 70
+      "description": "For the ClusterURLMonitor the functionality is split into the same sub-modules.",
+      "line": 58
     },
     {
       "file": "controllers/clusterurlmonitor/clusterurlmonitor_supplement.go",
-      "description": "This function is where the actual processing of a requerst for ClusterUrlMonitors is done. ClusterUrlMonitors can be used to create monitoring of arbitrary URLs in an OpenShift cluster.",
-      "line": 316
+      "description": "Here are some of the functions defined that are used in the reconcile loop.",
+      "line": 18
     },
     {
-      "file": "pkg/util/templates/templates.go",
-      "description": "functionality that is common between the RouteMonitor and ClusterUrlMonitor processing is located in the pkg folder. This file contains all resource templates that the operator creates, like ServiceMonitors or PrometheusRules.",
-      "line": 23
+      "file": "pkg/servicemonitor/servicemonitor.go",
+      "description": "functionality that is common between the RouteMonitor and ClusterUrlMonitor processing is located in the pkg folder. This file contains for example contains the templates for the ServiceMonitors that are created.",
+      "line": 84
+    },
+    {
+      "file": "pkg/alert/prometheusrule.go",
+      "description": "functionality that is common between the RouteMonitor and ClusterUrlMonitor processing is located in the pkg folder. This file contains for example contains the templates for the PrometheusRules that are created.",
+      "line": 142
     },
     {
       "file": "pkg/blackboxexporter/blackboxexporter.go",
@@ -69,7 +79,7 @@
     {
       "file": "controllers/clusterurlmonitor/clusterurlmonitor_test.go",
       "description": "We use Ginkgo and Gomega for our test suite.",
-      "line": 389
+      "line": 77
     },
     {
       "file": "int/int_test.go",

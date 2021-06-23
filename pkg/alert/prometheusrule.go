@@ -1,72 +1,77 @@
-package templates
+package alert
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	prometheus "github.com/prometheus/common/model"
 
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	serviceMonitorPeriod string = "30s"
-	UrlLabelName         string = "probe_url"
-)
+type PrometheusRule struct {
+	Client   client.Client
+	Ctx      context.Context
+	Comparer util.ResourceComparerInterface
+}
 
-// TemplateForServiceMonitorResource returns a ServiceMonitor
-func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName) monitoringv1.ServiceMonitor {
-
-	routeMonitorLabels := blackboxexporter.GenerateBlackBoxExporterLables()
-
-	labelSelector := metav1.LabelSelector{MatchLabels: routeMonitorLabels}
-
-	// Currently we only support `http_2xx` as module
-	// Still make it a variable so we can easily add functionality later
-	modules := []string{"http_2xx"}
-
-	params := map[string][]string{
-		"module": modules,
-		"target": {url},
+func NewPrometheusRule(ctx context.Context, c client.Client) *PrometheusRule {
+	return &PrometheusRule{
+		Client:   c,
+		Ctx:      ctx,
+		Comparer: &util.ResourceComparer{},
 	}
+}
 
-	serviceMonitor := monitoringv1.ServiceMonitor{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespacedName.Name,
-			Namespace: namespacedName.Namespace,
-		},
-		Spec: monitoringv1.ServiceMonitorSpec{
-			Endpoints: []monitoringv1.Endpoint{
-				{
-					Port: blackboxexporter.BlackBoxExporterPortName,
-					// Probe every 30s
-					Interval: serviceMonitorPeriod,
-					// Timeout has to be smaller than probe interval
-					ScrapeTimeout: "15s",
-					Path:          "/probe",
-					Scheme:        "http",
-					Params:        params,
-					MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
-						{
-							Replacement: url,
-							TargetLabel: UrlLabelName,
-						},
-					},
-				}},
-			Selector: labelSelector,
-			NamespaceSelector: monitoringv1.NamespaceSelector{
-				MatchNames: []string{
-					blackBoxExporterNamespace,
-				},
-			},
-		},
+// Creates or Updates PrometheusRule Deployment according to the template
+func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.PrometheusRule) error {
+	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
+	deployedPrometheusRule := &monitoringv1.PrometheusRule{}
+	err := u.Client.Get(u.Ctx, namespacedName, deployedPrometheusRule)
+	if err != nil {
+		// No similar Prometheus Rule exists
+		if !k8serrors.IsNotFound(err) {
+			return err
+		}
+		return u.Client.Create(u.Ctx, &template)
 	}
-	return serviceMonitor
+	if !u.Comparer.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
+		// Update existing PrometheuesRule for the case that the template changed
+		deployedPrometheusRule.Spec = template.Spec
+		return u.Client.Update(u.Ctx, deployedPrometheusRule)
+	}
+	return nil
+}
+
+func (u *PrometheusRule) DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error {
+	// nothing to delete, stopping early
+	if prometheusRuleRef == *new(v1alpha1.NamespacedName) {
+		return nil
+	}
+	namespacedName := types.NamespacedName{Name: prometheusRuleRef.Name, Namespace: prometheusRuleRef.Namespace}
+	resource := &monitoringv1.PrometheusRule{}
+	// Does the resource already exist?
+	err := u.Client.Get(u.Ctx, namespacedName, resource)
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			// If this is an unknown error
+			return err
+		}
+		// Resource doesn't exist, nothing to do
+		return nil
+	}
+	return u.Client.Delete(u.Ctx, resource)
 }
 
 type multiWindowMultiBurnAlertRule struct {
@@ -89,7 +94,7 @@ func alertThreshold(windowSize, percent, label, burnRate string) string {
 func sufficientProbes(windowSize, label string) string {
 	window, _ := prometheus.ParseDuration(windowSize)
 	window_duration := time.Duration(window)
-	mPeriod, _ := prometheus.ParseDuration(serviceMonitorPeriod)
+	mPeriod, _ := prometheus.ParseDuration(servicemonitor.ServiceMonitorPeriod)
 	mPeriod_duration := time.Duration(mPeriod)
 	necessaryProbesInWindow := int(window_duration.Minutes() / mPeriod_duration.Minutes() * 0.5)
 
@@ -101,7 +106,7 @@ func sufficientProbes(windowSize, label string) string {
 
 //render creates a monitoring rule for the defined multiwindow multi-burn rate alert
 func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, namespacedName types.NamespacedName) monitoringv1.Rule {
-	labelSelector := fmt.Sprintf(`%s="%s"`, UrlLabelName, url)
+	labelSelector := fmt.Sprintf(`%s="%s"`, servicemonitor.UrlLabelName, url)
 
 	alertString := "" +
 		alertThreshold(r.shortWindow, percent, labelSelector, r.burnRate) +
@@ -125,11 +130,11 @@ func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, names
 
 func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[string]string {
 	return map[string]string{
-		UrlLabelName:   url,
-		"namespace":    namespace,
-		"severity":     r.severity,
-		"long_window":  r.longWindow,
-		"short_window": r.shortWindow,
+		servicemonitor.UrlLabelName: url,
+		"namespace":                 namespace,
+		"severity":                  r.severity,
+		"long_window":               r.longWindow,
+		"short_window":              r.shortWindow,
 	}
 }
 

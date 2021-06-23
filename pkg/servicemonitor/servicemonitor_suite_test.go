@@ -1,4 +1,4 @@
-package deleter_test
+package servicemonitor_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDeleter(t *testing.T) {
+func TestServiceMonitor(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Deleter Suite")
+	RunSpecs(t, "Service Monitor Suite")
 }

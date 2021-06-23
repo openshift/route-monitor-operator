@@ -29,6 +29,14 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - clusterversions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
   - dnses
   verbs:
   - get
@@ -55,6 +63,7 @@ rules:
   - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - monitoring.openshift.io
@@ -103,4 +112,3 @@ rules:
   verbs:
   - get
   - list
-  - watch

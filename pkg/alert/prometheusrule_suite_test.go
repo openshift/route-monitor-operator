@@ -1,4 +1,4 @@
-package supplement_test
+package alert_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestSupplement(t *testing.T) {
+func TestPrometheusRule(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Supplement Suite")
+	RunSpecs(t, "Prometheus Rule Suite")
 }

@@ -46,6 +46,7 @@ func RequeueReconcile() (result Result, err error) {
 // RequeueReconcileWith will not requeue if errIn doesn't fire
 func RequeueReconcileWith(errIn error) (result Result, err error) {
 	if errIn != nil {
+		result.Requeue = true
 		err = errIn
 		return
 	}

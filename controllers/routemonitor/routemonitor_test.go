@@ -2,19 +2,22 @@ package routemonitor_test
 
 import (
 	"github.com/golang/mock/gomock"
+	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"context"
 	"time"
 
 	//tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 
+	routev1 "github.com/openshift/api/route/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
-	//nolint:staticcheck // This will not be migrated until we migrate operator-sdk to a newer version (I think)
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
@@ -25,87 +28,78 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	routemonitormocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/routemonitor"
+	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 
 var _ = Describe("Routemonitor", func() {
 
 	var (
-		mockClient *clientmocks.MockClient
-		mockCtrl   *gomock.Controller
+		mockClient           *clientmocks.MockClient
+		mockCtrl             *gomock.Controller
+		mockBlackboxExporter *controllermocks.MockBlackBoxExporterHandler
+		mockUtils            *controllermocks.MockMonitorResourceHandler
+		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
+		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
 
-		routeMonitorReconciler       routemonitor.RouteMonitorReconciler
-		routeMonitorReconcilerClient client.Client
-		mockSupplement               *routemonitormocks.MockRouteMonitorSupplement
-		mockDeleter                  *routemonitormocks.MockRouteMonitorDeleter
-		mockAdder                    *routemonitormocks.MockRouteMonitorAdder
-		mockBlackboxExporter         *routemonitormocks.MockBlackBoxExporter
-		mockResourceComparer         *routemonitormocks.MockResourceComparer
-		ctx                          context.Context
+		update helper.MockHelper
+		delete helper.MockHelper
+		get    helper.MockHelper
+		create helper.MockHelper
 
-		update                                        helper.MockHelper
-		delete                                        helper.MockHelper
-		get                                           helper.MockHelper
-		create                                        helper.MockHelper
-		ensureServiceMonitorResourceAbsent            helper.MockHelper
-		ensurePrometheusRuleResourceAbsent            helper.MockHelper
-		shouldDeleteBlackBoxExporterResources         helper.MockHelper
-		ensureBlackBoxExporterResourcesAbsent         helper.MockHelper
-		ensureBlackBoxExporterResourcesExist          helper.MockHelper
-		ensureFinalizerAbsent                         helper.MockHelper
-		deepEqualCalledTimes                          int
-		deepEqualResponse                             bool
-		shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
-		ensureFinalizerAbsentResponse                 utilreconcile.Result
-
+		routeMonitorReconciler        routemonitor.RouteMonitorReconciler
 		routeMonitor                  v1alpha1.RouteMonitor
-		expectedRouteMonitor          v1alpha1.RouteMonitor
 		routeMonitorFinalizers        []string
 		routeMonitorDeletionTimestamp *metav1.Time
-		routeMonitorStatus            v1alpha1.RouteMonitorStatus
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockDeleter = routemonitormocks.NewMockRouteMonitorDeleter(mockCtrl)
-		mockAdder = routemonitormocks.NewMockRouteMonitorAdder(mockCtrl)
-		mockResourceComparer = routemonitormocks.NewMockResourceComparer(mockCtrl)
+		mockBlackboxExporter = controllermocks.NewMockBlackBoxExporterHandler(mockCtrl)
+		mockUtils = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
+		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
+		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
 
-		mockSupplement = routemonitormocks.NewMockRouteMonitorSupplement(mockCtrl)
-		mockBlackboxExporter = routemonitormocks.NewMockBlackBoxExporter(mockCtrl)
-		routeMonitorFinalizers = routemonitorconst.FinalizerList
-
-		routeMonitorReconcilerClient = mockClient
-
-		ctx = constinit.Context
+		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
+			Log:              constinit.Logger,
+			Client:           mockClient,
+			Scheme:           constinit.Scheme,
+			BlackBoxExporter: mockBlackboxExporter,
+			Common:           mockUtils,
+			ServiceMonitor:   mockServiceMonitor,
+			Prom:             mockPrometheusRule,
+		}
 
 		update = helper.MockHelper{}
 		delete = helper.MockHelper{}
 		get = helper.MockHelper{}
 		create = helper.MockHelper{}
-		ensureServiceMonitorResourceAbsent = helper.MockHelper{}
-		ensurePrometheusRuleResourceAbsent = helper.MockHelper{}
-		shouldDeleteBlackBoxExporterResources = helper.MockHelper{}
-		ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
-		ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
-		ensureFinalizerAbsent = helper.MockHelper{}
-		deepEqualCalledTimes = 0
-		deepEqualResponse = true
-		shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 
-		ensureFinalizerAbsentResponse = utilreconcile.Result{}
-
+		routeMonitorFinalizers = routemonitorconst.FinalizerList
+		routeMonitorDeletionTimestamp = &metav1.Time{}
+		routeMonitor = v1alpha1.RouteMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "scott-pilgrim",
+				Namespace:         "the-world",
+				DeletionTimestamp: routeMonitorDeletionTimestamp,
+				Finalizers:        routeMonitorFinalizers,
+			},
+			Status: v1alpha1.RouteMonitorStatus{
+				RouteURL: "fake-route-url",
+			},
+			Spec: v1alpha1.RouteMonitorSpec{
+				Slo: v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.5",
+				},
+			},
+		}
 	})
+
 	JustBeforeEach(func() {
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(get.ErrorResponse).
 			Times(get.CalledTimes)
-
-		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(update.ErrorResponse).
-			Times(update.CalledTimes)
 
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
 			Return(delete.ErrorResponse).
@@ -115,326 +109,86 @@ var _ = Describe("Routemonitor", func() {
 			Return(create.ErrorResponse).
 			Times(create.CalledTimes)
 
-		mockDeleter.EXPECT().EnsureServiceMonitorResourceAbsent(gomock.Any(), gomock.Any()).
-			Return(ensureServiceMonitorResourceAbsent.ErrorResponse).
-			Times(ensureServiceMonitorResourceAbsent.CalledTimes)
-
-		mockDeleter.EXPECT().EnsurePrometheusRuleResourceAbsent(gomock.Any(), gomock.Any()).
-			Return(ensurePrometheusRuleResourceAbsent.ErrorResponse).
-			Times(ensurePrometheusRuleResourceAbsent.CalledTimes)
-
-		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
-			Return(deepEqualResponse).
-			Times(deepEqualCalledTimes)
-
-		mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
-			Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).
-			Return(ensureBlackBoxExporterResourcesAbsent.ErrorResponse)
-
-		mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().
-			Times(shouldDeleteBlackBoxExporterResources.CalledTimes).
-			Return(shouldDeleteBlackBoxExporterResourcesResponse, shouldDeleteBlackBoxExporterResources.ErrorResponse)
-
-		mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesExist().
-			Times(ensureBlackBoxExporterResourcesExist.CalledTimes).
-			Return(ensureBlackBoxExporterResourcesExist.ErrorResponse)
-
-		mockSupplement.EXPECT().EnsureFinalizerAbsent(gomock.Any(), gomock.Any()).
-			Times(ensureFinalizerAbsent.CalledTimes).
-			Return(ensureFinalizerAbsentResponse, ensureFinalizerAbsent.ErrorResponse)
-
-		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
-			Log:                    constinit.Logger,
-			Client:                 routeMonitorReconcilerClient,
-			Scheme:                 constinit.Scheme,
-			RouteMonitorSupplement: mockSupplement,
-			RouteMonitorDeleter:    mockDeleter,
-			RouteMonitorAdder:      mockAdder,
-			BlackBoxExporter:       mockBlackboxExporter,
-			ResourceComparer:       mockResourceComparer,
-		}
-
-		routeMonitor = v1alpha1.RouteMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "scott-pilgrim",
-				Namespace:         "the-world",
-				DeletionTimestamp: routeMonitorDeletionTimestamp,
-				Finalizers:        routeMonitorFinalizers,
-			},
-			Status: routeMonitorStatus,
-		}
-		expectedRouteMonitor = routeMonitor
-
-		deepEqualResponse = true
-		deepEqualCalledTimes = 0
-
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 	})
+
 	AfterEach(func() {
 		mockCtrl.Finish()
 	})
 
-	Describe("EnsurePrometheusRuleResourceExists", func() {
+	//--------------------------------------------------------------------------------------
+	// 		EnsureMonitorAndDependenciesAbsent
+	//--------------------------------------------------------------------------------------
+	Describe("EnsureMonitorAndDependenciesAbsent", func() {
 		var (
-			routeMonitorSlo     v1alpha1.SloSpec
-			mockStatusWriter    *clientmocks.MockStatusWriter
-			errorToPopulate     error
-			shouldPopulateError bool
+			shouldDeleteBlackBoxExporterResources         helper.MockHelper
+			ensureBlackBoxExporterResourcesAbsent         helper.MockHelper
+			ensureBlackBoxExporterResourcesExist          helper.MockHelper
+			deleteServiceMonitorDeployment                helper.MockHelper
+			deletePrometheusRuleDeployment                helper.MockHelper
+			deleteFinalizer                               helper.MockHelper
+			shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
+
+			res utilreconcile.Result
+			err error
 		)
 		BeforeEach(func() {
-			//			routeMonitorSlo = v1alpha1.SloSpec{}
-			routeMonitorSlo = v1alpha1.SloSpec{
-				TargetAvailabilityPercent: "99.95",
-			}
-			routeMonitorStatus = v1alpha1.RouteMonitorStatus{
-				RouteURL: "fake-route-url",
-			}
-
-			mockStatusWriter = clientmocks.NewMockStatusWriter(mockCtrl)
-			errorToPopulate = nil
-			shouldPopulateError = false
-
-			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
-				Slo: routeMonitorSlo,
-			}
+			shouldDeleteBlackBoxExporterResources = helper.MockHelper{}
+			ensureBlackBoxExporterResourcesAbsent = helper.MockHelper{}
+			ensureBlackBoxExporterResourcesExist = helper.MockHelper{}
+			deleteServiceMonitorDeployment = helper.MockHelper{}
+			deletePrometheusRuleDeployment = helper.MockHelper{}
+			deleteFinalizer = helper.MockHelper{}
+			shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
 		})
 		JustBeforeEach(func() {
-			routeMonitor.Spec = v1alpha1.RouteMonitorSpec{
-				Slo: routeMonitorSlo,
-			}
-			expectedRouteMonitor = routeMonitor
-			if shouldPopulateError {
-				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-				expectedRouteMonitor.Status.ErrorStatus = errorToPopulate.Error()
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Eq(&expectedRouteMonitor)).
-					Times(1).
-					Return(nil)
-			}
-		})
-		When("the RouteMonitor has no Host", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorStatus = v1alpha1.RouteMonitorStatus{}
-				shouldPopulateError, errorToPopulate = true, customerrors.NoHost
-			})
-			JustBeforeEach(func() {
-				scheme := constinit.Scheme
-				routeMonitorReconcilerClient = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
-			})
-			It("should return No Host error", func() {
-				// Act
-				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the RouteMonitor has no slo spec", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
-				routeMonitorSlo = v1alpha1.SloSpec{}
-			})
-			It("should skip processing and continue", func() {
-				// Act
-				res, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).NotTo(BeNil())
-				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
-			})
-		})
-		When("the RouteMonitor has a slo spec but percent is too low", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "-0/10",
-				}
-				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
-			})
-			It("should Throw an error", func() {
-				// Act
-				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the RouteMonitor has a slo spec but percent is too high", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "101",
-				}
 
-				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
-			})
-			It("should Throw an error", func() {
-				// Act
-				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the RouteMonitor has an empty slo value", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorSlo = v1alpha1.SloSpec{}
-				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
-			})
-			It("should do nothing", func() {
-				// Act
-				res, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).NotTo(BeNil())
-				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
-			})
-		})
-		When("the RouteMonitor has invalid slo type", func() {
-			// Arrange
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorSlo = v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "fake-slo-type",
-				}
-				shouldPopulateError, errorToPopulate = true, customerrors.InvalidSLO
-			})
-			It("should Throw an error", func() {
-				// Act
-				_, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		Describe("the resource exists but...", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorFinalizers = routemonitorconst.FinalizerList
-				get.CalledTimes = 1
-				deepEqualCalledTimes = 1
-			})
-			JustBeforeEach(func() {
-				routeMonitor.Name = "rmo-name"
-				routeMonitor.Namespace = "rmo-namespace"
-				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
-					Times(1).
-					Return(nil)
-				//Act
-				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp).NotTo(BeNil())
-				Expect(resp).To(Equal(utilreconcile.StopOperation()))
-			})
-			When("deepEqual is true (they are the same)", func() {
-				It("should stop operation", func() {})
-			})
-			When("deepEqual is false (they are different)", func() {
-				BeforeEach(func() {
-					deepEqualResponse = false
-					update.CalledTimes = 1
-				})
-				It("should stop operation", func() {})
-			})
-		})
-
-		When("the resource Exists but not the same as the generated template", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorFinalizers = routemonitorconst.FinalizerList
-				mockClient.EXPECT().Status().Return(mockStatusWriter).Times(1)
-				get.CalledTimes = 1
-
-				deepEqualResponse = false
-				deepEqualCalledTimes = 1
-
-				update.CalledTimes = 1
-			})
-
-			JustBeforeEach(func() {
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).
-					Times(1).
-					Return(nil)
-				routeMonitor.Name = "rmo-name"
-				routeMonitor.Namespace = "rmo-namespace"
-			})
-			It("should call `Get` and `Update` and not call `Create` and stop reconciling", func() {
-				//Act
-				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp).NotTo(BeNil())
-				Expect(resp).To(Equal(utilreconcile.StopOperation()))
-			})
-		})
-
-		When("the EnsurePrometheusRuleResourceExists should pass all checks", func() {
-			BeforeEach(func() {
-				routeMonitorReconcilerClient = mockClient
-				routeMonitorFinalizers = routemonitorconst.FinalizerList
-				get.CalledTimes = 1
-
-				deepEqualResponse = true
-				deepEqualCalledTimes = 1
-			})
-
-			JustBeforeEach(func() {
-				routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{
-					Name:      routeMonitor.Name,
-					Namespace: routeMonitor.Namespace,
-				}
-			})
-
-			It("should continue reconciling", func() {
-				//Act
-				resp, err := routeMonitorReconciler.EnsurePrometheusRuleResourceExists(ctx, routeMonitor)
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(resp).NotTo(BeNil())
-				Expect(resp).To(Equal(utilreconcile.ContinueOperation()))
-			})
-		})
-	})
-
-	Describe("EnsureRouteMonitorAndDependenciesAbsent", func() {
-		BeforeEach(func() {
-			// Arrange
-			routeMonitorReconcilerClient = mockClient
 			shouldDeleteBlackBoxExporterResources.CalledTimes = 1
+
+			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
+				Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).
+				Return(ensureBlackBoxExporterResourcesAbsent.ErrorResponse)
+
+			mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().
+				Times(shouldDeleteBlackBoxExporterResources.CalledTimes).
+				Return(shouldDeleteBlackBoxExporterResourcesResponse, shouldDeleteBlackBoxExporterResources.ErrorResponse)
+
+			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesExist().
+				Times(ensureBlackBoxExporterResourcesExist.CalledTimes).
+				Return(ensureBlackBoxExporterResourcesExist.ErrorResponse)
+
+			mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(gomock.Any()).
+				Times(deleteServiceMonitorDeployment.CalledTimes).
+				Return(deleteServiceMonitorDeployment.ErrorResponse)
+
+			mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(gomock.Any()).
+				Times(deletePrometheusRuleDeployment.CalledTimes).
+				Return(deletePrometheusRuleDeployment.ErrorResponse)
+
+			// act
+			res, err = routeMonitorReconciler.EnsureMonitorAndDependenciesAbsent(routeMonitor)
 		})
 		When("func ShouldDeleteBlackBoxExporterResources fails unexpectedly", func() {
 			BeforeEach(func() {
-				// Arrange
 				shouldDeleteBlackBoxExporterResources.ErrorResponse = consterror.CustomError
 			})
 			It("should bubble up the error", func() {
-				// Act
-				_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
 		Describe("ShouldDeleteBlackBoxExporterResources instructs to delete", func() {
 			BeforeEach(func() {
-				// Arrange
 				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.DeleteBlackBoxExporter
 				ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
-
 			})
-
 			When("func EnsureBlackBoxExporterServiceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					// Arrange
 					ensureBlackBoxExporterResourcesAbsent.ErrorResponse = consterror.CustomError
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
@@ -444,36 +198,27 @@ var _ = Describe("Routemonitor", func() {
 					ensureBlackBoxExporterResourcesAbsent = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
-			When("func EnsureServiceMonitorResourceAbsent fails unexpectedly", func() {
+			When("func deleteServiceMonitorDeployment fails unexpectedly", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
-					ensureServiceMonitorResourceAbsent = helper.CustomErrorHappensOnce()
+					deleteServiceMonitorDeployment = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
-			When("func EnsurePrometheusRuleResourceAbsent fails unexpectedly", func() {
+			When("func DeletePrometheusRuleDeployment fails unexpectedly", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
-					ensureServiceMonitorResourceAbsent.CalledTimes = 1
-					ensurePrometheusRuleResourceAbsent = helper.CustomErrorHappensOnce()
+					deleteServiceMonitorDeployment.CalledTimes = 1
+					deletePrometheusRuleDeployment = helper.CustomErrorHappensOnce()
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
@@ -481,14 +226,12 @@ var _ = Describe("Routemonitor", func() {
 			When("func EnsureFinalizerAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
-					ensureServiceMonitorResourceAbsent.CalledTimes = 1
-					ensurePrometheusRuleResourceAbsent.CalledTimes = 1
-					ensureFinalizerAbsent = helper.CustomErrorHappensOnce()
+					deleteServiceMonitorDeployment.CalledTimes = 1
+					deletePrometheusRuleDeployment.CalledTimes = 1
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
@@ -496,14 +239,13 @@ var _ = Describe("Routemonitor", func() {
 			When("all deletions happened successfully", func() {
 				BeforeEach(func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
-					ensureServiceMonitorResourceAbsent.CalledTimes = 1
-					ensurePrometheusRuleResourceAbsent.CalledTimes = 1
-					ensureFinalizerAbsent.CalledTimes = 1
+					deleteServiceMonitorDeployment.CalledTimes = 1
+					deletePrometheusRuleDeployment.CalledTimes = 1
+					deleteFinalizer.CalledTimes = 1
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any())
 				})
 				It("should reconcile", func() {
-					// Act
-					res, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).NotTo(HaveOccurred())
 					Expect(res).To(Equal(utilreconcile.StopOperation()))
 				})
@@ -511,62 +253,46 @@ var _ = Describe("Routemonitor", func() {
 		})
 		When("ShouldDeleteBlackBoxExporterResources instructs to keep the BlackBoxExporter", func() {
 			BeforeEach(func() {
-				// Arrange
+				shouldDeleteBlackBoxExporterResources.CalledTimes = 1
 				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
-				ensureServiceMonitorResourceAbsent.CalledTimes = 1
-				ensurePrometheusRuleResourceAbsent.CalledTimes = 1
+				deleteServiceMonitorDeployment.CalledTimes = 1
+				deletePrometheusRuleDeployment.CalledTimes = 1
 			})
 			When("func EnsureServiceMonitorResourceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					// Arrange
-					ensureServiceMonitorResourceAbsent.ErrorResponse = consterror.CustomError
-					ensurePrometheusRuleResourceAbsent.CalledTimes = 0
+					deleteServiceMonitorDeployment.ErrorResponse = consterror.CustomError
+					deletePrometheusRuleDeployment.CalledTimes = 0
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
-
 			When("func EnsurePrometheusRuleResourceAbsent fails unexpectedly", func() {
 				BeforeEach(func() {
-					// Arrange
-					ensurePrometheusRuleResourceAbsent.ErrorResponse = consterror.CustomError
+					deletePrometheusRuleDeployment.ErrorResponse = consterror.CustomError
 				})
 				It("should bubble up the error", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
-
 			When("the resource has a finalizer but 'Update' failed", func() {
-				// Arrange
 				BeforeEach(func() {
-					ensureFinalizerAbsent = helper.CustomErrorHappensOnce()
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("Should bubble up the failure", func() {
-					// Act
-					_, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err).To(MatchError(consterror.CustomError))
 				})
 			})
 			When("the resource has a finalizer but 'Update' succeeds", func() {
-				// Arrange
 				BeforeEach(func() {
-					ensureFinalizerAbsent.CalledTimes = 1
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 				})
 				It("Should succeed and call for a requeue", func() {
-					// Act
-					res, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-					// Assert
 					Expect(err).NotTo(HaveOccurred())
 					Expect(res).NotTo(BeNil())
 					Expect(res).To(Equal(utilreconcile.StopOperation()))
@@ -577,17 +303,15 @@ var _ = Describe("Routemonitor", func() {
 					routeMonitorFinalizers = []string{}
 					routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
 					delete.CalledTimes = 1
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(false)
 				})
 				When("no deletion was requested", func() {
 					BeforeEach(func() {
 						routeMonitorDeletionTimestamp = nil
 						delete.CalledTimes = 0
-						ensureFinalizerAbsent.CalledTimes = 1
+						deleteFinalizer.CalledTimes = 1
 					})
 					It("should skip next steps and stop processing", func() {
-						// Act
-						res, err := routeMonitorReconciler.EnsureRouteMonitorAndDependenciesAbsent(ctx, routeMonitor)
-						// Assert
 						Expect(err).NotTo(HaveOccurred())
 						Expect(res).To(Equal(utilreconcile.StopOperation()))
 					})
@@ -595,4 +319,509 @@ var _ = Describe("Routemonitor", func() {
 			})
 		})
 	})
+
+	//--------------------------------------------------------------------------------------
+	// 		GetRouteMonitor
+	//--------------------------------------------------------------------------------------
+	Describe("GetRouteMonitor", func() {
+		f := fuzz.New()
+
+		var (
+			scheme                *runtime.Scheme
+			req                   ctrl.Request
+			routeMonitorName      string
+			routeMonitorNamespace string
+
+			resRouteMonitor v1alpha1.RouteMonitor
+			res             utilreconcile.Result
+			err             error
+		)
+
+		f.Fuzz(&routeMonitorName)
+		f.Fuzz(&routeMonitorNamespace)
+
+		BeforeEach(func() {
+		})
+
+		JustBeforeEach(func() {
+			scheme = constinit.Scheme
+			req = ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "bla", //routeMonitorName,
+					Namespace: "bda", //routeMonitorNamespace,
+				},
+			}
+
+			// Act
+			resRouteMonitor, res, err = routeMonitorReconciler.GetRouteMonitor(req)
+		})
+		When("func Get fails unexpectedly", func() {
+			BeforeEach(func() {
+				get = helper.CustomErrorHappensOnce()
+			})
+			It("should stop requeue", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
+		When("the RouteMonitor is not found", func() {
+			BeforeEach(func() {
+				routeMonitorReconciler.Client = fake.NewFakeClientWithScheme(scheme)
+			})
+			It("should stop requeue", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+				Expect(resRouteMonitor).To(BeZero())
+			})
+		})
+		When("the RouteMonitor is found", func() {
+			BeforeEach(func() {
+				routeMonitorReconciler.Client = fake.NewFakeClientWithScheme(scheme, &routeMonitor)
+			})
+			It("should return the object", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resRouteMonitor).NotTo(BeNil())
+			})
+		})
+	})
+	//--------------------------------------------------------------------------------------
+	// 		GetRoute
+	//--------------------------------------------------------------------------------------
+	Describe("GetRoute", func() {
+
+		f := fuzz.New()
+
+		var (
+			scheme                = constinit.Scheme
+			routeMonitorName      string
+			routeMonitorNamespace string
+			route                 routev1.Route
+
+			res routev1.Route
+			err error
+		)
+
+		// Start Fuzz testing for values
+		f.Fuzz(&routeMonitorName)
+		f.Fuzz(&routeMonitorNamespace)
+
+		BeforeEach(func() {
+			routeMonitor.Spec.Route = v1alpha1.RouteMonitorRouteSpec{
+				Name:      routeMonitorName,
+				Namespace: routeMonitorNamespace,
+			}
+		})
+		JustBeforeEach(func() {
+
+			// Act
+			res, err = routeMonitorReconciler.GetRoute(routeMonitor)
+		})
+		When("the Route is not found", func() {
+			// Arrange
+			BeforeEach(func() {
+				route = routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      routeMonitorName + "-but-different",
+						Namespace: routeMonitorNamespace,
+					},
+				}
+				routeMonitorReconciler.Client = fake.NewFakeClientWithScheme(scheme, &route)
+			})
+			It("should return a Not Found error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+				Expect(res).To(BeZero())
+
+			})
+		})
+		When("the Route is found", func() {
+			BeforeEach(func() {
+				route = routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      routeMonitorName,
+						Namespace: routeMonitorNamespace,
+					},
+				}
+				routeMonitorReconciler.Client = fake.NewFakeClientWithScheme(scheme, &route)
+			})
+			It("should return the route", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).ShouldNot(BeNil())
+			})
+		})
+
+		Describe("Missing a RouteMonitor Field", func() {
+			route = routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      routeMonitorName,
+					Namespace: routeMonitorNamespace,
+				},
+			}
+			When("the RouteMonitor doesnt have Spec.Route.Namespace", func() {
+				BeforeEach(func() {
+					routeMonitor.Spec.Route.Namespace = ""
+				})
+				It("should return a custom error", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
+					Expect(res).To(BeZero())
+				})
+			})
+			When("the RouteMonitor doesnt have Spec.Route.Name", func() {
+				BeforeEach(func() {
+					routeMonitor.Spec.Route.Name = ""
+				})
+				It("should return a custom error", func() {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
+					Expect(res).To(BeZero())
+				})
+			})
+		})
+	})
+	//--------------------------------------------------------------------------------------
+	// 		EnsureRouteURLExists
+	//--------------------------------------------------------------------------------------
+	Describe("EnsureRouteURLExists", func() {
+
+		f := fuzz.New()
+
+		var (
+			route                 routev1.Route
+			expectedRouteMonitor  v1alpha1.RouteMonitor
+			routeMonitorName      string
+			routeMonitorNamespace string
+
+			res       utilreconcile.Result
+			err       error
+			ingresses []string
+		)
+
+		// Start Fuzz testing for values
+		f.Fuzz(&routeMonitorName)
+		f.Fuzz(&routeMonitorNamespace)
+
+		BeforeEach(func() {
+			routeMonitor.Spec.Route = v1alpha1.RouteMonitorRouteSpec{
+				Name:      routeMonitorName,
+				Namespace: routeMonitorNamespace,
+			}
+			expectedRouteMonitor = routeMonitor
+		})
+
+		JustBeforeEach(func() {
+			route = routev1.Route{
+				Status: routev1.RouteStatus{
+					Ingress: ConvertToIngressHosts(ingresses),
+				},
+			}
+
+			//act
+			res, err = routeMonitorReconciler.EnsureRouteURLExists(route, routeMonitor)
+		})
+
+		When("the Route has no Ingresses", func() {
+			// Arrange
+			It("should return No Ingress error", func() {
+				Expect(res).To(Equal(utilreconcile.RequeueOperation()))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(HavePrefix("No Ingress:"))
+			})
+		})
+		When("the Route has no Host", func() {
+			BeforeEach(func() {
+				ingresses = []string{""}
+			})
+			It("should return No Host error", func() {
+				Expect(res).To(Equal(utilreconcile.RequeueOperation()))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(customerrors.NoHost))
+			})
+		})
+
+		When("func Update fails unexpectedly", func() {
+			var (
+				firstRouteURL = "freddy"
+			)
+			BeforeEach(func() {
+				ingresses = []string{
+					firstRouteURL,
+					"eddie",
+				}
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+				routeMonitorReconciler.Client = mockClient
+			})
+			JustBeforeEach(func() {
+				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+			})
+			It("should bubble up the error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.CustomError))
+			})
+		})
+		When("the Route has too many Ingress", func() {
+			var (
+				firstRouteURL = "freddy"
+			)
+			BeforeEach(func() {
+				ingresses = []string{
+					firstRouteURL,
+					"eddie",
+				}
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+			})
+			JustBeforeEach(func() {
+				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+			})
+			It("should update the first ingress", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+		When("the RouteURL is not like the extracted Route", func() {
+			var (
+				firstRouteURL = "freddy"
+			)
+			BeforeEach(func() {
+				ingresses = []string{
+					firstRouteURL,
+				}
+
+				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+			})
+			JustBeforeEach(func() {
+				routeMonitor.Status.RouteURL = firstRouteURL + "but-different"
+				expectedRouteMonitor.Status.RouteURL = firstRouteURL
+
+			})
+			It("should update with the Route information", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+
+		When("the Route has the same RouteURL as the extracted one", func() {
+			BeforeEach(func() {
+				ingresses = []string{
+					"fake-route-url",
+				}
+
+				routeMonitor.Status = v1alpha1.RouteMonitorStatus{
+					RouteURL: "fake-route-url",
+				}
+				routeMonitorReconciler.Client = mockClient
+			})
+			JustBeforeEach(func() {
+				expectedRouteMonitor.Status.RouteURL = "fake-route-url"
+			})
+			It("should skip this operation", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+	})
+	//--------------------------------------------------------------------------------------
+	// 		EnsurePrometheusRuleResourceExists
+	//--------------------------------------------------------------------------------------
+	Describe("EnsurePrometheusRuleResourceExists", func() {
+		var (
+			resp utilreconcile.Result
+			err  error
+		)
+		JustBeforeEach(func() {
+			resp, err = routeMonitorReconciler.EnsurePrometheusRuleExists(routeMonitor)
+		})
+		Describe("The RouteMonitor settings are INVALID", func() {
+			BeforeEach(func() {
+				mockUtils.EXPECT().ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("", customerrors.NoHost).Times(1)
+			})
+			Describe("It sets the Error state in the RouteMonitor the first time", func() {
+				BeforeEach(func() {
+					mockUtils.EXPECT().SetErrorStatus(gomock.Any(), customerrors.NoHost).Return(true)
+				})
+				When("updating the RouteMonitor with the new error State works", func() {
+					BeforeEach(func() {
+						mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+					})
+					It("stops reconcileing", func() {
+						Expect(err).NotTo(HaveOccurred())
+						Expect(resp).To(Equal(utilreconcile.StopOperation()))
+					})
+				})
+				When("updating the RouteMonitor new error State failes", func() {
+					BeforeEach(func() {
+						mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+					})
+					It("requeues with the particular error", func() {
+						Expect(err).To(Equal(consterror.CustomError))
+						Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+					})
+				})
+			})
+
+			Describe("It deletes existing PrometheusRules", func() {
+				BeforeEach(func() {
+					routeMonitor.Status.PrometheusRuleRef = v1alpha1.NamespacedName{Name: "test", Namespace: "test2"}
+					mockUtils.EXPECT().SetErrorStatus(gomock.Any(), customerrors.NoHost).Return(false)
+				})
+				When("the PrometheusRule deletion fails", func() {
+					BeforeEach(func() {
+						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef).Times(1).Return(consterror.CustomError)
+					})
+					It("should reconcile with the particular error", func() {
+						Expect(err).To(Equal(consterror.CustomError))
+						Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+					})
+				})
+				When("the PrometheusRule deletion was successful", func() {
+					BeforeEach(func() {
+						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef).Times(1)
+					})
+					When("updating PrometheusRuleRef in the RouteMonitor fails", func() {
+						BeforeEach(func() {
+							mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+						})
+						It("should reconcile with the particular error", func() {
+							Expect(err).To(Equal(consterror.CustomError))
+							Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+						})
+					})
+					When("updating PrometheusRuleRef in the RouteMonitor was successful", func() {
+						BeforeEach(func() {
+							mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+						})
+						It("stops reconciling", func() {
+							Expect(err).NotTo(HaveOccurred())
+							Expect(resp).To(Equal(utilreconcile.StopOperation()))
+						})
+					})
+				})
+			})
+		})
+		Describe("The RouteMonitor settings are VALID", func() {
+			BeforeEach(func() {
+				mockUtils.EXPECT().ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo).Return("99.5", nil).Times(1)
+				mockUtils.EXPECT().SetErrorStatus(gomock.Any(), nil).Return(false)
+			})
+			When("the update the PrometheusRule failed", func() {
+				BeforeEach(func() {
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Return(consterror.CustomError)
+				})
+				It("requeues with the error", func() {
+					Expect(err).To(Equal(consterror.CustomError))
+					Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+				})
+			})
+			When("the update of the PrometheusRule succeded", func() {
+				BeforeEach(func() {
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any())
+				})
+				When("a new PrometheusRule was created", func() {
+					BeforeEach(func() {
+						mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
+					})
+					When("the ServiceMonitor is updated successfully", func() {
+						BeforeEach(func() {
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+						})
+						It("stops reconciling", func() {
+							Expect(err).NotTo(HaveOccurred())
+							Expect(resp).To(Equal(utilreconcile.StopOperation()))
+						})
+					})
+					When("updating the reference fails", func() {
+						BeforeEach(func() {
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+						})
+						It("requeus with error", func() {
+							Expect(err).To(Equal(consterror.CustomError))
+							Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+						})
+					})
+				})
+			})
+		})
+	})
+	//--------------------------------------------------------------------------------------
+	// 		EnsureServiceMonitorResourceExists
+	//--------------------------------------------------------------------------------------
+	Describe("EnsureServiceMonitorResourceExists", func() {
+		var (
+			resp utilreconcile.Result
+			err  error
+		)
+		JustBeforeEach(func() {
+			resp, err = routeMonitorReconciler.EnsureServiceMonitorExists(routeMonitor)
+		})
+		When("The RouteUrl is not set", func() {
+			BeforeEach(func() {
+				routeMonitor.Status.RouteURL = ""
+			})
+			It("will requeue with the NoHost error ", func() {
+				Expect(err).To(Equal(customerrors.NoHost))
+				Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+			})
+		})
+		Describe("It updates the ServiceMonitor targeting the blackbox Exporter Namespace", func() {
+			BeforeEach(func() {
+				mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
+				mockUtils.EXPECT().GetClusterID().Return("test-cluster-id")
+			})
+			When("the update of the ServiceMonitor fails", func() {
+				BeforeEach(func() {
+					mockServiceMonitor.EXPECT().UpdateServiceMonitorDeployment(gomock.Any()).Return(consterror.CustomError)
+				})
+				It("will requeue with the error", func() {
+					Expect(err).To(Equal(consterror.CustomError))
+					Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+				})
+			})
+			When("the update of the ServiceMonitor is successfull", func() {
+				BeforeEach(func() {
+					mockServiceMonitor.EXPECT().UpdateServiceMonitorDeployment(gomock.Any())
+				})
+				When("the update of the ServiceMonitorRef fails", func() {
+					BeforeEach(func() {
+						mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(false, consterror.CustomError)
+					})
+					It("will requeue with the error", func() {
+						Expect(err).To(Equal(consterror.CustomError))
+						Expect(resp).To(Equal(utilreconcile.RequeueOperation()))
+					})
+				})
+				When("the update of the ServiceMonitorRef is successfull", func() {
+					BeforeEach(func() {
+						mockUtils.EXPECT().SetResourceReference(gomock.Any(), gomock.Any()).Return(true, nil)
+					})
+					When("it updates the RouteMonitor", func() {
+						BeforeEach(func() {
+							mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
+						})
+						It("stops reconciiling", func() {
+							Expect(err).NotTo(HaveOccurred())
+							Expect(resp).To(Equal(utilreconcile.StopOperation()))
+						})
+					})
+				})
+			})
+		})
+	})
 })
+
+//--------------------------------------------------------------------------------------
+// 		Helper Functions
+//--------------------------------------------------------------------------------------
+
+func ConvertToIngressHosts(in []string) []routev1.RouteIngress {
+	res := make([]routev1.RouteIngress, len(in))
+	for i, s := range in {
+		res[i] = routev1.RouteIngress{
+			Host: s,
+		}
+	}
+	return res
+}
