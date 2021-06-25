@@ -34,10 +34,6 @@ import (
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
-const (
-	FinalizerKey string = "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller"
-)
-
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
 type ClusterUrlMonitorReconciler struct {
 	Client client.Client
@@ -66,6 +62,12 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
+
+const (
+	FinalizerKey string = "clusterurlmonitor.routemonitoroperator.monitoring.openshift.io/finalizer"
+	// PrevFinalizerKey is here until migration to new key is done
+	PrevFinalizerKey string = "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller"
+)
 
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=clusterurlmonitors/status,verbs=get;update;patch

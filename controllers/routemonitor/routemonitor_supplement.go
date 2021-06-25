@@ -113,6 +113,8 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")
 	if r.Common.DeleteFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyways
+		r.Common.DeleteFinalizer(&routeMonitor, consts.PrevFinalizerKey)
 		return r.Common.UpdateMonitorResource(&routeMonitor)
 	}
 	return utilreconcile.StopReconcile()
@@ -120,6 +122,8 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 
 func (s *RouteMonitorReconciler) EnsureFinalizerSet(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	if s.Common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyways
+		s.Common.DeleteFinalizer(&routeMonitor, consts.PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&routeMonitor)
 	}
 	return utilreconcile.ContinueReconcile()

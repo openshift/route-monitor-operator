@@ -226,7 +226,7 @@ var _ = Describe("Routemonitor", func() {
 					ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
 					deleteServiceMonitorDeployment.CalledTimes = 1
 					deletePrometheusRuleDeployment.CalledTimes = 1
-					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true).Times(2)
 					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("should bubble up the error", func() {
@@ -240,7 +240,7 @@ var _ = Describe("Routemonitor", func() {
 					deleteServiceMonitorDeployment.CalledTimes = 1
 					deletePrometheusRuleDeployment.CalledTimes = 1
 					deleteFinalizer.CalledTimes = 1
-					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true).Times(2)
 					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any())
 				})
 				It("should reconcile", func() {
@@ -277,7 +277,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the resource has a finalizer but 'Update' failed", func() {
 				BeforeEach(func() {
-					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true).Times(2)
 					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
 				})
 				It("Should bubble up the failure", func() {
@@ -287,7 +287,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the resource has a finalizer but 'Update' succeeds", func() {
 				BeforeEach(func() {
-					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true)
+					mockUtils.EXPECT().DeleteFinalizer(gomock.Any(), gomock.Any()).Return(true).Times(2)
 					mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Return(utilreconcile.StopOperation(), nil)
 				})
 				It("Should succeed and call for a requeue", func() {

@@ -110,6 +110,8 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 	}
 
 	if s.Common.DeleteFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyways
+		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
 	}
 
@@ -118,6 +120,8 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 
 func (s *ClusterUrlMonitorReconciler) EnsureFinalizerSet(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
 	if s.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyways
+		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()

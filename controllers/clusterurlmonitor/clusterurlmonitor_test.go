@@ -184,7 +184,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				BeforeEach(func() {
 					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef).Times(1)
-					mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller").Times(1).Return(true)
+					gomock.InOrder(
+						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, FinalizerKey).Times(1).Return(true),
+						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey).Times(1),
+					)
 					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
 
 				})
