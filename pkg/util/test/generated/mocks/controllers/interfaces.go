@@ -11,9 +11,9 @@ import (
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v10 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	reflect "reflect"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MockMonitorResourceHandler is a mock of MonitorResourceHandler interface
@@ -84,7 +84,7 @@ func (mr *MockMonitorResourceHandlerMockRecorder) SetResourceReference(reference
 }
 
 // UpdateMonitorResource mocks base method
-func (m *MockMonitorResourceHandler) UpdateMonitorResource(cr runtime.Object) (reconcile.Result, error) {
+func (m *MockMonitorResourceHandler) UpdateMonitorResource(cr client.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateMonitorResource", cr)
 	ret0, _ := ret[0].(reconcile.Result)
@@ -99,7 +99,7 @@ func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResource(cr inter
 }
 
 // UpdateMonitorResourceStatus mocks base method
-func (m *MockMonitorResourceHandler) UpdateMonitorResourceStatus(cr runtime.Object) (reconcile.Result, error) {
+func (m *MockMonitorResourceHandler) UpdateMonitorResourceStatus(cr client.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateMonitorResourceStatus", cr)
 	ret0, _ := ret[0].(reconcile.Result)

@@ -3,13 +3,21 @@ layout: go.kubebuilder.io/v2
 repo: github.com/openshift/route-monitor-operator
 projectName: route-monitor-operator
 resources:
-- group: monitoring
+-
+  controller: true
+  domain: openshift.io
+  group: monitoring
   kind: RouteMonitor
+  path: github.com/openshift/route-monitor-operator/api/v1alpha1
   version: v1alpha1
-- group: monitoring
+-
+  controller: true
+  domain: openshift.io
+  group: monitoring
   kind: ClusterUrlMonitor
+  path: github.com/openshift/route-monitor-operator/api/v1alpha1
   version: v1alpha1
-version: 3-alpha
+version: "3"
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}

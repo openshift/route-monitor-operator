@@ -14,9 +14,11 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
@@ -325,6 +327,7 @@ var _ = Describe("Routemonitor", func() {
 		f := fuzz.New()
 
 		var (
+			scheme                *runtime.Scheme
 			req                   ctrl.Request
 			routeMonitorName      string
 			routeMonitorNamespace string
@@ -341,6 +344,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 
 		JustBeforeEach(func() {
+			scheme = constinit.Scheme
 			req = ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      "bla", //routeMonitorName,
@@ -362,8 +366,8 @@ var _ = Describe("Routemonitor", func() {
 		})
 		When("the RouteMonitor is not found", func() {
 			BeforeEach(func() {
-				get.CalledTimes = 1
-				get.ErrorResponse = consterror.NotFoundErr
+				routeMonitorReconciler.Client = fake.NewClientBuilder().WithScheme(scheme).Build()
+
 			})
 			It("should stop requeue", func() {
 				Expect(err).NotTo(HaveOccurred())
@@ -373,7 +377,8 @@ var _ = Describe("Routemonitor", func() {
 		})
 		When("the RouteMonitor is found", func() {
 			BeforeEach(func() {
-				get.CalledTimes = 1
+				routeMonitorReconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(&routeMonitor).
+					Build()
 			})
 			It("should return the object", func() {
 				Expect(err).NotTo(HaveOccurred())
@@ -386,21 +391,31 @@ var _ = Describe("Routemonitor", func() {
 	//--------------------------------------------------------------------------------------
 	Describe("GetRoute", func() {
 
+		f := fuzz.New()
+
 		var (
-			res routev1.Route
-			err error
+			scheme                *runtime.Scheme
+			routeMonitorName      string
+			routeMonitorNamespace string
+
+			route routev1.Route
+			res   routev1.Route
+			err   error
 		)
+
+		// Start Fuzz testing for values
+		f.Fuzz(&routeMonitorName)
+		f.Fuzz(&routeMonitorNamespace)
 
 		BeforeEach(func() {
 			routeMonitor.Spec.Route = v1alpha1.RouteMonitorRouteSpec{
 				Name:      "fake",
 				Namespace: "fake-namespace",
 			}
+			scheme = constinit.Scheme
 		})
 		JustBeforeEach(func() {
 
-			// Act
-			res, err = routeMonitorReconciler.GetRoute(routeMonitor)
 		})
 		When("the Route is not found", func() {
 			// Arrange
@@ -409,6 +424,9 @@ var _ = Describe("Routemonitor", func() {
 				get.ErrorResponse = consterror.NotFoundErr
 			})
 			It("should return a Not Found error", func() {
+				// Act
+				res, err = routeMonitorReconciler.GetRoute(routeMonitor)
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(k8serrors.IsNotFound(err)).To(BeTrue())
 				Expect(res).To(BeZero())
@@ -417,20 +435,39 @@ var _ = Describe("Routemonitor", func() {
 		})
 		When("the Route is found", func() {
 			BeforeEach(func() {
-				get.CalledTimes = 1
+				route = routev1.Route{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "fake",
+						Namespace: "fake-namespace",
+					},
+				}
+
+				routeMonitorReconciler.Client = fake.NewClientBuilder().WithScheme(scheme).WithObjects(&route).Build()
 			})
 			It("should return the route", func() {
+				// Act
+				res, err = routeMonitorReconciler.GetRoute(routeMonitor)
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).ShouldNot(BeNil())
 			})
 		})
 
 		Describe("Missing a RouteMonitor Field", func() {
+			route = routev1.Route{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      routeMonitorName,
+					Namespace: routeMonitorNamespace,
+				},
+			}
 			When("the RouteMonitor doesnt have Spec.Route.Namespace", func() {
 				BeforeEach(func() {
 					routeMonitor.Spec.Route.Namespace = ""
 				})
 				It("should return a custom error", func() {
+					// Act
+					res, err = routeMonitorReconciler.GetRoute(routeMonitor)
+					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
 					Expect(res).To(BeZero())
@@ -441,6 +478,9 @@ var _ = Describe("Routemonitor", func() {
 					routeMonitor.Spec.Route.Name = ""
 				})
 				It("should return a custom error", func() {
+					// Act
+					res, err = routeMonitorReconciler.GetRoute(routeMonitor)
+					// Assert
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(HavePrefix("Invalid CR:"))
 					Expect(res).To(BeZero())
