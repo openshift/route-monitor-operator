@@ -43,6 +43,7 @@ github.com/google/gofuzz/bytesource
 # github.com/google/uuid v1.1.2
 github.com/google/uuid
 # github.com/googleapis/gnostic v0.5.5
+## explicit
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
 github.com/googleapis/gnostic/jsonschema
