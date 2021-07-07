@@ -40,7 +40,7 @@ all: manager
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
 
 # Run tests
-test: generate fmt vet manifests 
+test: generate fmt vet
 	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
@@ -48,11 +48,11 @@ manager: generate fmt vet
 	go build -o bin/manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+run: generate fmt vet
 	go run ./main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run-verbose: generate fmt vet manifests
+run-verbose: generate fmt vet
 	go run ./main.go --zap-log-level=5
 
 # Install CRDs into a cluster
@@ -91,7 +91,7 @@ vet:
 	go vet ./...
 
 # Generate code
-generate: mockgen controller-gen
+generate: mockgen controller-gen manifests
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 test-integration:
