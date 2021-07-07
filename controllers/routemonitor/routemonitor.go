@@ -70,7 +70,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	r.Ctx = context.Background()
