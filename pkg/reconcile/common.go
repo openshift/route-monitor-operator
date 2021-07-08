@@ -12,7 +12,6 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -124,7 +123,7 @@ func (u *MonitorResourceCommon) SetFinalizer(o v1.Object, finalizerKey string) b
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR in reconcile loops
-func (u *MonitorResourceCommon) UpdateMonitorResource(cr runtime.Object) (reconcile.Result, error) {
+func (u *MonitorResourceCommon) UpdateMonitorResource(cr client.Object) (reconcile.Result, error) {
 	if err := u.Client.Update(u.Ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
@@ -133,7 +132,7 @@ func (u *MonitorResourceCommon) UpdateMonitorResource(cr runtime.Object) (reconc
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR Status in reconcile loops
-func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr runtime.Object) (reconcile.Result, error) {
+func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr client.Object) (reconcile.Result, error) {
 	if err := u.Client.Status().Update(u.Ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}

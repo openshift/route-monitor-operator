@@ -27,8 +27,9 @@ import (
 
 type Integration struct {
 	Client     client.Client
-	clientChan chan struct{}
+	ctx        context.Context
 	mgr        manager.Manager
+	cancelFunc context.CancelFunc
 }
 
 func NewIntegration() (*Integration, error) {
@@ -48,13 +49,14 @@ func NewIntegration() (*Integration, error) {
 		return &Integration{}, err
 	}
 	client := mgr.GetClient()
-	i := Integration{client, make(chan struct{}), mgr}
-	go func(x chan struct{}) {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	i := Integration{client, ctx, mgr, cancelFunc}
+	go func(x context.Context) {
 		err := mgr.GetCache().Start(x)
 		if err != nil {
 			panic(err)
 		}
-	}(i.clientChan)
+	}(i.ctx)
 
 	// Wait for cache to start. Is there a better way?
 	time.Sleep(2 * time.Second)
@@ -62,7 +64,7 @@ func NewIntegration() (*Integration, error) {
 }
 
 func (i *Integration) Shutdown() {
-	close(i.clientChan)
+	i.cancelFunc()
 }
 
 func (i *Integration) RemoveClusterUrlMonitor(namespace, name string) error {

@@ -1,4 +1,13 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+    app: route-monitor-operator
+    component: operator
+  name: openshift-route-monitor-operator
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: system
@@ -27,6 +36,8 @@ spec:
         app: route-monitor-operator
         component: operator
     spec:
+      securityContext:
+        runAsNonRoot: true
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -44,7 +55,7 @@ spec:
         - /manager
         args:
         - --metrics-addr=127.0.0.1:8080
-        - --enable-leader-election
+        - --leader-elect
         - --zap-log-level=$(LOG_LEVEL)
         - --blackbox-image=$(BLACKBOX_IMAGE)
         - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
@@ -62,6 +73,20 @@ spec:
               fieldPath: metadata.namespace
         image: controller:latest
         name: manager
+        securityContext:
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
           limits:
             cpu: 100m

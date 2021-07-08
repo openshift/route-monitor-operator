@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	. "github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
+	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -23,7 +23,7 @@ import (
 var _ = Describe("Clusterurlmonitor", func() {
 	var (
 		clusterUrlMonitor    v1alpha1.ClusterUrlMonitor
-		reconciler           ClusterUrlMonitorReconciler
+		reconciler           clusterurlmonitor.ClusterUrlMonitorReconciler
 		mockClient           *clientmocks.MockClient
 		mockBlackBoxExporter *controllermocks.MockBlackBoxExporterHandler
 		mockCommon           *controllermocks.MockMonitorResourceHandler
@@ -59,7 +59,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor.Spec.Prefix = prefix
 		clusterUrlMonitor.Spec.Suffix = suffix
 		clusterUrlMonitor.Spec.Port = port
-		reconciler = ClusterUrlMonitorReconciler{
+		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
 			Log:              constinit.Logger,
 			Client:           mockClient,
 			Scheme:           constinit.Scheme,
@@ -164,7 +164,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			err error
 		)
 		BeforeEach(func() {
-			clusterUrlMonitor.Finalizers = []string{FinalizerKey}
+			clusterUrlMonitor.Finalizers = []string{clusterurlmonitor.FinalizerKey}
 		})
 		JustBeforeEach(func() {
 			res, err = reconciler.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
@@ -184,7 +184,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				BeforeEach(func() {
 					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef).Times(1)
-					mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, "clusterurlmonitor.monitoring.openshift.io/clusterurlmonitorcontroller").Times(1).Return(true)
+					gomock.InOrder(
+						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.FinalizerKey).Times(1).Return(true),
+						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.PrevFinalizerKey).Times(1),
+					)
 					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
 
 				})

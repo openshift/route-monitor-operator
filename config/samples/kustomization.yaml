@@ -2,3 +2,4 @@
 resources:
 - monitoring_v1alpha1_clusterurlmonitor.yaml
 - monitoring_v1alpha1_routemonitor.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples
