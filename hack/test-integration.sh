@@ -6,6 +6,7 @@ export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
 export NAMESPACE=${NAMESPACE:-openshift-route-monitor-operator}
 export IMAGE_NAME=route-monitor-operator
 export KUBECTL=oc
+export SKIP_CLEANUP=1
 
 
 function parseArgs {
@@ -110,7 +111,7 @@ function printOperatorLogs {
 
 function runTests {
   echo -e "\n\nRUNNING INTEGRATION TESTS\n\n"
-	if go test ./int -count=1; then
+  if go test ./int -count=1; then
     echo -e "\n\nINTEGRATION TEST SUCCESSFUL!\n\n"
     return 0
   fi
