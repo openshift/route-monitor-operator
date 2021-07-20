@@ -80,19 +80,6 @@ run code coverage analysis per [this SOP](https://github.com/openshift/ops-sop/b
   this is copied into the repository root, because that's
   [where codecov.io expects it](https://docs.codecov.io/docs/codecov-yaml#can-i-name-the-file-codecovyml).
 
-- A `make` target to [request the secret mapping in openshift/release](https://github.com/openshift/ops-sop/blob/be43125239deb1f2bbc1ef54f010410e97ff6146/services/codecov.md#openshiftrelease-pr-1---secret-mapping):
-
-```shell
-$ make codecov-secret-mapping
-```
-
-If you already have the openshift/release repository cloned locally, you
-may specify its path via `$RELEASE_CLONE`:
-
-```shell
-$ make RELEASE_CLONE=/home/me/github/openshift/release codecov-secret-mapping
-```
-
 ## Linting and other static analysis with `golangci-lint`
 
 - A `go-check` `make` target, which
