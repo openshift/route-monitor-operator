@@ -77,9 +77,12 @@ const (
 
 func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Ctx = ctx
+	log := r.Log.WithName("Reconcile").WithValues("name", req.Name, "namespace", req.Namespace)
 
+	log.V(2).Info("Entering GetClusterUrlMonitor")
 	clusterUrlMonitor, res, err := r.GetClusterUrlMonitor(req)
 	if err != nil {
+		log.Error(err, "Failed to retreive ClusterUrlMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
@@ -88,38 +91,55 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	res, err = r.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
 	if err != nil {
+		log.Error(err, "Failed to delete ClusterUrlMontior. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
+		log.Info("Successfully deleted ClusterUrlMonitor. Finished Reconcile")
 		return utilreconcile.Stop()
 	}
 
+	log.V(2).Info("Entering EnsureFinalizerSet")
 	res, err = r.EnsureFinalizerSet(clusterUrlMonitor)
 	if err != nil {
+		log.Error(err, "Failed to set ClusterUrlMonitor's Finalizer. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
+		log.Info("Successfully set ClusterUrlMonitor finalizers. Stopping...")
 		return utilreconcile.Stop()
 	}
 
+	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
+		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 
+	log.V(2).Info("Entering EnsureServiceMonitorExists")
 	res, err = r.EnsureServiceMonitorExists(clusterUrlMonitor)
 	if err != nil {
+		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
+		log.Info("Successfully patched ClusterUrlMonitor with ServiceMonitorRef. Stopping...")
 		return utilreconcile.Stop()
 	}
 
+	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
 	res, err = r.EnsurePrometheusRuleExists(clusterUrlMonitor)
 	if err != nil {
+		log.Error(err, "Failed to set PrometheusRule. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
+	if res.ShouldStop() {
+		log.Info("Successfully patched ClusterUrlMonitor with PrometheusRuleRef. Stopping...")
+		return utilreconcile.Stop()
+	}
 
+	log.Info("All operations for ClusterUrlMonitor completed. Finished Reconcile.")
 	return utilreconcile.Stop()
 }
 

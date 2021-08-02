@@ -6,7 +6,6 @@ export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
 export NAMESPACE=${NAMESPACE:-openshift-route-monitor-operator}
 export IMAGE_NAME=route-monitor-operator
 export KUBECTL=oc
-export SKIP_CLEANUP=1
 
 
 function parseArgs {
@@ -32,6 +31,11 @@ function parseArgs {
          usage; break;;
     esac
   done
+  echo "SKIP_BUILD=${SKIP_BUILD}"
+  echo "SKIP_CLEANUP=${SKIP_CLEANUP}"
+  echo "KUBECONFIG=${KUBECONFIG}"
+  echo "NAMESPACE=${NAMESPACE}"
+  echo "IMAGE_NAME=${IMAGE_NAME}"
 }
 
 function usage {
@@ -103,9 +107,9 @@ function printOperatorLogs {
 		return
 	fi
 	podName=$(oc -n "$NAMESPACE" get po -lapp="route-monitor-operator" -ojsonpath='{.items[0].metadata.name}')
-	echo "status of the pod"
-	oc -n "$NAMESPACE" get po "$podName" -ojsonpath='{.status}'
-	echo "pod logs"
+	echo -e "\nstatus of the pod\n"
+	oc -n "$NAMESPACE" get po "$podName" -ojsonpath='{.status}' | jq
+	echo -e "\npod logs\n"
 	oc -n "$NAMESPACE" logs "$podName"
 }
 
@@ -125,15 +129,18 @@ function cleanup {
   echo -e "\n\nCLEANING UP\n\n"
   oc delete namespace "$NAMESPACE" || true
   if [[ -d config.bak ]]; then
-    rsync -v config{.bak/*,}
-    rm -r config.bak
+    rm -rf config
+    mv config{.bak,}
   fi
 }
 
 parseArgs "$@"
 
-if [[ -z $SKIP_CLEANUP ]]; then
+
+if [[ -z $SKIP_CLEANUP ]]; then  
   trap cleanup EXIT
+else
+  trap printOperatorLogs EXIT
 fi
 
 if [[ -z $SKIP_BUILD ]]; then
@@ -148,5 +155,3 @@ waitForDeployment
 if [[ -z $SKIP_TEST ]]; then
   runTests
 fi
-
-printOperatorLogs
