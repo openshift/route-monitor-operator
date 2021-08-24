@@ -100,57 +100,40 @@ generate: mockgen controller-gen manifests
 test-integration:
 	hack/test-integration.sh
 
-
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
+CONTROLLER_GEN_FILE = $(shell pwd)/bin/controller-gen
+controller-gen: ## Download controller-gen locally if necessary.
+ifeq ($(origin CONTROLLER_GEN), undefined)
+	$(call go-get-tool,$(CONTROLLER_GEN_FILE),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+CONTROLLER_GEN := $(CONTROLLER_GEN_FILE)
+endif
+MOCKGEN_FILE = $(shell pwd)/bin/mockgen
+mockgen: ## Download kustomize locally if necessary.
+ifeq ($(origin MOCKGEN), undefined)
+	$(call go-get-tool,$(MOCKGEN_FILE),github.com/golang/mock/mockgen@v1.4.4)
+MOCKGEN := $(MOCKGEN_FILE)
 endif
 
-mockgen:
-ifeq (, $(shell which mockgen))
-	@{ \
-	set -e ;\
-	MOCKGEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$MOCKGEN_TMP_DIR ;\
-	go mod init tmp ;\
-	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4 ;\
-	rm -rf $$MOCKGEN_TMP_DIR ;\
-	}
-MOCKGEN=$(GOBIN)/mockgen
-else
-MOCKGEN=$(shell which mockgen)
+KUSTOMIZE_FILE = $(shell pwd)/bin/kustomize
+kustomize: ## Download kustomize locally if necessary.
+ifeq ($(origin KUSTOMIZE), undefined)
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+KUSTOMIZE := $(KUSTOMIZE_FILE)
 endif
 
-kustomize:
-ifndef KUSTOMIZE
-ifeq (, $(shell which kustomize))
-	@{ \
-	set -e ;\
-	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/kustomize/kustomize/v3@v3.8.8 ;\
-	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
-	}
-KUSTOMIZE=$(GOBIN)/kustomize
-else
-KUSTOMIZE=$(shell which kustomize)
-endif
-endif
-
-
+# go-get-tool will 'go get' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath Makefile))
+define go-get-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+echo "installed at $(GOBIN)" ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
 # from https://sdk.operatorframework.io/docs/upgrading-sdk-version/v1.6.1/#gov2-gov3-ansiblev1-helmv1-add-opm-and-catalog-build-makefile-targets
 OS = $(shell go env GOOS)
 ARCH = $(shell go env GOARCH)
@@ -187,9 +170,9 @@ GIT_ROOT?=$(shell git rev-parse --show-toplevel 2>&1)
 export SELECTOR_SYNC_SET_DESTINATION?=${GIT_ROOT}/hack/olm-registry/olm-artifacts-template.yaml
 
 add-kustomize-data: kustomize
-	    rm -rf $(YAML_DIRECTORY)
-	    mkdir $(YAML_DIRECTORY)
-	    $(KUSTOMIZE) build config/olm/ > $(YAML_DIRECTORY)/00_olm-resources_generated.yaml
+	rm -rf $(YAML_DIRECTORY)
+	mkdir $(YAML_DIRECTORY)
+	$(KUSTOMIZE) build config/olm/ > $(YAML_DIRECTORY)/00_olm-resources_generated.yaml
 
 .PHONY: generate-syncset
 generate-syncset: kustomize add-kustomize-data
