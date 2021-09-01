@@ -1,16 +1,16 @@
 maintainers:
-- RiRa12621
+- NautiluX
 approvers:
-- RiRa12621
 - NautiluX
 - georgettica
 - rafael-azevedo
 - sulmer-redhat
 reviewers:
-- RiRa12621
 - NautiluX
 - georgettica
 - rafael-azevedo
 - sulmer-redhat
 - ramonbutter
 - Tessg22
+emeritus_approvers:
+- RiRa12621
