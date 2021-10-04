@@ -43,16 +43,16 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 	if err := b.Client.List(b.Ctx, routeMonitors); err != nil {
 		return blackboxexporter.KeepBlackBoxExporter, err
 	}
-	for _, routeMonitor := range routeMonitors.Items {
-		objectsDependingOnExporter = append(objectsDependingOnExporter, &routeMonitor)
+	for i := range routeMonitors.Items {
+		objectsDependingOnExporter = append(objectsDependingOnExporter, &routeMonitors.Items[i])
 	}
 
 	clusterUrlMonitors := &v1alpha1.ClusterUrlMonitorList{}
 	if err := b.Client.List(b.Ctx, clusterUrlMonitors); err != nil {
 		return blackboxexporter.KeepBlackBoxExporter, err
 	}
-	for _, clusterUrlMonitor := range clusterUrlMonitors.Items {
-		objectsDependingOnExporter = append(objectsDependingOnExporter, &clusterUrlMonitor)
+	for i := range clusterUrlMonitors.Items {
+		objectsDependingOnExporter = append(objectsDependingOnExporter, &clusterUrlMonitors.Items[i])
 	}
 	b.Log.V(4).Info("Number of objects depending on BlackBoxExporter:", "amountOfObjects", len(objectsDependingOnExporter))
 
