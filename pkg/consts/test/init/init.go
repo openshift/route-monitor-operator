@@ -2,7 +2,8 @@ package init
 
 import (
 	"context"
-	"github.com/go-logr/logr/testing"
+
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -14,7 +15,7 @@ import (
 
 var (
 	Context = context.TODO()
-	Logger  = testing.NullLogger{}
+	Logger  = logr.DiscardLogger{}
 	Scheme  = setScheme(runtime.NewScheme())
 )
 

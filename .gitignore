@@ -42,3 +42,5 @@ saas-route-monitor-operator-bundle/
 
 # Local Dev ENVS
 .vscode/
+
+bin

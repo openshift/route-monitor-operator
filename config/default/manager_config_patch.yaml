@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: openshift-route-monitor-operator
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --zap-log-level=debug
+            - --blackbox-image=$(BLACKBOX_IMAGE)
+            - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
+            - --config=controller_manager_config.yaml
+          volumeMounts:
+            - name: manager-config
+              mountPath: /controller_manager_config.yaml
+              subPath: controller_manager_config.yaml
+      volumes:
+        - name: manager-config
+          configMap:
+            name: manager-config

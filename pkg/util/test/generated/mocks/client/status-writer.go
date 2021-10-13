@@ -7,7 +7,6 @@ package client
 import (
 	context "context"
 	gomock "github.com/golang/mock/gomock"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	reflect "reflect"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -36,7 +35,7 @@ func (m *MockStatusWriter) EXPECT() *MockStatusWriterMockRecorder {
 }
 
 // Patch mocks base method
-func (m *MockStatusWriter) Patch(arg0 context.Context, arg1 runtime.Object, arg2 client.Patch, arg3 ...client.PatchOption) error {
+func (m *MockStatusWriter) Patch(arg0 context.Context, arg1 client.Object, arg2 client.Patch, arg3 ...client.PatchOption) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1, arg2}
 	for _, a := range arg3 {
@@ -55,7 +54,7 @@ func (mr *MockStatusWriterMockRecorder) Patch(arg0, arg1, arg2 interface{}, arg3
 }
 
 // Update mocks base method
-func (m *MockStatusWriter) Update(arg0 context.Context, arg1 runtime.Object, arg2 ...client.UpdateOption) error {
+func (m *MockStatusWriter) Update(arg0 context.Context, arg1 client.Object, arg2 ...client.UpdateOption) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {

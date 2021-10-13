@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: route-monitor-operator-system
-  namespace: openshift-monitoring
+  namespace: openshift-route-monitor-operator

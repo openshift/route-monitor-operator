@@ -7,8 +7,8 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 //go:generate mockgen -source $GOFILE -destination ../pkg/util/test/generated/mocks/$GOPACKAGE/interfaces.go -package $GOPACKAGE
@@ -32,11 +32,11 @@ type MonitorResourceHandler interface {
 
 	// UpdateMonitorResource updates the Spec of the ClusterURLMonitor & RouteMonitor CR
 	// Should be called after object that triggered reconcile loop has been changed
-	UpdateMonitorResource(cr runtime.Object) (utilreconcile.Result, error)
+	UpdateMonitorResource(cr client.Object) (utilreconcile.Result, error)
 
 	// UpdateMonitorResourceStatus updates the State Field of the ClusterURLMonitor & RouteMonitor
 	// Should be called after object that triggered reconcile loop has been changed
-	UpdateMonitorResourceStatus(cr runtime.Object) (utilreconcile.Result, error)
+	UpdateMonitorResourceStatus(cr client.Object) (utilreconcile.Result, error)
 
 	// SetFinalizer adds finalizerKey to an object
 	SetFinalizer(o v1.Object, finalizerKey string) bool
