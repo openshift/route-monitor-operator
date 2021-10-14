@@ -14,7 +14,7 @@ RUN ~/go/bin/kustomize version
 FROM quay.io/operator-framework/operator-sdk:v1.13.1
 
 # We need git to clone our repo
-RUN microdnf install -y git
+RUN microdnf install -y git gcc
 # Clean up after install
 RUN rm -rf /.cache
 # Copy kustomize binary from builder 
