@@ -77,7 +77,7 @@ func main() {
 	var blackboxExporterImage string
 	var blackboxExporterNamespace string
 
-	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/app-sre/prom-blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
+	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", "openshift-route-monitor-operator", "Blackbox-exporter deployment will reside on this Namespace")
 
 	opts := zap.Options{}
