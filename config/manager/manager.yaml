@@ -66,7 +66,7 @@ spec:
         - name: BLACKBOX_IMAGE
           # override so you can pull any blackbox-exporter image you fancy
           # this value is the default value
-          value: "quay.io/app-sre/prom-blackbox-exporter:master"
+          value: "quay.io/prometheus/blackbox-exporter:master"
         - name: BLACKBOX_NAMESPACE
           valueFrom:
             fieldRef:
