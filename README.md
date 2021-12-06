@@ -21,7 +21,7 @@ openshift-route-monitor-operator creates `ServiceMonitors` based on the defined 
 
 The operator watches all namespaces for `routeMonitors`.
 They are used to define what route to probe.
-`RouteMonitors` are namespace scoped and need to exist in the same namespaces as the `Route` they're used for.
+`RouteMonitors` are namespace scoped and can reference `Routes` from other namespaces.
 
 ### ClusterUrlMonitors
 
