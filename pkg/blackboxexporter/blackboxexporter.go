@@ -3,6 +3,7 @@ package blackboxexporter
 import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 
 	"context"
@@ -21,15 +22,23 @@ import (
 
 type BlackBoxExporter struct {
 	Client         client.Client
-	Log            logr.Logger
+	Comparer       util.ResourceComparerInterface
 	Ctx            context.Context
 	Image          string
+	Log            logr.Logger
 	NamespacedName types.NamespacedName
 }
 
 func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
 	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
-	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName}
+	return &BlackBoxExporter{
+		Client:         client,
+		Comparer:       &util.ResourceComparer{},
+		Ctx:            ctx,
+		Image:          blackBoxImage,
+		Log:            log,
+		NamespacedName: blackboxNamespacedName,
+	}
 }
 
 func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
@@ -80,11 +89,17 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 		// populate the resource with the template
 		resource := populationFunc()
 		// and create it
-		err = b.Client.Create(b.Ctx, &resource)
-		if err != nil {
-			return err
-		}
+		return b.Client.Create(b.Ctx, &resource)
 	}
+
+	template := populationFunc()
+	if !b.Comparer.DeepEqual(resource.Spec, template.Spec) {
+		// template differs from resource, update to reconcile
+		b.Log.Info("the spec of the resource", "resource.Spec", resource.Spec)
+		resource.Spec = template.Spec
+		return b.Client.Update(b.Ctx, &resource)
+	}
+
 	return nil
 }
 

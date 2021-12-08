@@ -5,34 +5,35 @@
 package reconcileCommon
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
-// MockResourceComparerInterface is a mock of ResourceComparerInterface interface
+// MockResourceComparerInterface is a mock of ResourceComparerInterface interface.
 type MockResourceComparerInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockResourceComparerInterfaceMockRecorder
 }
 
-// MockResourceComparerInterfaceMockRecorder is the mock recorder for MockResourceComparerInterface
+// MockResourceComparerInterfaceMockRecorder is the mock recorder for MockResourceComparerInterface.
 type MockResourceComparerInterfaceMockRecorder struct {
 	mock *MockResourceComparerInterface
 }
 
-// NewMockResourceComparerInterface creates a new mock instance
+// NewMockResourceComparerInterface creates a new mock instance.
 func NewMockResourceComparerInterface(ctrl *gomock.Controller) *MockResourceComparerInterface {
 	mock := &MockResourceComparerInterface{ctrl: ctrl}
 	mock.recorder = &MockResourceComparerInterfaceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockResourceComparerInterface) EXPECT() *MockResourceComparerInterfaceMockRecorder {
 	return m.recorder
 }
 
-// DeepEqual mocks base method
+// DeepEqual mocks base method.
 func (m *MockResourceComparerInterface) DeepEqual(x, y interface{}) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeepEqual", x, y)
@@ -40,7 +41,7 @@ func (m *MockResourceComparerInterface) DeepEqual(x, y interface{}) bool {
 	return ret0
 }
 
-// DeepEqual indicates an expected call of DeepEqual
+// DeepEqual indicates an expected call of DeepEqual.
 func (mr *MockResourceComparerInterfaceMockRecorder) DeepEqual(x, y interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeepEqual", reflect.TypeOf((*MockResourceComparerInterface)(nil).DeepEqual), x, y)

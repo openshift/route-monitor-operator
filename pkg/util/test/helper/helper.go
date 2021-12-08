@@ -42,3 +42,8 @@ func CustomErrorHappensOnce() MockHelper {
 		ErrorResponse: consterror.CustomError,
 	}
 }
+
+type ResourceComparerMockHelper struct {
+	CalledTimes int
+	ReturnValue bool
+}

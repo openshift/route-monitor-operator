@@ -2,6 +2,7 @@ package int_test
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -449,5 +450,35 @@ var _ = Describe("Integrationtests", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
+
+		When("blackboxexporter self heal", func() {
+			BeforeEach(func() {
+				err := i.Client.Create(context.TODO(), &routeMonitor)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForServiceMonitor(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err = i.WaitForPrometheusRule(expectedDependentResource, 20)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("removes the corresponding PrometheusRule", func() {
+				deploy, err := i.WaitForDeployment(types.NamespacedName{Name: "blackbox-exporter", Namespace: routeMonitorNamespace}, 20)
+				Expect(err).NotTo(HaveOccurred())
+				var replicas int32 = 2
+				deploy.Spec.Replicas = &replicas
+				err = i.Client.Update(context.TODO(), &deploy)
+				Expect(err).NotTo(HaveOccurred())
+
+				time.Sleep(time.Second * 5)
+
+				deploy, err = i.WaitForDeployment(types.NamespacedName{Name: "blackbox-exporter", Namespace: routeMonitorNamespace}, 20)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(deploy.Spec.Replicas).To(Equal(1))
+
+			})
+		})
+
 	})
 })

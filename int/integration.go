@@ -9,8 +9,8 @@ import (
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/openshift/route-monitor-operator/pkg/alert"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/pkg/alert"
 )
 
 type Integration struct {
@@ -141,6 +142,22 @@ func (i *Integration) WaitForServiceMonitor(name types.NamespacedName, seconds i
 		return serviceMonitor, fmt.Errorf("ServiceMonitor didn't appear after %d seconds", seconds)
 	}
 	return serviceMonitor, nil
+}
+
+func (i *Integration) WaitForDeployment(name types.NamespacedName, seconds int) (appsv1.Deployment, error) {
+	resource := appsv1.Deployment{}
+	t := 0
+	for ; t < seconds; t++ {
+		err := i.Client.Get(context.TODO(), name, &resource)
+		if !errors.IsNotFound(err) {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if t == seconds {
+		return resource, fmt.Errorf("WaitForDeployment: resource didn't appear after %d seconds", seconds)
+	}
+	return resource, nil
 }
 
 func (i *Integration) WaitForPrometheusRule(name types.NamespacedName, seconds int) (monitoringv1.PrometheusRule, error) {

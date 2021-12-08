@@ -100,20 +100,22 @@ generate: mockgen controller-gen manifests
 test-integration:
 	hack/test-integration.sh
 
-CONTROLLER_GEN_FILE = $(shell pwd)/bin/controller-gen
+BINARIES_DIR=$(shell pwd)/bin
+
+CONTROLLER_GEN_FILE = $(BINARIES_DIR)/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq ($(origin CONTROLLER_GEN), undefined)
 	$(call go-get-tool,$(CONTROLLER_GEN_FILE),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
 CONTROLLER_GEN := $(CONTROLLER_GEN_FILE)
 endif
-MOCKGEN_FILE = $(shell pwd)/bin/mockgen
+MOCKGEN_FILE = $(BINARIES_DIR)/mockgen
 mockgen: ## Download kustomize locally if necessary.
 ifeq ($(origin MOCKGEN), undefined)
 	$(call go-get-tool,$(MOCKGEN_FILE),github.com/golang/mock/mockgen@v1.4.4)
 MOCKGEN := $(MOCKGEN_FILE)
 endif
 
-KUSTOMIZE_FILE = $(shell pwd)/bin/kustomize
+KUSTOMIZE_FILE = $(BINARIES_DIR)/kustomize
 kustomize: ## Download kustomize locally if necessary.
 ifeq ($(origin KUSTOMIZE), undefined)
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)

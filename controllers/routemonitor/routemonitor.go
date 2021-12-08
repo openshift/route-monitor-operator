@@ -64,7 +64,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 }
 
 // +kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;delete;update
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;delete;update
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.openshift.io,resources=routemonitors,verbs=get;list;watch;create;update;patch;delete

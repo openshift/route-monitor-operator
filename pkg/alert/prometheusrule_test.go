@@ -20,11 +20,6 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
-type ResourceComparerMockHelper struct {
-	CalledTimes int
-	ReturnValue bool
-}
-
 var _ = Describe("CR Deployment Handling", func() {
 	var (
 		ctx                  context.Context
@@ -32,7 +27,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		mockCtrl             *gomock.Controller
 		mockResourceComparer *utilmock.MockResourceComparerInterface
 
-		deepEqual ResourceComparerMockHelper
+		deepEqual testhelper.ResourceComparerMockHelper
 		get       testhelper.MockHelper
 		create    testhelper.MockHelper
 		update    testhelper.MockHelper
@@ -49,7 +44,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
 
-		deepEqual = ResourceComparerMockHelper{}
+		deepEqual = testhelper.ResourceComparerMockHelper{}
 		get = testhelper.MockHelper{}
 		create = testhelper.MockHelper{}
 		update = testhelper.MockHelper{}

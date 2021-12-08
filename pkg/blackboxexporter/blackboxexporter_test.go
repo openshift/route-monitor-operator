@@ -5,18 +5,19 @@ import (
 	"time"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	bbe "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
+	bbe_const "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	utilmock "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
+	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	. "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 
 var _ = Describe("Blackboxexporter", func() {
@@ -24,32 +25,47 @@ var _ = Describe("Blackboxexporter", func() {
 		mockClient *clientmocks.MockClient
 		mockCtrl   *gomock.Controller
 
-		blackboxExporter BlackBoxExporter
+		blackboxExporter     bbe.BlackBoxExporter
+		mockResourceComparer *utilmock.MockResourceComparerInterface
 
 		ctx context.Context
 
-		get    helper.MockHelper
-		delete helper.MockHelper
-		create helper.MockHelper
-		list   helper.MockHelper
+		deepEqual helper.ResourceComparerMockHelper
+		get       helper.MockHelper
+		update    helper.MockHelper
+		delete    helper.MockHelper
+		create    helper.MockHelper
+		list      helper.MockHelper
 	)
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
+		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
 
 		ctx = constinit.Context
 
+		deepEqual = helper.ResourceComparerMockHelper{}
 		get = helper.MockHelper{}
+		update = helper.MockHelper{}
 		delete = helper.MockHelper{}
 		create = helper.MockHelper{}
 		list = helper.MockHelper{}
 	})
 	JustBeforeEach(func() {
-		blackboxExporter = BlackBoxExporter{
-			Log:    constinit.Logger,
-			Client: mockClient,
-			Ctx:    ctx,
+		blackboxExporter = bbe.BlackBoxExporter{
+			Log:      constinit.Logger,
+			Client:   mockClient,
+			Ctx:      ctx,
+			Comparer: mockResourceComparer,
 		}
+
+		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
+			Return(deepEqual.ReturnValue).
+			Times(deepEqual.CalledTimes)
+
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(get.ErrorResponse).
@@ -193,28 +209,6 @@ var _ = Describe("Blackboxexporter", func() {
 
 		})
 
-		When("the resource(deployment) Exists", func() {
-			It("should call `Get` and not call `Create`", func() {
-				//Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-
-			})
-		})
-		When("the resource(deployment) is Not Found", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create.CalledTimes = 1
-			})
-			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
-				//Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
 		When("the resource(deployment) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
@@ -228,6 +222,7 @@ var _ = Describe("Blackboxexporter", func() {
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
+
 		When("the resource(deployment) Create fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
@@ -242,6 +237,63 @@ var _ = Describe("Blackboxexporter", func() {
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
 		})
+
+		When("the resource(deployment) is Not Found", func() {
+			// Arrange
+			BeforeEach(func() {
+				get.ErrorResponse = consterror.NotFoundErr
+				create.CalledTimes = 1
+			})
+			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
+				//Act
+				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+				//Assert
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		Describe("resource exists and DeepEqual checks", func() {
+			BeforeEach(func() {
+				deepEqual.CalledTimes = 1
+				deepEqual.ReturnValue = true
+			})
+			When("the resource(deployment) Exists and is the latest generation", func() {
+				It("should call `Get` and not call `Create`", func() {
+					//Act
+					err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+
+				})
+			})
+			When("the resource(deployment) Exists and needs to be updated, but fail unexpectedly", func() {
+				BeforeEach(func() {
+					deepEqual.ReturnValue = false
+					update.CalledTimes = 1
+					update.ErrorResponse = consterror.CustomError
+				})
+				It("should call `Get`, `Create` and call `Update` but return the error", func() {
+					//Act
+					err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+					//Assert
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError(consterror.CustomError))
+				})
+			})
+			When("the resource(deployment) Exists and needs to be updated", func() {
+				BeforeEach(func() {
+					deepEqual.ReturnValue = false
+					update.CalledTimes = 1
+				})
+				It("should call `Get`, `Create` and `Update`", func() {
+					//Act
+					err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+					//Assert
+					Expect(err).NotTo(HaveOccurred())
+				})
+			})
+		})
+
 	})
 	Describe("CreateBlackBoxExporterService", func() {
 
@@ -356,7 +408,7 @@ var _ = Describe("Blackboxexporter", func() {
 				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackboxexporter.KeepBlackBoxExporter))
+				Expect(res).To(Equal(bbe_const.KeepBlackBoxExporter))
 
 			})
 		})
@@ -380,7 +432,7 @@ var _ = Describe("Blackboxexporter", func() {
 				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackboxexporter.DeleteBlackBoxExporter))
+				Expect(res).To(Equal(bbe_const.DeleteBlackBoxExporter))
 			})
 
 		})

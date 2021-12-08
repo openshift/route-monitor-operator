@@ -9,7 +9,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
-	. "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
+	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,7 +46,7 @@ var _ = Describe("Finalizer", func() {
 
 			It("should return false", func() {
 				// Act
-				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				res := finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey)
 				// Assert
 				Expect(res).To(BeFalse())
 			})
@@ -54,7 +54,7 @@ var _ = Describe("Finalizer", func() {
 		When("'FinalizerKey' is in the 'Finalizers' list", func() {
 			It("should return true", func() {
 				// Act
-				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				res := finalizer.HasFinalizer(&routeMonitor, consts.FinalizerKey)
 				// Assert
 				Expect(res).To(BeTrue())
 			})
@@ -68,7 +68,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should return 'true'", func() {
 				// Act
-				res := WasDeleteRequested(&routeMonitor)
+				res := finalizer.WasDeleteRequested(&routeMonitor)
 				// Assert
 				Expect(res).To(BeTrue())
 			})
@@ -77,7 +77,7 @@ var _ = Describe("Finalizer", func() {
 			// Arrange
 			It("should return 'false'", func() {
 				// Act
-				res := WasDeleteRequested(&routeMonitor)
+				res := finalizer.WasDeleteRequested(&routeMonitor)
 				// Assert
 				Expect(res).To(BeFalse())
 			})
@@ -91,7 +91,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return false for a key", func() {
 				// Act
-				res := Contains(list, key)
+				res := finalizer.Contains(list, key)
 				// Asset
 				Expect(res).To(BeFalse())
 			})
@@ -103,7 +103,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return false for a key isn't in the list", func() {
 				// Act
-				res := Contains(list, key)
+				res := finalizer.Contains(list, key)
 				// Asset
 				Expect(res).To(BeFalse())
 			})
@@ -115,7 +115,7 @@ var _ = Describe("Finalizer", func() {
 			})
 			It("should Return true for a key is actually there", func() {
 				// Act
-				res := Contains(list, key)
+				res := finalizer.Contains(list, key)
 				// Asset
 				Expect(res).To(BeTrue())
 			})
@@ -128,7 +128,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{}}
 				// Act
-				Remove(&obj, key)
+				finalizer.Remove(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
@@ -139,7 +139,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{secondKey}}
 				// Act
-				Remove(&obj, key)
+				finalizer.Remove(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{secondKey}))
 			})
@@ -150,7 +150,8 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{key}}
 				// Act
-				Remove(&obj, key)
+				finalizer.Remove(&obj, key)
+				// Assert
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
@@ -162,7 +163,7 @@ var _ = Describe("Finalizer", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{}
 				// Act
-				Add(&obj, key)
+				finalizer.Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})
@@ -173,7 +174,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{}}
 				// Act
-				Add(&obj, key)
+				finalizer.Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})
@@ -184,7 +185,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{secondKey}}
 				// Act
-				Add(&obj, key)
+				finalizer.Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key, secondKey}))
 			})
@@ -195,7 +196,7 @@ var _ = Describe("Finalizer", func() {
 				obj := metav1.ObjectMeta{
 					Finalizers: []string{key}}
 				// Act
-				Add(&obj, key)
+				finalizer.Add(&obj, key)
 				// Assert
 				Expect(obj.Finalizers).To(Equal([]string{key}))
 			})
