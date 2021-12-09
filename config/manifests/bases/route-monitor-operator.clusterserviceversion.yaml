@@ -53,8 +53,6 @@ spec:
   - name: Route Monitor Operator
     url: https://github.com/openshift/route-monitor-operator/
   maintainers:
-  - email: rrackow@redhat.com
-    name: RiRa12621
   - email: 11993626+georgettica@users.noreply.github.com
     name: georgettica
   maturity: alpha
