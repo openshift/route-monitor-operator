@@ -15,7 +15,7 @@ jobs:
         CONTAINER_ENGINE: docker
 
     - name: Commit changes
-      uses: EndBug/add-and-commit@v7
+      uses: EndBug/add-and-commit@v8.0.1
       with:
         message: "make generate-syncset"
         add: "hack/olm-registry/olm-artifacts-template.yaml"
