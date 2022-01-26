@@ -1,3 +1,5 @@
+# to build this, use the 'make packagemanifests-build' command
+
 FROM quay.io/openshift/origin-operator-registry:4.10.0
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
