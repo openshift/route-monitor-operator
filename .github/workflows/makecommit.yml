@@ -11,6 +11,8 @@ jobs:
 
     - name: Make
       run: make generate-syncset
+      env:
+        CONTAINER_ENGINE: docker
 
     - name: Commit changes
       uses: EndBug/add-and-commit@v7
