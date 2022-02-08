@@ -5,8 +5,20 @@
 
 version: 2
 updates:
-  - package-ecosystem: "gomod" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "docker" 
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "docker" # to update the ./hack/pipeline.dockerfile image
+    directory: "/hack" 
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "github-actions" 
+    directory: "/"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod" 
+    directory: "/" 
     vendor: true
     schedule:
       interval: "daily"
