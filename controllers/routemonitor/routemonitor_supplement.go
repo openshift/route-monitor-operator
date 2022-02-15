@@ -185,6 +185,11 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 	}
 
 	currentRouteURL := routeMonitor.Status.RouteURL
+	if route.Spec.TLS != nil {
+		r.Log.V(3).Info("TLS detected: adding https to extractedRouteURL as the url ")
+		extractedRouteURL = fmt.Sprintf("https://%s", extractedRouteURL)
+	}
+
 	if currentRouteURL == extractedRouteURL {
 		r.Log.V(3).Info("Same RouteURL: currentRouteURL and extractedRouteURL are equal, update not required")
 		return utilreconcile.ContinueReconcile()

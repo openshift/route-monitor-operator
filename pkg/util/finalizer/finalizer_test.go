@@ -62,7 +62,7 @@ var _ = Describe("Finalizer", func() {
 	})
 	Describe("WasDeleteRequested", func() {
 		When("a user Requests a Deletion", func() {
-			//Arrange
+			// Arrange
 			BeforeEach(func() {
 				routeMonitorDeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
 			})

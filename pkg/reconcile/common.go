@@ -92,7 +92,7 @@ func (u *MonitorResourceCommon) ParseMonitorSLOSpecs(routeURL string, sloSpec v1
 	if routeURL == "" {
 		return "", customerrors.NoHost
 	}
-	if sloSpec == *new(v1alpha1.SloSpec) {
+	if sloSpec == (v1alpha1.SloSpec{}) {
 		return "", nil
 	}
 	isValid, parsedSlo := sloSpec.IsValid()

@@ -8,7 +8,7 @@ import (
 
 	"time"
 
-	//tested package
+	// tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -347,8 +347,8 @@ var _ = Describe("Routemonitor", func() {
 			scheme = constinit.Scheme
 			req = ctrl.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "bla", //routeMonitorName,
-					Namespace: "bda", //routeMonitorNamespace,
+					Name:      "bla", // routeMonitorName,
+					Namespace: "bda", // routeMonitorNamespace,
 				},
 			}
 
@@ -525,7 +525,7 @@ var _ = Describe("Routemonitor", func() {
 				},
 			}
 
-			//act
+			// act
 			res, err = routeMonitorReconciler.EnsureRouteURLExists(route, routeMonitor)
 		})
 
