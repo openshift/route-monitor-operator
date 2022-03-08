@@ -93,6 +93,12 @@ else
     rm -rf "$SAAS_OPERATOR_DIR"
     git clone --branch "$operator_channel" ${GIT_PATH} "$SAAS_OPERATOR_DIR"
 
+    # If this is a brand new SaaS setup, then set up accordingly
+    if [[ ! -d "${BUNDLE_DIR}" ]]; then
+        echo "Setting up new SaaS operator dir: ${BUNDLE_DIR}"
+        mkdir "${BUNDLE_DIR}"
+    fi
+
     # For testing purposes, support disabling anything that relies on
     # querying the saas file in app-interface. This includes pruning
     # undeployed commits in production.
@@ -115,7 +121,6 @@ else
         MANAGED_RESOURCE_TYPE=$(curl -s "${SAAS_FILE_URL}" | \
                 $YQ_CMD r - "managedResourceTypes[0]"
         )
-
         if [[ "${MANAGED_RESOURCE_TYPE}" == "" ]]; then
             echo "Unabled to determine if SAAS file managed resource type"
             exit 1
@@ -175,19 +180,27 @@ else
 fi
 
 if [[ "$generate_script" = "common" ]] ; then
+
+    # If setting up a new SaaS repo, there is no previous version when building a bundle
+    # Optionally pass it to the bundle generator in that case.
+    if [[ -z "${OPERATOR_PREV_VERSION}" ]]; then
+        PREV_VERSION_OPTS=""
+    else
+        PREV_VERSION_OPTS="-p ${OPERATOR_PREV_VERSION}"
+    fi
     # Jenkins can't be relied upon to have py3, so run the generator in
     # a container.
     # ...Unless we're already in a container, which is how boilerplate
     # CI runs. We have py3 there, so run natively in that case.
     if [[ -z "$CONTAINER_ENGINE" ]]; then
-        ./boilerplate/openshift/golang-osd-operator/csv-generate/common-generate-operator-bundle.py -o ${operator_name} -d ${OUTPUT_DIR} -p ${OPERATOR_PREV_VERSION} -i ${REPO_DIGEST} -V ${operator_version}
+        ./boilerplate/openshift/golang-osd-operator/csv-generate/common-generate-operator-bundle.py -o ${operator_name} -d ${OUTPUT_DIR} ${PREV_VERSION_OPTS} -i ${REPO_DIGEST} -V ${operator_version}
     else
         if [[ ${CONTAINER_ENGINE##*/} == "podman" ]]; then
             CE_OPTS="--userns keep-id -v `pwd`:`pwd`:Z"
         else
             CE_OPTS="-v `pwd`:`pwd`"
         fi
-        $CONTAINER_ENGINE run --rm ${CE_OPTS} -u `id -u`:0 -w `pwd` registry.access.redhat.com/ubi8/python-36:1-134 /bin/bash -c "python -m pip install oyaml; python ./boilerplate/openshift/golang-osd-operator/csv-generate/common-generate-operator-bundle.py -o ${operator_name} -d ${OUTPUT_DIR} -p ${OPERATOR_PREV_VERSION} -i ${REPO_DIGEST} -V ${operator_version}"
+        $CONTAINER_ENGINE run --rm ${CE_OPTS} -u `id -u`:0 -w `pwd` registry.access.redhat.com/ubi8/python-36:1-134 /bin/bash -c "python -m pip install oyaml; python ./boilerplate/openshift/golang-osd-operator/csv-generate/common-generate-operator-bundle.py -o ${operator_name} -d ${OUTPUT_DIR} ${PREV_VERSION_OPTS} -i ${REPO_DIGEST} -V ${operator_version}"
     fi
 elif [[ "$generate_script" = "hack" ]] ; then
     if [ -z "$OPERATOR_PREV_VERSION" ] ; then
