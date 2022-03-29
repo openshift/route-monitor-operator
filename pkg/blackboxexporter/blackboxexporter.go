@@ -115,7 +115,7 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 	labelSelectors := metav1.LabelSelector{
 		MatchLabels: labels}
 	// hardcode the replicasize for no
-	//replicas := m.Spec.Size
+	// replicas := m.Spec.Size
 	var replicas int32 = 1
 
 	dep := appsv1.Deployment{

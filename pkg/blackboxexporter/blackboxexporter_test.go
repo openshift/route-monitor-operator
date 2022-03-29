@@ -195,9 +195,9 @@ var _ = Describe("Blackboxexporter", func() {
 
 		When("the resource(deployment) Exists", func() {
 			It("should call `Get` and not call `Create`", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 
 			})
@@ -209,9 +209,9 @@ var _ = Describe("Blackboxexporter", func() {
 				create.CalledTimes = 1
 			})
 			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -221,9 +221,9 @@ var _ = Describe("Blackboxexporter", func() {
 				get.ErrorResponse = consterror.CustomError
 			})
 			It("should return the error and not call `Create`", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
@@ -235,9 +235,9 @@ var _ = Describe("Blackboxexporter", func() {
 				create = helper.CustomErrorHappensOnce()
 			})
 			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
-				//Assert
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
@@ -251,9 +251,9 @@ var _ = Describe("Blackboxexporter", func() {
 				get.CalledTimes = 1
 			})
 			It("should call `Get` and not call `Create`", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
-				//Assert
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 
 			})
@@ -265,9 +265,9 @@ var _ = Describe("Blackboxexporter", func() {
 				create.CalledTimes = 1
 			})
 			It("should call `Get` successfully and `Create` the resource(service)", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
-				//Assert
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -277,9 +277,9 @@ var _ = Describe("Blackboxexporter", func() {
 				get = helper.CustomErrorHappensOnce()
 			})
 			It("should return the error and not call `Create`", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
-				//Assert
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
@@ -291,9 +291,9 @@ var _ = Describe("Blackboxexporter", func() {
 				create = helper.CustomErrorHappensOnce()
 			})
 			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				//Act
+				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
-				//Assert
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})
@@ -326,7 +326,7 @@ var _ = Describe("Blackboxexporter", func() {
 			It("should fail with the List error", func() {
 				// Act
 				_, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
-				//Assert
+				// Assert
 				Expect(err).To(HaveOccurred())
 				Expect(err).To(MatchError(consterror.CustomError))
 			})

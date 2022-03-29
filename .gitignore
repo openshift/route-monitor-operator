@@ -44,3 +44,5 @@ saas-route-monitor-operator-bundle/
 .vscode/
 
 bin
+
+/config.bak/

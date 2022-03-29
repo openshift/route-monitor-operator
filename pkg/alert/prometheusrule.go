@@ -56,7 +56,7 @@ func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.Pr
 
 func (u *PrometheusRule) DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error {
 	// nothing to delete, stopping early
-	if prometheusRuleRef == *new(v1alpha1.NamespacedName) {
+	if prometheusRuleRef == (v1alpha1.NamespacedName{}) {
 		return nil
 	}
 	namespacedName := types.NamespacedName{Name: prometheusRuleRef.Name, Namespace: prometheusRuleRef.Namespace}
@@ -104,7 +104,7 @@ func sufficientProbes(windowSize, label string) string {
 	return rule
 }
 
-//render creates a monitoring rule for the defined multiwindow multi-burn rate alert
+// render creates a monitoring rule for the defined multiwindow multi-burn rate alert
 func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, namespacedName types.NamespacedName) monitoringv1.Rule {
 	labelSelector := fmt.Sprintf(`%s="%s"`, servicemonitor.UrlLabelName, url)
 

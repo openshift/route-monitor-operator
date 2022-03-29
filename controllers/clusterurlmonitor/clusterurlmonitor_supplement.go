@@ -71,7 +71,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	//Update RouteMonitor ServiceMonitorRef if required
+	// Update RouteMonitor ServiceMonitorRef if required
 	updated, err := s.Common.SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, namespacedName)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
