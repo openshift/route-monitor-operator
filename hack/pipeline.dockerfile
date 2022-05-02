@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest AS kustomize-builder
+FROM registry.access.redhat.com/ubi8/ubi-micro:latest AS kustomize-builder
 
 RUN microdnf install -y golang make which
 RUN microdnf install -y git
