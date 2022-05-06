@@ -58,9 +58,9 @@ In order to develop the repo follow these steps to get an env started:
 1. run `make test` to test build and deploy
 2. change [Makefile](./Makefile) and [config/manager/manager.yaml](config/manager/manager.yaml) to point to the repo you wish to use
 3. build and deploy with `make docker-build docker-push`
-    3.1. if you want to use a local image use IMG=<custom-image>
+    1. if you want to use a local image use IMG=<custom-image>
 4. use `make deploy` to deploy your operator on a cluster you are logged into
-    4.1. this also can have the IMG
+    1. this also can have the IMG
 5. check logs with `oc logs -n openshift-monitoring deploy/route-monitor-operator-controller-manager -c manager`
 6. retrigger pull of pod with `oc delete -n openshift-monitoring -lapp=route-monitor-operator,component=operator`
 
