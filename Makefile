@@ -41,10 +41,6 @@ all: manager
 
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
 
-# Run tests
-test: generate fmt vet
-	go test $(TESTS) -coverprofile cover.out
-
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager main.go
