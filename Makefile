@@ -8,8 +8,6 @@ OPERATOR_NAME=route-monitor-operator
 MAINPACKAGE=.
 TESTTARGETS=$(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | grep -v /int)
 
-# need to override boilerplate targets which are not working on this operator
-op-generate openapi-generate: ;
 
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
@@ -94,19 +92,9 @@ fmt:
 vet:
 	go vet ./...
 
-# Generate code
-generate: mockgen controller-gen manifests
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
 test-integration:
 	hack/test-integration.sh
 
-CONTROLLER_GEN_FILE = $(shell pwd)/bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-ifeq ($(origin CONTROLLER_GEN), undefined)
-	$(call go-get-tool,$(CONTROLLER_GEN_FILE),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
-CONTROLLER_GEN := $(CONTROLLER_GEN_FILE)
-endif
 MOCKGEN_FILE = $(shell pwd)/bin/mockgen
 mockgen: ## Download kustomize locally if necessary.
 ifeq ($(origin MOCKGEN), undefined)
