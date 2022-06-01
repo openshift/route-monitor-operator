@@ -55,7 +55,9 @@ function buildImage {
   echo -e "\n\nSTARTING BUILD\n\n"
   oc adm new-project "$NAMESPACE" || true
   oc new-build --binary --strategy=docker --name "$IMAGE_NAME" -n "$NAMESPACE" || true
-  oc start-build -n "$NAMESPACE" "$IMAGE_NAME" --from-dir . -F
+  # .git dirs are excluded by default. Use --exclude="" to include them,
+  # as the build relies on discovering git-isms from the repo.
+  oc start-build -n "$NAMESPACE" "$IMAGE_NAME" --from-dir . --exclude="" -F
  
   oc set image-lookup -n "$NAMESPACE" "$IMAGE_NAME"
 }
