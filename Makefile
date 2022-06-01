@@ -77,7 +77,7 @@ sample-uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/samples | $(KUBECTL) delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests:
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code

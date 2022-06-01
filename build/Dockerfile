@@ -18,4 +18,4 @@ WORKDIR /
 COPY --from=builder /workspace/build/_output/bin/* .
 USER nonroot:nonroot
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/route-monitor-operator"]
