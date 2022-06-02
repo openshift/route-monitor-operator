@@ -15,7 +15,7 @@ RUN make go-build
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.access.redhat.com/ubi8/ubi-micro:8.5-836
 WORKDIR /
-COPY --from=builder /workspace/build/_output/bin/* .
+COPY --from=builder /workspace/build/_output/bin/* /manager
 USER nonroot:nonroot
 
-ENTRYPOINT ["/route-monitor-operator"]
+ENTRYPOINT ["/manager"]
