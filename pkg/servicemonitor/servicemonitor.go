@@ -121,7 +121,7 @@ func TemplateForServiceMonitorResource(url, blackBoxExporterNamespace string, na
 						},
 						{
 							Replacement: clusterID,
-							TargetLabel: "ClusterID",
+							TargetLabel: "_id",
 						},
 					},
 				}},
