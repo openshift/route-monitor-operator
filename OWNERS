@@ -2,13 +2,13 @@ maintainers:
 - NautiluX
 approvers:
 - NautiluX
-- georgettica
-- rafael-azevedo
-reviewers:
-- NautiluX
-- georgettica
-- rafael-azevedo
-- ramonbutter
 - Tessg22
 - ninabauer
+- rafael-azevedo
+- shibumi
+reviewers:
+- NautiluX
+- Tessg22
+- ninabauer
+- rafael-azevedo
 - shibumi
