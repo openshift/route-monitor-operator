@@ -1,4 +1,3 @@
-FIPS_ENABLED=true
 include boilerplate/generated-includes.mk
 
 KUBECTL ?= kubectl
@@ -8,6 +7,8 @@ OPERATOR_NAME=route-monitor-operator
 MAINPACKAGE=.
 TESTTARGETS=$(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | grep -v /int)
 
+# need to override boilerplate targets which are not working on this operator
+op-generate openapi-generate: ;
 
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
@@ -25,7 +26,8 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-CRD_OPTIONS ?= "crd:crdVersions=v1"
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:crdVersions=v1,trivialVersions=true,preserveUnknownFields=false"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -39,6 +41,10 @@ OPERATOR_SDK ?= operator-sdk
 all: manager
 
 TESTS=$(shell go list ./... | grep -v /int | tr '\n' ' ')
+
+# Run tests
+test: generate fmt vet
+	go test $(TESTS) -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
@@ -76,7 +82,7 @@ sample-uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/samples | $(KUBECTL) delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests:
+manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
@@ -87,9 +93,19 @@ fmt:
 vet:
 	go vet ./...
 
+# Generate code
+generate: mockgen controller-gen manifests
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
 test-integration:
 	hack/test-integration.sh
 
+CONTROLLER_GEN_FILE = $(shell pwd)/bin/controller-gen
+controller-gen: ## Download controller-gen locally if necessary.
+ifeq ($(origin CONTROLLER_GEN), undefined)
+	$(call go-get-tool,$(CONTROLLER_GEN_FILE),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+CONTROLLER_GEN := $(CONTROLLER_GEN_FILE)
+endif
 MOCKGEN_FILE = $(shell pwd)/bin/mockgen
 mockgen: ## Download kustomize locally if necessary.
 ifeq ($(origin MOCKGEN), undefined)

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+
 set -euo pipefail
 
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
@@ -55,9 +55,7 @@ function buildImage {
   echo -e "\n\nSTARTING BUILD\n\n"
   oc adm new-project "$NAMESPACE" || true
   oc new-build --binary --strategy=docker --name "$IMAGE_NAME" -n "$NAMESPACE" || true
-  # .git dirs are excluded by default. Use --exclude="" to include them,
-  # as the build relies on discovering git-isms from the repo.
-  oc start-build -n "$NAMESPACE" "$IMAGE_NAME" --from-dir . --exclude="" -F -w
+  oc start-build -n "$NAMESPACE" "$IMAGE_NAME" --from-dir . -F
  
   oc set image-lookup -n "$NAMESPACE" "$IMAGE_NAME"
 }
@@ -110,7 +108,7 @@ function printOperatorLogs {
 	fi
 	podName=$(oc -n "$NAMESPACE" get po -lapp="route-monitor-operator" -ojsonpath='{.items[0].metadata.name}')
 	echo -e "\nstatus of the pod\n"
-	oc -n "$NAMESPACE" get po "$podName" -ojsonpath='{.status}' 
+	oc -n "$NAMESPACE" get po "$podName" -ojsonpath='{.status}' | jq
 	echo -e "\npod logs\n"
 	oc -n "$NAMESPACE" logs "$podName"
 }
