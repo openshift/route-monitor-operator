@@ -68,3 +68,5 @@ objects:
       metadata:
         name: ${REPO_NAME}
         namespace: ${NAMESPACE}
+        annotations:
+          olm.operatorframework.io/exclude-global-namespace-resolution: 'true'
