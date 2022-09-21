@@ -15,7 +15,7 @@ import (
 
 var (
 	Context = context.TODO()
-	Logger  = logr.DiscardLogger{}
+	Logger  = logr.Discard()
 	Scheme  = setScheme(runtime.NewScheme())
 )
 
