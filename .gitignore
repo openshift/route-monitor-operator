@@ -12,7 +12,7 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # binary for the operator
 bin/manager
@@ -42,6 +42,7 @@ saas-route-monitor-operator-bundle/
 
 # Local Dev ENVS
 .vscode/
+.idea/
 
 bin
 
