@@ -1,0 +1,54 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    categories: A list of comma separated categories that your operator falls under.
+    certified: "false"
+    description: Operator to monitor ingress route for OpenShift Clusters.
+    containerImage: quay.io/app-sre/route-monitor-operator:latest
+  name: route-monitor-operator.v0.0.1
+  namespace: openshift-route-monitor-operator
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+  description: Automatically enables blackbox probes for routes on OpenShift clusters
+    to be consumed by the Cluster Monitoring Operator or any vanilla Prometheus Operator
+  displayName: Route Monitor Operator
+  icon:
+  - base64data: "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"
+    mediatype: "image/png"
+  install:
+    spec:
+      deployments:
+      - name: route-monitor-operator-controller-manager
+    strategy: "deployment"
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - operator-sdk
+  - golang
+  - monitoring
+  - sre
+  - openshift-dedicated
+  - openshift
+  - redhat
+  links:
+  - name: Route Monitor Operator
+    url: https://github.com/openshift/route-monitor-operator/
+  maintainers:
+  - email: 11993626+georgettica@users.noreply.github.com
+    name: georgettica
+  maturity: alpha
+  provider:
+    name: Red Hat
+    url: https://www.redhat.com
+  replaces: route-monitor-operator.v0.1.183-e9011b0
+  version: 0.0.1
