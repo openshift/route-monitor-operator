@@ -1,28 +1,27 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: route-monitor-operator-controller-manager
-  namespace: openshift-route-monitor-operator
   labels:
-    control-plane: controller-manager
     app: route-monitor-operator
     component: operator
+    control-plane: controller-manager
+  name: route-monitor-operator-controller-manager
+  namespace: openshift-route-monitor-operator
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      control-plane: controller-manager
       app: route-monitor-operator
       component: operator
-  replicas: 1
+      control-plane: controller-manager
   template:
     metadata:
       labels:
-        control-plane: controller-manager
         app: route-monitor-operator
         component: operator
+        control-plane: controller-manager
     spec:
-      securityContext:
-        runAsNonRoot: true
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -31,40 +30,31 @@ spec:
                   - key: node-role.kubernetes.io/infra
                     operator: Exists
               weight: 1
-      tolerations:
-        - effect: NoSchedule
-          key: node-role.kubernetes.io/infra
-          operator: Exists
       containers:
-        - command:
-            - /manager
-          args:
-            - --zap-log-level=$(LOG_LEVEL)
+        - args:
+            - --zap-log-level=debug
             - --blackbox-image=$(BLACKBOX_IMAGE)
             - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
             - --config=controller_manager_config.yaml
+          command:
+            - /manager
           env:
             - name: LOG_LEVEL
-              # level 1 is debug, so when we want to raise the level we can
               value: "1"
             - name: BLACKBOX_IMAGE
-              # override so you can pull any blackbox-exporter image you fancy
-              # this value is the default value
-              value: "quay.io/prometheus/blackbox-exporter:master"
+              value: quay.io/prometheus/blackbox-exporter:master
             - name: BLACKBOX_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: controller:latest
-          name: manager
-          securityContext:
-            allowPrivilegeEscalation: false
+          image: route-monitor-operator:latest
           livenessProbe:
             httpGet:
               path: /healthz
               port: 8081
             initialDelaySeconds: 15
             periodSeconds: 20
+          name: manager
           readinessProbe:
             httpGet:
               path: /readyz
@@ -78,12 +68,20 @@ spec:
             requests:
               cpu: 100m
               memory: 20Mi
+          securityContext:
+            allowPrivilegeEscalation: false
           volumeMounts:
             - mountPath: /controller_manager_config.yaml
               name: manager-config
               subPath: controller_manager_config.yaml
+      securityContext:
+        runAsNonRoot: true
       serviceAccountName: route-monitor-operator-system
       terminationGracePeriodSeconds: 10
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/infra
+          operator: Exists
       volumes:
         - configMap:
             name: route-monitor-operator-manager-config
