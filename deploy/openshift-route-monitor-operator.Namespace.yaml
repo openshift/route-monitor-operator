@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    app: route-monitor-operator
-    component: operator
-    control-plane: controller-manager
-  name: openshift-route-monitor-operator
