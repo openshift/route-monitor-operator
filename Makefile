@@ -1,3 +1,4 @@
+FIPS_ENABLED=true
 include boilerplate/generated-includes.mk
 
 KUBECTL ?= kubectl
@@ -8,7 +9,7 @@ MAINPACKAGE=.
 TESTTARGETS=$(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | grep -v /int)
 
 # need to override boilerplate targets which are not working on this operator
-op-generate openapi-generate: ;
+# op-generate openapi-generate: ;
 
 VERSION ?= $(OPERATOR_VERSION)
 PREV_VERSION ?= $(VERSION)
@@ -27,7 +28,8 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:crdVersions=v1,trivialVersions=true,preserveUnknownFields=false"
+# CRD_OPTIONS ?= "crd:crdVersions=v1,trivialVersions=true,preserveUnknownFields=false"
+CRD_OPTIONS ?= "crd"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -82,8 +84,10 @@ sample-uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/samples | $(KUBECTL) delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests: controller-gen kustomize yq
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(KUSTOMIZE) build config/default | $(YQ) -s '"deploy/" + .metadata.name + "." + .kind + ".yaml"'
+
 
 # Run go fmt against code
 fmt:
@@ -100,24 +104,28 @@ generate: mockgen controller-gen manifests
 test-integration:
 	hack/test-integration.sh
 
-CONTROLLER_GEN_FILE = $(shell pwd)/bin/controller-gen
+CONTROLLER_GEN := $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-ifeq ($(origin CONTROLLER_GEN), undefined)
-	$(call go-get-tool,$(CONTROLLER_GEN_FILE),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
-CONTROLLER_GEN := $(CONTROLLER_GEN_FILE)
-endif
-MOCKGEN_FILE = $(shell pwd)/bin/mockgen
-mockgen: ## Download kustomize locally if necessary.
-ifeq ($(origin MOCKGEN), undefined)
-	$(call go-get-tool,$(MOCKGEN_FILE),github.com/golang/mock/mockgen@v1.4.4)
-MOCKGEN := $(MOCKGEN_FILE)
+ifeq (,$(wildcard $(CONTROLLER_GEN)))
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0)
 endif
 
-KUSTOMIZE_FILE = $(shell pwd)/bin/kustomize
+YQ := $(shell pwd)/bin/yq
+yq: ## Download yq locally if necessary.
+ifeq (,$(wildcard $(YQ)))
+	$(call go-get-tool,$(YQ),github.com/mikefarah/yq/v4@v4.27.5)
+endif
+
+MOCKGEN := $(shell pwd)/bin/mockgen
+mockgen: ## Download kustomize locally if necessary.
+ifeq (,$(wildcard $(MOCKGEN)))
+	$(call go-get-tool,$(MOCKGEN),github.com/golang/mock/mockgen@v1.4.4)
+endif
+
+KUSTOMIZE := $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-ifeq ($(origin KUSTOMIZE), undefined)
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
-KUSTOMIZE := $(KUSTOMIZE_FILE)
+ifeq (,$(wildcard $(KUSTOMIZE)))
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.7)
 endif
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
@@ -129,7 +137,8 @@ TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+export GOBIN=$(PROJECT_DIR)/bin ;\
+go install $(2) ;\
 echo "installed at $(GOBIN)" ;\
 rm -rf $$TMP_DIR ;\
 }
