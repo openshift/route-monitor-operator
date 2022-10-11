@@ -20,7 +20,11 @@ CONTAINER_MOUNT=/go/src/$(repo_import $REPO_ROOT)
 # First set up a detached container with the repo mounted.
 banner "Starting the container"
 if [[ "${CONTAINER_ENGINE##*/}" == "podman" ]]; then
-    CE_OPTS="--userns keep-id -v $REPO_ROOT:$CONTAINER_MOUNT:Z"
+    if [[ $OSTYPE == *"darwin"* ]]; then
+        CE_OPTS="--userns keep-id -v $REPO_ROOT:$CONTAINER_MOUNT"
+    else
+        CE_OPTS="--userns keep-id -v $REPO_ROOT:$CONTAINER_MOUNT:Z"
+    fi
 else
     CE_OPTS="-v $REPO_ROOT:$CONTAINER_MOUNT"
 fi
