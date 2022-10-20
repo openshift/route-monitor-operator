@@ -10,18 +10,22 @@ import (
 // for example:
 //
 // var (
-// 	getCalledTimes int
-// 	getErrorResponse error
+//
+//	getCalledTimes int
+//	getErrorResponse error
+//
 // )
-// BeforeEach(func() {
-// 	getCalledTimes = 0
-// 	getErrorResponse = nil
-// }
-// JustBeforeEach(func() {
-// 	mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-// 		Return(getErrorResponse).
-// 		Times(getCalledTimes)
-// }
+//
+//	BeforeEach(func() {
+//		getCalledTimes = 0
+//		getErrorResponse = nil
+//	}
+//
+//	JustBeforeEach(func() {
+//		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+//			Return(getErrorResponse).
+//			Times(getCalledTimes)
+//	}
 //
 // this made the tests full of variables that were used seperately
 // by joining them into one struct, a more unified way was introduced

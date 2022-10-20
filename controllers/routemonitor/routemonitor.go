@@ -36,18 +36,18 @@ import (
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
-	Client client.Client
-	Ctx    context.Context
-	Log    logr.Logger
-	Scheme *runtime.Scheme
-
+	Client           client.Client
+	Ctx              context.Context
+	Log              logr.Logger
+	Scheme           *runtime.Scheme
 	BlackBoxExporter controllers.BlackBoxExporterHandler
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
+	Hypershift       bool
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *RouteMonitorReconciler {
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()
@@ -57,9 +57,10 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client, enablehypershift),
 		Prom:             alert.NewPrometheusRule(ctx, client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
+		Hypershift:       enablehypershift,
 	}
 }
 

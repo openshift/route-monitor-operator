@@ -45,9 +45,10 @@ type ClusterUrlMonitorReconciler struct {
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
+	Hypershift       bool
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *ClusterUrlMonitorReconciler {
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *ClusterUrlMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()
@@ -55,9 +56,10 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Client:           client,
 		Ctx:              ctx,
 		Log:              log,
+		Hypershift:       enablehypershift,
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client, enablehypershift),
 		Prom:             alert.NewPrometheusRule(ctx, client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}

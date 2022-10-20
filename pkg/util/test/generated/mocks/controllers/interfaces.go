@@ -12,7 +12,8 @@ import (
 	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	v10 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v10 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,7 +42,7 @@ func (m *MockMonitorResourceHandler) EXPECT() *MockMonitorResourceHandlerMockRec
 }
 
 // DeleteFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) DeleteFinalizer(o v10.Object, finalizerKey string) bool {
+func (m *MockMonitorResourceHandler) DeleteFinalizer(o v11.Object, finalizerKey string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteFinalizer", o, finalizerKey)
 	ret0, _ := ret[0].(bool)
@@ -98,7 +99,7 @@ func (mr *MockMonitorResourceHandlerMockRecorder) SetErrorStatus(errorStatus, er
 }
 
 // SetFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) SetFinalizer(o v10.Object, finalizerKey string) bool {
+func (m *MockMonitorResourceHandler) SetFinalizer(o v11.Object, finalizerKey string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetFinalizer", o, finalizerKey)
 	ret0, _ := ret[0].(bool)
@@ -193,19 +194,32 @@ func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), serviceMonitorRef)
 }
 
-// GetServiceMonitor mocks base method.
-func (m *MockServiceMonitorHandler) GetServiceMonitor(namespacedName types.NamespacedName) (v1.ServiceMonitor, error) {
+// HypershiftUpdateServiceMonitorDeployment mocks base method.
+func (m *MockServiceMonitorHandler) HypershiftUpdateServiceMonitorDeployment(template v10.ServiceMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetServiceMonitor", namespacedName)
-	ret0, _ := ret[0].(v1.ServiceMonitor)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "HypershiftUpdateServiceMonitorDeployment", template)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// GetServiceMonitor indicates an expected call of GetServiceMonitor.
-func (mr *MockServiceMonitorHandlerMockRecorder) GetServiceMonitor(namespacedName interface{}) *gomock.Call {
+// HypershiftUpdateServiceMonitorDeployment indicates an expected call of HypershiftUpdateServiceMonitorDeployment.
+func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorDeployment(template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceMonitor", reflect.TypeOf((*MockServiceMonitorHandler)(nil).GetServiceMonitor), namespacedName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HypershiftUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).HypershiftUpdateServiceMonitorDeployment), template)
+}
+
+// TemplateAndUpdateServiceMonitorDeployment mocks base method.
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
