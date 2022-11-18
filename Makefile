@@ -104,10 +104,10 @@ generate: mockgen controller-gen manifests
 test-integration:
 	hack/test-integration.sh
 
-CONTROLLER_GEN := $(shell pwd)/bin/controller-gen
+# CONTROLLER_GEN := $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 ifeq (,$(wildcard $(CONTROLLER_GEN)))
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0)
 endif
 
 YQ := $(shell pwd)/bin/yq
