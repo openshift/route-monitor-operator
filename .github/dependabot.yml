@@ -5,20 +5,38 @@
 
 version: 2
 updates:
-  - package-ecosystem: "docker" 
+  - package-ecosystem: "docker"
     directory: "/"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "docker"
+    directory: "/build"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
     schedule:
       interval: "daily"
   - package-ecosystem: "docker" # to update the ./hack/pipeline.dockerfile image
-    directory: "/hack" 
+    directory: "/hack"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
     schedule:
       interval: "daily"
-  - package-ecosystem: "github-actions" 
+  - package-ecosystem: "github-actions"
     directory: "/"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
     schedule:
       interval: "daily"
-  - package-ecosystem: "gomod" 
-    directory: "/" 
-    vendor: true
+  - package-ecosystem: "gomod"
+    directory: "/"
+    labels:
+      - "area/dependency"
+      - "ok-to-test"
     schedule:
       interval: "daily"
