@@ -149,10 +149,10 @@ func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1
 }
 
 func (s *ClusterUrlMonitorReconciler) GetClusterDomain() (string, error) {
-	clusterConfig := configv1.DNS{}
-	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterConfig)
+	clusterInfra := configv1.Infrastructure{}
+	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "infrastructure"}, &clusterInfra)
 	if err != nil {
 		return "", err
 	}
-	return clusterConfig.Spec.BaseDomain, nil
+	return clusterInfra.Status.APIServerURL, nil
 }
