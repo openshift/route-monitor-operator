@@ -86,10 +86,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // fetching domain
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().GetClusterID().Times(1)
-				mockServiceMonitor.EXPECT().UpdateServiceMonitorDeployment(gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, ns).Times(1).Return(true, nil)
 				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1)
 			})
@@ -98,7 +98,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
-
 	})
 
 	Describe("EnsurePrometheusRuleResourceExists", func() {
