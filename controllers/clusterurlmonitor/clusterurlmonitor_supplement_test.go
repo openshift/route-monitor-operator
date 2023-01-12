@@ -71,7 +71,7 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 	Describe("GetClusterDomain()", func() {
 		Context("HyperShift", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "infrastructure"}, &configv1.Infrastructure{}).DoAndReturn(
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, &configv1.Infrastructure{}).DoAndReturn(
 					func(arg0, arg1, arg2 interface{}, arg3 ...interface{}) error {
 						return nil
 					})

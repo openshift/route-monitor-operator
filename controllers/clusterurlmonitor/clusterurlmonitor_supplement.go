@@ -1,7 +1,9 @@
 package clusterurlmonitor
 
 import (
+	"net/url"
 	"reflect"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
@@ -150,9 +152,19 @@ func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1
 
 func (s *ClusterUrlMonitorReconciler) GetClusterDomain() (string, error) {
 	clusterInfra := configv1.Infrastructure{}
-	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "infrastructure"}, &clusterInfra)
+	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterInfra)
 	if err != nil {
 		return "", err
 	}
-	return clusterInfra.Status.APIServerURL, nil
+	u, err := url.Parse(clusterInfra.Status.APIServerURL)
+	if err != nil {
+		return "", err
+	}
+	// the hostname format is api.basename so cutting at the first '.' will give
+	// us the base name
+	before, baseName, _ := strings.Cut(u.Hostname(), ".")
+	if before != "api" {
+		baseName = strings.Join([]string{before, baseName}, ".")
+	}
+	return baseName, nil
 }
