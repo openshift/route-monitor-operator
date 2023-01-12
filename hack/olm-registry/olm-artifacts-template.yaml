@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: Template
-metadata: selectorsyncset-template
+metadata:
+  name: selectorsyncset-template
 
 parameters:
 - name: CHANNEL
