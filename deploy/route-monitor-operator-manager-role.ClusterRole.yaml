@@ -4,6 +4,8 @@ kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: route-monitor-operator-manager-role
+  annotations:
+    package-operator.run/phase: rbac
 rules:
   - apiGroups:
       - '*'

@@ -4,6 +4,8 @@ kind: Role
 metadata:
   name: route-monitor-operator-leader-election-role
   namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: rbac
 rules:
   - apiGroups:
       - ""

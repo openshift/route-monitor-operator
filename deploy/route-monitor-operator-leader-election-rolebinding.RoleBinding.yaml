@@ -4,6 +4,8 @@ kind: RoleBinding
 metadata:
   name: route-monitor-operator-leader-election-rolebinding
   namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: rbac
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

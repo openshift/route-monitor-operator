@@ -4,6 +4,8 @@ kind: Role
 metadata:
   name: prometheus-k8s
   namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: prometheus
 rules:
 - apiGroups:
   - ""

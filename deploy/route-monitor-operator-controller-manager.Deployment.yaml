@@ -8,6 +8,8 @@ metadata:
     control-plane: controller-manager
   name: route-monitor-operator-controller-manager
   namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: deploy
 spec:
   replicas: 1
   selector:
@@ -47,7 +49,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          image: route-monitor-operator:latest
+          image: quay.io/app-sre/route-monitor-operator:v0.1.461-dbddf1f
           livenessProbe:
             httpGet:
               path: /healthz

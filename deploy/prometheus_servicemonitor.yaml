@@ -6,6 +6,8 @@ metadata:
     control-plane: controller-manager
   name: controller-manager-metrics-monitor
   namespace: openshift-monitoring
+  annotations:
+    package-operator.run/phase: prometheus
 spec:
   endpoints:
     - path: /metrics

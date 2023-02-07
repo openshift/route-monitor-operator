@@ -17,3 +17,5 @@ kind: ConfigMap
 metadata:
   name: route-monitor-operator-manager-config
   namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: deploy
