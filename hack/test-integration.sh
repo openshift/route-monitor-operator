@@ -61,6 +61,7 @@ function buildImage {
 }
 
 function verifyForBuildSuccess {
+  sleep 300
   local latestJobName phase
   latestJobName="$IMAGE_NAME"-$( oc -n "$NAMESPACE" get buildconfig "$IMAGE_NAME" -ojsonpath='{.status.lastVersion}') 
   phase=$(oc -n "$NAMESPACE" get build "$latestJobName" -ojsonpath='{.status.phase}')
