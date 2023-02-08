@@ -15,3 +15,6 @@ configMapGenerator:
 - name: manager-config
   files:
   - controller_manager_config.yaml
+
+commonAnnotations:
+  package-operator.run/phase: deploy
