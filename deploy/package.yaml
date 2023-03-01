@@ -1,6 +1,6 @@
 apiVersion: package-operator.run/v1alpha1
-kind: ClusterPackage
+kind: Package
 metadata:
   name: route-monitor-operator
 spec:
-  image: quay.io/achvatal/route-monitor-operator:package
+  image: quay.io/achvatal/route-monitor-operator:package-mgmt

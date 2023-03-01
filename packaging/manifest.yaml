@@ -9,11 +9,17 @@ spec:
   - Namespaced
   phases:
   - name: crds
+    class: hosted-cluster
   - name: namespace
+    class: hosted-cluster
   - name: rbac
+    class: hosted-cluster
   - name: prometheus
+    class: hosted-cluster
   - name: config
+    class: hosted-cluster
   - name: deploy
+    class: hosted-cluster
   availabilityProbes:
   - probes:
     - condition:
