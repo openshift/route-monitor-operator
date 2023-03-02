@@ -228,3 +228,17 @@ syncset-uninstall:
 .PHONY: boilerplate-update
 boilerplate-update:
 	@boilerplate/update
+
+.PHONY: kubectl-package
+kubectl-package:
+ifeq (,$(wildcard bin/kubectl-package))
+	wget https://github.com/package-operator/package-operator/releases/latest/download/kubectl-package_$(GOOS)_$(GOARCH) -O bin/kubectl-package
+	chmod 755 bin/kubectl-package
+endif
+
+.PHONY: package
+package:
+	./bin/kubectl-package build -t $(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME)-hs-package:$(OPERATOR_IMAGE_TAG) --push packaging/
+
+.PHONY: everything
+everything: package build-push
