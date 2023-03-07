@@ -3,4 +3,4 @@ kind: Package
 metadata:
   name: route-monitor-operator
 spec:
-  image: quay.io/achvatal/route-monitor-operator:package-mgmt
+  image: quay.io/achvatal/route-monitor-operator-hs-package:v0.1.460-de9c79f
