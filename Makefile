@@ -87,6 +87,7 @@ sample-uninstall: manifests kustomize
 manifests: controller-gen kustomize yq
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	$(KUSTOMIZE) build config/default | $(YQ) -s '"deploy/" + .metadata.name + "." + .kind + ".yaml"'
+	$(YQ) '.spec.template.spec.containers[0].image = "$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME):$(OPERATOR_IMAGE_TAG)"' deploy/route-monitor-operator-controller-manager.Deployment.yaml > packaging/06-deploy/route-monitor-operator-controller-manager.Deployment.yaml
 
 
 # Run go fmt against code
@@ -237,7 +238,7 @@ ifeq (,$(wildcard bin/kubectl-package))
 endif
 
 .PHONY: package
-package:
+package: manifests
 	./bin/kubectl-package build -t $(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME)-hs-package:$(OPERATOR_IMAGE_TAG) --push packaging/
 
 .PHONY: everything
