@@ -33,7 +33,23 @@ type ClusterUrlMonitorSpec struct {
 	Suffix string  `json:"suffix,omitempty"`
 	Port   string  `json:"port,omitempty"`
 	Slo    SloSpec `json:"slo,omitempty"`
+	// +kubebuilder:validation:Enum=infra;hcp
+	// +kubebuilder:default:="infra"
+	// +optional
+	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
 }
+
+// ClusterDomainRef defines the object used determine the cluster's domain
+// By default, 'infra' is used, which references the 'infrastructures/cluster' object
+type ClusterDomainRef string
+
+var (
+	// ClusterDomainRefInfra indicates the clusterDomain should be determined from the 'infrastructures/cluster' object
+	ClusterDomainRefInfra ClusterDomainRef = "infra"
+
+	// ClusterDomainRefHCP indicates the clusterDomain should be determined from the 'hcp/cluster' object in the same namespace as the ClusterURLMonitor being reconciled
+	ClusterDomainRefHCP ClusterDomainRef = "hcp"
+)
 
 // ClusterUrlMonitorStatus defines the observed state of ClusterUrlMonitor
 type ClusterUrlMonitorStatus struct {

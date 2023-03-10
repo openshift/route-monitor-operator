@@ -1,11 +1,13 @@
 package clusterurlmonitor
 
 import (
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
@@ -13,11 +15,16 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	hcpClusterAnnotation = "hypershift.openshift.io/cluster"
 )
 
 // Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
 func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	clusterDomain, err := s.GetClusterDomain()
+	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -58,7 +65,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 
 // Takes care that right ServiceMonitor for the defined ClusterURLMonitor are in place
 func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	clusterDomain, err := s.GetClusterDomain()
+	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -150,20 +157,72 @@ func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1
 	return ClusterUrlMonitor, utilreconcile.ContinueOperation(), nil
 }
 
-func (s *ClusterUrlMonitorReconciler) GetClusterDomain() (string, error) {
+// GetClusterDomain returns the baseDomain for a cluster, using the correct method based on it's type
+func (s *ClusterUrlMonitorReconciler) GetClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
+	if monitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
+		return s.getHypershiftClusterDomain(monitor)
+	}
+	return s.getInfraClusterDomain()
+}
+
+// getInfraClusterDomain returns a normal OSD/ROSA cluster's domain based on it's infrastructure object
+func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain() (string, error) {
 	clusterInfra := configv1.Infrastructure{}
 	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterInfra)
 	if err != nil {
 		return "", err
 	}
-	u, err := url.Parse(clusterInfra.Status.APIServerURL)
+	return removeSubdomain("api", clusterInfra.Status.APIServerURL)
+}
+
+// getHypershiftClusterDomain returns a hypershift hosted cluster's domain based on it's hostedCluster object
+func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
+	// Retrieve the HostedControlPlane in order to lookup the associated hostedCluster object
+	hcpList := hypershiftv1beta1.HostedControlPlaneList{}
+	err := s.Client.List(s.Ctx, &hcpList, client.InNamespace(monitor.Namespace))
 	if err != nil {
 		return "", err
 	}
+	if len(hcpList.Items) != 1 {
+		return "", fmt.Errorf("invalid number of HostedControlPlanes detected in namespace '%s': expected 1, got %d", monitor.Namespace, len(hcpList.Items))
+	}
+	clusterHCP := hcpList.Items[0]
+	clusterAnnotation := clusterHCP.Annotations[hcpClusterAnnotation]
+	annotationTokens := strings.Split(clusterAnnotation, "/")
+	if len(annotationTokens) != 2 {
+		return "", fmt.Errorf("invalid annotation for HostedControlPlane '%s': expected <namespace>/<hostedcluster name>, got %s", clusterHCP.Name, clusterAnnotation)
+	}
+
+	// Retrieve hostedCluster using HCP annotation
+	hostedCluster := hypershiftv1beta1.HostedCluster{}
+	hcReq := types.NamespacedName{
+		Namespace: annotationTokens[0],
+		Name:      annotationTokens[1],
+	}
+	err = s.Client.Get(s.Ctx, hcReq, &hostedCluster)
+	if err != nil {
+		return "", err
+	}
+
+	return removeSubdomain("rosa", hostedCluster.Spec.DNS.BaseDomain)
+}
+
+func removeSubdomain(subdomain, clusterURL string) (string, error) {
+	// url.Parse requires a 'http://' or 'https://' prefix in order
+	// to function properly
+	if !strings.HasPrefix(clusterURL, "https://") && !strings.HasPrefix(clusterURL, "http://") {
+		clusterURL = fmt.Sprintf("https://%s", clusterURL)
+	}
+
+	u, err := url.Parse(clusterURL)
+	if err != nil {
+		return "", err
+	}
+
 	// the hostname format is api.basename so cutting at the first '.' will give
 	// us the base name
 	before, baseName, _ := strings.Cut(u.Hostname(), ".")
-	if before != "api" {
+	if before != subdomain {
 		baseName = strings.Join([]string{before, baseName}, ".")
 	}
 	return baseName, nil

@@ -138,7 +138,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 				{
 					Port: blackboxexporter.BlackBoxExporterPortName,
 					// Probe every 30s
-					Interval: ServiceMonitorPeriod,
+					Interval: monitoringv1.Duration(ServiceMonitorPeriod),
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
 					Path:          "/probe",
