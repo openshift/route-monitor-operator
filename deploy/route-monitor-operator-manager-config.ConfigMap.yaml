@@ -15,5 +15,7 @@ data:
       resourceName: 431ceb26.my.domain
 kind: ConfigMap
 metadata:
+  annotations:
+    package-operator.run/phase: deploy
   name: route-monitor-operator-manager-config
   namespace: openshift-route-monitor-operator

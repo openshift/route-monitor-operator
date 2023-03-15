@@ -2,6 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  annotations:
+    package-operator.run/phase: rbac
   name: route-monitor-operator-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io

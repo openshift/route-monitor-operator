@@ -2,6 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  annotations:
+    package-operator.run/phase: rbac
   creationTimestamp: null
   name: route-monitor-operator-manager-role
 rules:

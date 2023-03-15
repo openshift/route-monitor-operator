@@ -4,6 +4,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
+    package-operator.run/phase: crds
   creationTimestamp: null
   name: routemonitors.monitoring.openshift.io
 spec:

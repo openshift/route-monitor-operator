@@ -2,6 +2,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    package-operator.run/phase: deploy
   labels:
     app: route-monitor-operator
     component: operator
@@ -17,6 +19,8 @@ spec:
       control-plane: controller-manager
   template:
     metadata:
+      annotations:
+        package-operator.run/phase: deploy
       labels:
         app: route-monitor-operator
         component: operator

@@ -1,0 +1,43 @@
+---
+apiVersion: manifests.package-operator.run/v1alpha1
+kind: PackageManifest
+metadata:
+  name: route-monitor-operator
+spec:
+  scopes:
+  - Cluster
+  - Namespaced
+  phases:
+  - name: crds
+    class: hosted-cluster
+  - name: namespace
+    class: hosted-cluster
+  - name: rbac
+    class: hosted-cluster
+  - name: prometheus
+    class: hosted-cluster
+  - name: config
+    class: hosted-cluster
+  - name: deploy
+    class: hosted-cluster
+  availabilityProbes:
+  - probes:
+    - condition:
+        type: Available
+        status: "True"
+    - fieldsEqual:
+        fieldA: .status.updatedReplicas
+        fieldB: .status.replicas
+    selector:
+      kind:
+        group: apps
+        kind: Deployment
+  - probes:
+    - condition:
+        type: Established
+        status: "True"
+    selector:
+      kind:
+        group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+

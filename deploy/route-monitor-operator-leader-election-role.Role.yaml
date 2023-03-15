@@ -2,6 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  annotations:
+    package-operator.run/phase: rbac
   name: route-monitor-operator-leader-election-role
   namespace: openshift-route-monitor-operator
 rules:
