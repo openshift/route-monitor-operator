@@ -239,6 +239,7 @@ endif
 .PHONY: package
 package: yq kubectl-package
 	$(YQ) '.spec.template.spec.containers[0].image = "$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME):$(OPERATOR_IMAGE_TAG)"' deploy/route-monitor-operator-controller-manager.Deployment.yaml > packaging/06-deploy/route-monitor-operator-controller-manager.Deployment.yaml
+	$(CONTAINER_ENGINE) login -u $(QUAY_USER) -p $(QUAY_TOKEN) quay.io
 	./bin/kubectl-package build -t $(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME)-hs-package:$(OPERATOR_IMAGE_TAG) --push packaging/
 
 .PHONY: everything
