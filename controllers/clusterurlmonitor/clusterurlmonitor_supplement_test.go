@@ -1,46 +1,31 @@
 package clusterurlmonitor_test
 
 import (
-	"github.com/golang/mock/gomock"
+	"context"
+	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
 )
 
 var _ = Describe("ClusterUrlMonitorSupplement", func() {
 	var (
-		clusterUrlMonitor    v1alpha1.ClusterUrlMonitor
-		reconciler           clusterurlmonitor.ClusterUrlMonitorReconciler
-		mockClient           *clientmocks.MockClient
-		mockBlackBoxExporter *controllermocks.MockBlackBoxExporterHandler
-		mockCommon           *controllermocks.MockMonitorResourceHandler
-		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
-		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
+		clusterUrlMonitor v1alpha1.ClusterUrlMonitor
+		reconciler        clusterurlmonitor.ClusterUrlMonitorReconciler
 
-		mockCtrl *gomock.Controller
-
-		prefix string
-		port   string
-		suffix string
-
-		err error
+		testObjs []client.Object
 	)
 
 	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
-		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockBlackBoxExporter = controllermocks.NewMockBlackBoxExporterHandler(mockCtrl)
-		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
-		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
-		mockCommon = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
 		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "fake-clusterurlmonitor",
@@ -50,39 +35,92 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 	})
 
 	JustBeforeEach(func() {
-		clusterUrlMonitor.Spec.Prefix = prefix
-		clusterUrlMonitor.Spec.Suffix = suffix
-		clusterUrlMonitor.Spec.Port = port
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
-			Log:              constinit.Logger,
-			Client:           mockClient,
-			Scheme:           constinit.Scheme,
-			BlackBoxExporter: mockBlackBoxExporter,
-			Common:           mockCommon,
-			ServiceMonitor:   mockServiceMonitor,
-			Prom:             mockPrometheusRule,
+			Log:    constinit.Logger,
+			Client: buildClient(testObjs...),
+			Scheme: constinit.Scheme,
 		}
 	})
 
 	AfterEach(func() {
-		mockCtrl.Finish()
+		// Clear objects between tests to avoid cross-contamination
+		testObjs = []client.Object{}
 	})
 
 	Describe("GetClusterDomain()", func() {
+		const (
+			expectedDomain = "testdomain.devshift.org"
+		)
 		Context("HyperShift", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, &configv1.Infrastructure{}).DoAndReturn(
-					func(arg0, arg1, arg2 interface{}, arg3 ...interface{}) error {
-						return nil
-					})
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+
+				hcp := hypershiftv1beta1.HostedControlPlane{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hcp",
+						Namespace: "fake-namespace",
+						Annotations: map[string]string{
+							"hypershift.openshift.io/cluster": "test-ns/test-hc",
+						},
+					},
+				}
+				hc := hypershiftv1beta1.HostedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hc",
+						Namespace: "test-ns",
+					},
+					Spec: hypershiftv1beta1.HostedClusterSpec{
+						DNS: hypershiftv1beta1.DNSSpec{
+							BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
+						},
+					},
+				}
+
+				testObjs = append(testObjs, &hcp)
+				testObjs = append(testObjs, &hc)
 			})
 
 			It("should return a cluster URL", func() {
-				// can't figure out how to use gomock to modify arguments
-				_, err = reconciler.GetClusterDomain()
+				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(domain).To(Equal(expectedDomain))
+			})
+		})
+		Context("OSD/ROSA", func() {
+			var infra configv1.Infrastructure
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefInfra
 
-				Expect(err).To(BeNil())
+				infra = configv1.Infrastructure{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cluster",
+					},
+				}
+				testObjs = append(testObjs, &infra)
+			})
+
+			It("should return a cluster URL", func() {
+				// Objects cannot be created with a status predefined - it must
+				// be added as an update after creating
+				infra.Status.APIServerURL = fmt.Sprintf("https://api.%s:6443", expectedDomain)
+				err := reconciler.Client.Status().Update(context.TODO(), &infra)
+				Expect(err).ToNot(HaveOccurred())
+
+				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(domain).To(Equal(expectedDomain))
 			})
 		})
 	})
 })
+
+func buildClient(objs ...client.Object) client.Client {
+	var err error
+	err = hypershiftv1beta1.AddToScheme(constinit.Scheme)
+	Expect(err).ToNot(HaveOccurred())
+	err = configv1.AddToScheme(constinit.Scheme)
+	Expect(err).ToNot(HaveOccurred())
+
+	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme)
+	return builder.Build()
+}

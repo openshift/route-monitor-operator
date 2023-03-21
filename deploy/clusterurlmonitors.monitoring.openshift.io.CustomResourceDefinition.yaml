@@ -31,6 +31,13 @@ spec:
             spec:
               description: ClusterUrlMonitorSpec defines the desired state of ClusterUrlMonitor
               properties:
+                domainRef:
+                  default: infra
+                  description: ClusterDomainRef defines the object used determine the cluster's domain By default, 'infra' is used, which references the 'infrastructures/cluster' object
+                  enum:
+                    - infra
+                    - hcp
+                  type: string
                 port:
                   type: string
                 prefix:
