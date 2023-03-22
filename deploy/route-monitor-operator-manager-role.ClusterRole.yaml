@@ -54,7 +54,7 @@ rules:
   - apiGroups:
       - hypershift.openshift.io
     resources:
-      - hostedcluster
+      - hostedclusters
     verbs:
       - get
       - list
