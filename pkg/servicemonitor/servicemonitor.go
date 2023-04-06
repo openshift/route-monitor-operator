@@ -23,9 +23,10 @@ type ServiceMonitor struct {
 
 func NewServiceMonitor(ctx context.Context, c client.Client, enablehypershift bool) *ServiceMonitor {
 	return &ServiceMonitor{
-		Client:   c,
-		Ctx:      ctx,
-		Comparer: &util.ResourceComparer{},
+		Client:     c,
+		Ctx:        ctx,
+		Comparer:   &util.ResourceComparer{},
+		Hypershift: enablehypershift,
 	}
 }
 
@@ -167,7 +168,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 	}
 }
 
-// TemplateForServiceMonitorResource returns a ServiceMonitor for Hypershift
+// HyperShiftTemplateForServiceMonitorResource returns a ServiceMonitor for Hypershift
 func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string) rhobsv1.ServiceMonitor {
 	return rhobsv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
