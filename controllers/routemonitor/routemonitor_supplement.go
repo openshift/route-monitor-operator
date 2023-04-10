@@ -63,7 +63,13 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 
 	// update ServiceMonitor if requiredctrl
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, r.Common.GetClusterID()); err != nil {
+	isHCP := false
+	id, err := r.Common.GetOSDClusterID()
+	if err != nil {
+		return utilreconcile.RequeueReconcileWith(err)
+	}
+
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -96,7 +102,8 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef); err != nil {
+	isHCP := false
+	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

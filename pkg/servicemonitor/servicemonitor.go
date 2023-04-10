@@ -15,13 +15,12 @@ import (
 )
 
 type ServiceMonitor struct {
-	Client     client.Client
-	Ctx        context.Context
-	Comparer   util.ResourceComparerInterface
-	Hypershift bool
+	Client   client.Client
+	Ctx      context.Context
+	Comparer util.ResourceComparerInterface
 }
 
-func NewServiceMonitor(ctx context.Context, c client.Client, enablehypershift bool) *ServiceMonitor {
+func NewServiceMonitor(ctx context.Context, c client.Client) *ServiceMonitor {
 	return &ServiceMonitor{
 		Client:   c,
 		Ctx:      ctx,
@@ -34,14 +33,14 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool) error {
 	params := map[string][]string{
 		// Currently we only support `http_2xx` as module
 		"module": {"http_2xx"},
 		"target": {routeURL},
 	}
 
-	if u.Hypershift == true {
+	if isHCPMonitor {
 		s := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
 		return u.HypershiftUpdateServiceMonitorDeployment(s)
 	}
@@ -90,13 +89,13 @@ func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(template rhobs
 }
 
 // Deletes the ServiceMonitor Deployment
-func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName) error {
+func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, isHCPMonitor bool) error {
 	if serviceMonitorRef == (v1alpha1.NamespacedName{}) {
 		return nil
 	}
 	namespacedName := types.NamespacedName{Name: serviceMonitorRef.Name, Namespace: serviceMonitorRef.Namespace}
 
-	if u.Hypershift == true {
+	if isHCPMonitor {
 		resource := &rhobsv1.ServiceMonitor{}
 		// Does the resource already exist?
 		err := u.Client.Get(u.Ctx, namespacedName, resource)
@@ -167,7 +166,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 	}
 }
 
-// TemplateForServiceMonitorResource returns a ServiceMonitor for Hypershift
+// HyperShiftTemplateForServiceMonitorResource returns a ServiceMonitor for Hypershift
 func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string) rhobsv1.ServiceMonitor {
 	return rhobsv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{

@@ -15,7 +15,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -24,6 +23,11 @@ const (
 
 // Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
 func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	// We shouldn't create prometheusrules for HCP clusterUrlMonitors, since alerting is implemented in the upstream RHOBS tenant
+	if clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
+		return utilreconcile.ContinueReconcile()
+	}
+
 	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
@@ -73,7 +77,21 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	namespacedName := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 	spec := clusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, s.Common.GetClusterID()); err != nil {
+	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
+	var id string
+	if isHCP {
+		id, err = s.Common.GetHypershiftClusterID(clusterUrlMonitor.Namespace)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+	} else {
+		id, err = s.Common.GetOSDClusterID()
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+	}
+
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -94,7 +112,8 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 		return utilreconcile.ContinueReconcile()
 	}
 
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef)
+	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -177,16 +196,11 @@ func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain() (string, error) {
 
 // getHypershiftClusterDomain returns a hypershift hosted cluster's domain based on it's hostedCluster object
 func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
-	// Retrieve the HostedControlPlane in order to lookup the associated hostedCluster object
-	hcpList := hypershiftv1beta1.HostedControlPlaneList{}
-	err := s.Client.List(s.Ctx, &hcpList, client.InNamespace(monitor.Namespace))
+	clusterHCP, err := s.Common.GetHCP(monitor.Namespace)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to retrieve HostedControlPlane for hosted cluster: %w", err)
 	}
-	if len(hcpList.Items) != 1 {
-		return "", fmt.Errorf("invalid number of HostedControlPlanes detected in namespace '%s': expected 1, got %d", monitor.Namespace, len(hcpList.Items))
-	}
-	clusterHCP := hcpList.Items[0]
+
 	clusterAnnotation := clusterHCP.Annotations[hcpClusterAnnotation]
 	annotationTokens := strings.Split(clusterAnnotation, "/")
 	if len(annotationTokens) != 2 {

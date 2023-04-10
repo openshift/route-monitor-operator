@@ -44,7 +44,6 @@ type RouteMonitorReconciler struct {
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
-	Hypershift       bool
 }
 
 func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
@@ -57,10 +56,9 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client, enablehypershift),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
 		Prom:             alert.NewPrometheusRule(ctx, client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
-		Hypershift:       enablehypershift,
 	}
 }
 

@@ -2,12 +2,14 @@ package reconcileCommon
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -29,10 +31,9 @@ func (_ *ResourceComparer) DeepEqual(x, y interface{}) bool {
 }
 
 type MonitorResourceCommon struct {
-	Client    client.Client
-	Ctx       context.Context
-	ClusterID string
-	Comparer  ResourceComparerInterface
+	Client   client.Client
+	Ctx      context.Context
+	Comparer ResourceComparerInterface
 }
 
 func NewMonitorResourceCommon(ctx context.Context, c client.Client) *MonitorResourceCommon {
@@ -140,16 +141,37 @@ func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr client.Object) (r
 	return reconcile.StopReconcile()
 }
 
-func (u *MonitorResourceCommon) GetClusterID() string {
-	if u.ClusterID == "" {
-		var version configv1.ClusterVersion
-		err := u.Client.Get(u.Ctx, client.ObjectKey{Name: "version"}, &version)
-		if err != nil {
-			return ""
-		}
-		u.ClusterID = string(version.Spec.ClusterID)
+// GetOSDClusterID returns the ID for the cluster based on its ClusterVersion
+func (u *MonitorResourceCommon) GetOSDClusterID() (string, error) {
+	var version configv1.ClusterVersion
+	err := u.Client.Get(u.Ctx, client.ObjectKey{Name: "version"}, &version)
+	if err != nil {
+		return "", err
 	}
-	return u.ClusterID
+	return string(version.Spec.ClusterID), nil
+}
+
+// GetHypershiftClusterID returns the ID for a hosted cluster based on the HCP object in the same namespace as the provided ClusterURLMonitor
+func (u *MonitorResourceCommon) GetHypershiftClusterID(ns string) (string, error) {
+	hcp, err := u.GetHCP(ns)
+	if err != nil {
+		return "", err
+	}
+	return hcp.Spec.ClusterID, nil
+}
+
+// GetHCP returns the HostedControlPlane object in the namespace provided. If more than one HCP object exists in the same namespace, an error is returned
+func (u *MonitorResourceCommon) GetHCP(ns string) (hypershiftv1beta1.HostedControlPlane, error) {
+	// Retrieve the HostedControlPlane in order to lookup the associated hostedCluster object
+	hcpList := hypershiftv1beta1.HostedControlPlaneList{}
+	err := u.Client.List(u.Ctx, &hcpList, client.InNamespace(ns))
+	if err != nil {
+		return hypershiftv1beta1.HostedControlPlane{}, err
+	}
+	if len(hcpList.Items) != 1 {
+		return hypershiftv1beta1.HostedControlPlane{}, fmt.Errorf("invalid number of HostedControlPlanes detected in namespace '%s': expected 1, got %d", ns, len(hcpList.Items))
+	}
+	return hcpList.Items[0], nil
 }
 
 func (u *MonitorResourceCommon) GetServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
