@@ -129,6 +129,17 @@ rules:
   - patch
   - update
 - apiGroups:
+  - monitoring.rhobs
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes
