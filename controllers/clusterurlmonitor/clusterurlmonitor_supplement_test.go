@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
+	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 )
 
 var _ = Describe("ClusterUrlMonitorSupplement", func() {
@@ -35,10 +36,14 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 	})
 
 	JustBeforeEach(func() {
+		client := buildClient(testObjs...)
+		ctx := context.TODO()
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
 			Log:    constinit.Logger,
-			Client: buildClient(testObjs...),
+			Client: client,
 			Scheme: constinit.Scheme,
+			Common: reconcileCommon.NewMonitorResourceCommon(ctx, client),
+			Ctx:    ctx,
 		}
 	})
 

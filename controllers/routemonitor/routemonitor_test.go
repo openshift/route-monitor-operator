@@ -159,7 +159,7 @@ var _ = Describe("Routemonitor", func() {
 				Times(ensureBlackBoxExporterResourcesExist.CalledTimes).
 				Return(ensureBlackBoxExporterResourcesExist.ErrorResponse)
 
-			mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(gomock.Any()).
+			mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(gomock.Any(), gomock.Any()).
 				Times(deleteServiceMonitorDeployment.CalledTimes).
 				Return(deleteServiceMonitorDeployment.ErrorResponse)
 
@@ -778,9 +778,9 @@ var _ = Describe("Routemonitor", func() {
 		Describe("It updates the ServiceMonitor targeting the blackbox Exporter Namespace", func() {
 			When("the update of the ServiceMonitor fails", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
-					mockUtils.EXPECT().GetClusterID().Return("test-cluster-id")
+					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})
 				It("will requeue with the error", func() {
 					Expect(err).To(Equal(consterror.CustomError))
@@ -789,9 +789,9 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update of the ServiceMonitor is successfull", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
-					mockUtils.EXPECT().GetClusterID().Return("test-cluster-id")
+					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})
 				When("the update of the ServiceMonitorRef fails", func() {
 					BeforeEach(func() {

@@ -155,7 +155,7 @@ var _ = Describe("CR Deployment Handling", func() {
 	})
 	Describe("DeleteServiceMonitorDeployment", func() {
 		JustBeforeEach(func() {
-			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef)
+			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, false)
 		})
 		When("The ServiceMonitorRef is not set", func() {
 			BeforeEach(func() {

@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	v1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -55,18 +56,49 @@ func (mr *MockMonitorResourceHandlerMockRecorder) DeleteFinalizer(o, finalizerKe
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFinalizer", reflect.TypeOf((*MockMonitorResourceHandler)(nil).DeleteFinalizer), o, finalizerKey)
 }
 
-// GetClusterID mocks base method.
-func (m *MockMonitorResourceHandler) GetClusterID() string {
+// GetHCP mocks base method.
+func (m *MockMonitorResourceHandler) GetHCP(ns string) (v1beta1.HostedControlPlane, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetClusterID")
-	ret0, _ := ret[0].(string)
-	return ret0
+	ret := m.ctrl.Call(m, "GetHCP", ns)
+	ret0, _ := ret[0].(v1beta1.HostedControlPlane)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// GetClusterID indicates an expected call of GetClusterID.
-func (mr *MockMonitorResourceHandlerMockRecorder) GetClusterID() *gomock.Call {
+// GetHCP indicates an expected call of GetHCP.
+func (mr *MockMonitorResourceHandlerMockRecorder) GetHCP(ns interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetClusterID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHCP", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHCP), ns)
+}
+
+// GetHypershiftClusterID mocks base method.
+func (m *MockMonitorResourceHandler) GetHypershiftClusterID(ns string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHypershiftClusterID", ns)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHypershiftClusterID indicates an expected call of GetHypershiftClusterID.
+func (mr *MockMonitorResourceHandlerMockRecorder) GetHypershiftClusterID(ns interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHypershiftClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHypershiftClusterID), ns)
+}
+
+// GetOSDClusterID mocks base method.
+func (m *MockMonitorResourceHandler) GetOSDClusterID() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOSDClusterID")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOSDClusterID indicates an expected call of GetOSDClusterID.
+func (mr *MockMonitorResourceHandlerMockRecorder) GetOSDClusterID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOSDClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetOSDClusterID))
 }
 
 // ParseMonitorSLOSpecs mocks base method.
@@ -181,17 +213,17 @@ func (m *MockServiceMonitorHandler) EXPECT() *MockServiceMonitorHandlerMockRecor
 }
 
 // DeleteServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName) error {
+func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", serviceMonitorRef)
+	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", serviceMonitorRef, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteServiceMonitorDeployment indicates an expected call of DeleteServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(serviceMonitorRef interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(serviceMonitorRef, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), serviceMonitorRef)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), serviceMonitorRef, hcp)
 }
 
 // HypershiftUpdateServiceMonitorDeployment mocks base method.
@@ -209,17 +241,17 @@ func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorD
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
