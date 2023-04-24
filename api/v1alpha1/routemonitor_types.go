@@ -20,16 +20,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
 	Route RouteMonitorRouteSpec `json:"route,omitempty"`
 	Slo   SloSpec               `json:"slo,omitempty"`
+
+	// +kubebuilder:default:false
+	// +kubebuilder:validation:Optional
+
+	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
+	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
+	SkipPrometheusRule bool `json:"skipPrometheusRule"`
 }
 
-// RouteMonitorSpec references the obsered Route resource
+// RouteMonitorRouteSpec references the observed Route resource
 type RouteMonitorRouteSpec struct {
 	// Name is the name of the Route
 	Name string `json:"name,omitempty"`

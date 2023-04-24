@@ -20,6 +20,20 @@ import (
 
 // Ensures that all PrometheusRules CR are created according to the RouteMonitor
 func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+	// If .spec.skipPrometheusRule is true, ensure that the PrometheusRule does NOT exist
+	if routeMonitor.Spec.SkipPrometheusRule {
+		// Cleanup any existing PrometheusRules and update the status
+		if err := r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
+		if updated {
+			return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
+		}
+
+		return utilreconcile.ContinueReconcile()
+	}
+
 	parsedSlo, err := r.Common.ParseMonitorSLOSpecs(routeMonitor.Status.RouteURL, routeMonitor.Spec.Slo)
 	if r.Common.SetErrorStatus(&routeMonitor.Status.ErrorStatus, err) {
 		return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
