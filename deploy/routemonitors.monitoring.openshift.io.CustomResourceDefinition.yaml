@@ -33,7 +33,7 @@ spec:
               description: RouteMonitorSpec defines the desired state of RouteMonitor
               properties:
                 route:
-                  description: RouteMonitorSpec references the obsered Route resource
+                  description: RouteMonitorRouteSpec references the observed Route resource
                   properties:
                     name:
                       description: Name is the name of the Route
@@ -42,6 +42,9 @@ spec:
                       description: Namespace is the namespace of the Route
                       type: string
                   type: object
+                skipPrometheusRule:
+                  description: SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs. One common use-case for is for alerts that are defined separately, such as for hosted clusters.
+                  type: boolean
                 slo:
                   description: SloSpec defines what is the percentage
                   properties:
