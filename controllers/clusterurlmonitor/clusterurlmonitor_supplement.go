@@ -13,6 +13,8 @@ import (
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -66,6 +68,13 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	}
 	return utilreconcile.ContinueReconcile()
 }
+func isClusterVersionAvailable(hcp hypershiftv1beta1.HostedControlPlane) error {
+	condition := meta.FindStatusCondition(hcp.Status.Conditions, string(hypershiftv1beta1.ClusterVersionAvailable))
+	if condition == nil || condition.Status != metav1.ConditionTrue {
+		return fmt.Errorf("The cluster API is not yet available")
+	}
+	return nil
+}
 
 // Takes care that right ServiceMonitor for the defined ClusterURLMonitor are in place
 func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
@@ -79,8 +88,13 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
 	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
 	var id string
+	var hcp hypershiftv1beta1.HostedControlPlane
 	if isHCP {
 		id, err = s.Common.GetHypershiftClusterID(clusterUrlMonitor.Namespace)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		err = isClusterVersionAvailable(hcp)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
