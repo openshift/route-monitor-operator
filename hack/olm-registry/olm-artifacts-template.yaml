@@ -55,6 +55,8 @@ objects:
         image: ${REGISTRY_IMG}@${IMAGE_DIGEST}
         publisher: Red Hat
         sourceType: grpc
+        grpcPodConfig:
+          securityContextConfig: restricted
     - apiVersion: operators.coreos.com/v1alpha1
       kind: Subscription
       metadata:
