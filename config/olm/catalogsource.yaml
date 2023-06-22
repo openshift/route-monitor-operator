@@ -13,3 +13,5 @@ spec:
     mediatype: ''
   publisher: Red Hat
   sourceType: grpc
+  grpcPodConfig:
+    securityContextConfig: restricted
