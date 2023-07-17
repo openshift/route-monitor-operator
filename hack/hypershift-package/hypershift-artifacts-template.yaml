@@ -25,8 +25,16 @@ objects:
     name: hs-mgmt-route-monitor-operator
   spec:
     clusterDeploymentSelector:
-      matchLabels:
-        api.openshift.com/managed: 'true'
+      matchExpressions:
+        - key: ext-hypershift.openshift.io/cluster-type
+          operator: In
+          values: ["management-cluster"]
+        - key: api.openshift.com/managed
+          operator: In
+          values: ["true"]
+        - key: api.openshift.com/fedramp
+          operator: NotIn
+          values: ["true"]
     resourceApplyMode: Sync
     resources:
     - apiVersion: policy.open-cluster-management.io/v1
