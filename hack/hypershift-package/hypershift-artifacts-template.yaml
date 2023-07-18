@@ -37,7 +37,7 @@ objects:
               policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
               policy.open-cluster-management.io/standards: NIST SP 800-53
           name: hs-mgmt-route-monitor-operator
-          namespace: openshift-acm-policies
+          namespace: openshift-operator-lifecycle-manager
       spec:
           disabled: false
           policy-templates:
@@ -84,7 +84,7 @@ objects:
       kind: PlacementRule
       metadata:
           name: placement-hs-mgmt-route-monitor-operator
-          namespace: openshift-acm-policies
+          namespace: openshift-operator-lifecycle-manager
       spec:
           clusterSelector:
               matchExpressions:
@@ -96,7 +96,7 @@ objects:
       kind: PlacementBinding
       metadata:
           name: binding-hs-mgmt-route-monitor-operator
-          namespace: openshift-acm-policies
+          namespace: openshift-operator-lifecycle-manager
       placementRef:
           apiGroup: apps.open-cluster-management.io
           kind: PlacementRule
