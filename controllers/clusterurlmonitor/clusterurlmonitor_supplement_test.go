@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -53,74 +54,142 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 	})
 
 	Describe("GetClusterDomain()", func() {
-		const (
-			expectedDomain = "testdomain.devshift.org"
-		)
-		Context("HyperShift", func() {
-			BeforeEach(func() {
-				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+		Describe("Public clusters", func() {
+			const (
+				expectedDomain = "testdomain.devshift.org"
+			)
+			Context("HyperShift", func() {
+				BeforeEach(func() {
+					clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
 
-				hcp := hypershiftv1beta1.HostedControlPlane{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hcp",
-						Namespace: "fake-namespace",
-						Annotations: map[string]string{
-							"hypershift.openshift.io/cluster": "test-ns/test-hc",
-						},
-					},
-					Spec: hypershiftv1beta1.HostedControlPlaneSpec{
-						Platform: hypershiftv1beta1.PlatformSpec{
-							AWS: &hypershiftv1beta1.AWSPlatformSpec{
-								EndpointAccess: hypershiftv1beta1.Public,
+					hcp := hypershiftv1beta1.HostedControlPlane{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hcp",
+							Namespace: "fake-namespace",
+							Annotations: map[string]string{
+								"hypershift.openshift.io/cluster": "test-ns/test-hc",
 							},
 						},
-					},
-				}
-				hc := hypershiftv1beta1.HostedCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hc",
-						Namespace: "test-ns",
-					},
-					Spec: hypershiftv1beta1.HostedClusterSpec{
-						DNS: hypershiftv1beta1.DNSSpec{
-							BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
+						Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+							Platform: hypershiftv1beta1.PlatformSpec{
+								AWS: &hypershiftv1beta1.AWSPlatformSpec{
+									EndpointAccess: hypershiftv1beta1.Public,
+								},
+							},
 						},
-					},
-				}
+					}
+					hc := hypershiftv1beta1.HostedCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hc",
+							Namespace: "test-ns",
+						},
+						Spec: hypershiftv1beta1.HostedClusterSpec{
+							DNS: hypershiftv1beta1.DNSSpec{
+								BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
+							},
+						},
+					}
+					testObjs = append(testObjs, &hcp)
+					testObjs = append(testObjs, &hc)
+				})
 
-				testObjs = append(testObjs, &hcp)
-				testObjs = append(testObjs, &hc)
+				It("should return a cluster URL", func() {
+					domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(domain).To(Equal(expectedDomain))
+				})
 			})
+			Context("OSD/ROSA", func() {
+				var infra configv1.Infrastructure
+				BeforeEach(func() {
+					clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefInfra
 
-			It("should return a cluster URL", func() {
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(domain).To(Equal(expectedDomain))
+					infra = configv1.Infrastructure{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "cluster",
+						},
+					}
+					testObjs = append(testObjs, &infra)
+				})
+
+				It("should return a cluster URL", func() {
+					// Objects cannot be created with a status predefined - it must
+					// be added as an update after creating
+					infra.Status.APIServerURL = fmt.Sprintf("https://api.%s:6443", expectedDomain)
+					err := reconciler.Client.Status().Update(context.TODO(), &infra)
+					Expect(err).ToNot(HaveOccurred())
+
+					domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(domain).To(Equal(expectedDomain))
+				})
 			})
 		})
-		Context("OSD/ROSA", func() {
-			var infra configv1.Infrastructure
-			BeforeEach(func() {
-				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefInfra
 
-				infra = configv1.Infrastructure{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster",
-					},
-				}
-				testObjs = append(testObjs, &infra)
-			})
+		Describe("Private clusters", func() {
+			const (
+				expectedDomain = "testprivate.devshift.org"
+			)
+			Context("HyperShift", func() {
+				BeforeEach(func() {
+					clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
 
-			It("should return a cluster URL", func() {
-				// Objects cannot be created with a status predefined - it must
-				// be added as an update after creating
-				infra.Status.APIServerURL = fmt.Sprintf("https://api.%s:6443", expectedDomain)
-				err := reconciler.Client.Status().Update(context.TODO(), &infra)
-				Expect(err).ToNot(HaveOccurred())
+					hcp := hypershiftv1beta1.HostedControlPlane{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hcp",
+							Namespace: "fake-namespace",
+							Annotations: map[string]string{
+								"hypershift.openshift.io/cluster": "test-ns/test-hc",
+							},
+						},
+						Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+							Platform: hypershiftv1beta1.PlatformSpec{
+								AWS: &hypershiftv1beta1.AWSPlatformSpec{
+									EndpointAccess: hypershiftv1beta1.Private,
+								},
+							},
+						},
+						Status: hypershiftv1beta1.HostedControlPlaneStatus{
+							Conditions: []metav1.Condition{{
+								Type:   string(hypershiftv1beta1.InfrastructureReady),
+								Status: metav1.ConditionTrue,
+							}},
+						},
+					}
+					hc := hypershiftv1beta1.HostedCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hc",
+							Namespace: "test-ns",
+						},
+						Spec: hypershiftv1beta1.HostedClusterSpec{
+							DNS: hypershiftv1beta1.DNSSpec{
+								BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
+							},
+						},
+					}
+					svc := corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "private-router",
+							Namespace: "fake-namespace",
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{{
+									Hostname: "testprivate.devshift.org",
+								}},
+							},
+						},
+					}
+					testObjs = append(testObjs, &hcp)
+					testObjs = append(testObjs, &hc)
+					testObjs = append(testObjs, &svc)
+				})
 
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(domain).To(Equal(expectedDomain))
+				It("should return a cluster URL", func() {
+					domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(domain).To(Equal(expectedDomain))
+				})
 			})
 		})
 	})
@@ -131,6 +200,8 @@ func buildClient(objs ...client.Object) client.Client {
 	err = hypershiftv1beta1.AddToScheme(constinit.Scheme)
 	Expect(err).ToNot(HaveOccurred())
 	err = configv1.AddToScheme(constinit.Scheme)
+	Expect(err).ToNot(HaveOccurred())
+	err = corev1.AddToScheme(constinit.Scheme)
 	Expect(err).ToNot(HaveOccurred())
 
 	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme)
