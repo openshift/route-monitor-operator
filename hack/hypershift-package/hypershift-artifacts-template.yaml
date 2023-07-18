@@ -28,7 +28,7 @@ objects:
       matchExpressions:
         - key: ext-hypershift.openshift.io/cluster-type
           operator: In
-          values: ["management-cluster"]
+          values: ["service-cluster"]
         - key: api.openshift.com/managed
           operator: In
           values: ["true"]
@@ -45,7 +45,7 @@ objects:
               policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
               policy.open-cluster-management.io/standards: NIST SP 800-53
           name: hs-mgmt-route-monitor-operator
-          namespace: openshift-operator-lifecycle-manager
+          namespace: openshift-acm-policies
       spec:
           disabled: false
           policy-templates:
@@ -92,7 +92,7 @@ objects:
       kind: PlacementRule
       metadata:
           name: placement-hs-mgmt-route-monitor-operator
-          namespace: openshift-operator-lifecycle-manager
+          namespace: openshift-acm-policies
       spec:
           clusterSelector:
               matchExpressions:
@@ -104,7 +104,7 @@ objects:
       kind: PlacementBinding
       metadata:
           name: binding-hs-mgmt-route-monitor-operator
-          namespace: openshift-operator-lifecycle-manager
+          namespace: openshift-acm-policies
       placementRef:
           apiGroup: apps.open-cluster-management.io
           kind: PlacementRule
