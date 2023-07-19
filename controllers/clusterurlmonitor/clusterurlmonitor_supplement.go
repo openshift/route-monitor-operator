@@ -89,9 +89,13 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
 	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
 	var id string
-	var hcp hypershiftv1beta1.HostedControlPlane
 	if isHCP {
+		var hcp hypershiftv1beta1.HostedControlPlane
 		id, err = s.Common.GetHypershiftClusterID(clusterUrlMonitor.Namespace)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		hcp, err = s.Common.GetHCP(clusterUrlMonitor.Namespace)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
