@@ -247,7 +247,7 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 	if len(ingresses) > 0 {
 		return ingresses[0].Hostname, nil
 	}
-	return "", fmt.Errorf("ingresses are not available")
+	return "", fmt.Errorf("no ingresses found")
 }
 
 func removeSubdomain(subdomain, clusterURL string) (string, error) {
