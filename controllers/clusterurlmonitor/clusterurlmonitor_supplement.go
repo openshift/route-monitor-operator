@@ -99,6 +99,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
+
 		err = isClusterVersionAvailable(hcp)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
@@ -225,46 +226,28 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 		return "", fmt.Errorf("invalid annotation for HostedControlPlane '%s': expected <namespace>/<hostedcluster name>, got %s", clusterHCP.Name, clusterAnnotation)
 	}
 
-	endpointAccess := clusterHCP.Spec.Platform.AWS.EndpointAccess
-
-	// In the case of private clusters, the domain will be the ingress of the private router
-	if endpointAccess == hypershiftv1beta1.Private {
-		service := corev1.Service{}
-		query := types.NamespacedName{
-			Name:      "private-router",
-			Namespace: monitor.Namespace,
-		}
-
-		err := s.Client.Get(s.Ctx, query, &service)
-		if err != nil {
-			return "", fmt.Errorf("could not retrieve private router in namespace '%s'; Reason: %s", monitor.Namespace, err.Error())
-		}
-
-		// Ensure all load balancers are available before attempting to check ingress
-		condition := meta.FindStatusCondition(clusterHCP.Status.Conditions, string(hypershiftv1beta1.InfrastructureReady))
-		if condition == nil || condition.Status != metav1.ConditionTrue {
-			return "", fmt.Errorf("cluster infrastructure is not yet available")
-		}
-
-		ingresses := service.Status.LoadBalancer.Ingress
-		if len(ingresses) > 0 {
-			return ingresses[0].Hostname, nil
-		}
-		return "", fmt.Errorf("ingresses are not available")
+	service := corev1.Service{}
+	query := types.NamespacedName{
+		Name:      "private-router",
+		Namespace: monitor.Namespace,
 	}
 
-	// Retrieve hostedCluster using HCP annotation
-	hostedCluster := hypershiftv1beta1.HostedCluster{}
-	hcReq := types.NamespacedName{
-		Namespace: annotationTokens[0],
-		Name:      annotationTokens[1],
-	}
-	err = s.Client.Get(s.Ctx, hcReq, &hostedCluster)
+	err = s.Client.Get(s.Ctx, query, &service)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not retrieve private router in namespace '%s'; Reason: %s", monitor.Namespace, err.Error())
 	}
 
-	return removeSubdomain("rosa", hostedCluster.Spec.DNS.BaseDomain)
+	// Ensure all load balancers are available before attempting to check ingress
+	condition := meta.FindStatusCondition(clusterHCP.Status.Conditions, string(hypershiftv1beta1.InfrastructureReady))
+	if condition == nil || condition.Status != metav1.ConditionTrue {
+		return "", fmt.Errorf("cluster infrastructure is not yet available")
+	}
+
+	ingresses := service.Status.LoadBalancer.Ingress
+	if len(ingresses) > 0 {
+		return ingresses[0].Hostname, nil
+	}
+	return "", fmt.Errorf("ingresses are not available")
 }
 
 func removeSubdomain(subdomain, clusterURL string) (string, error) {
