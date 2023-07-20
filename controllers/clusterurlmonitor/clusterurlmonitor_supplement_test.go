@@ -68,13 +68,6 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 							"hypershift.openshift.io/cluster": "test-ns/test-hc",
 						},
 					},
-					Spec: hypershiftv1beta1.HostedControlPlaneSpec{
-						Platform: hypershiftv1beta1.PlatformSpec{
-							AWS: &hypershiftv1beta1.AWSPlatformSpec{
-								EndpointAccess: hypershiftv1beta1.Public,
-							},
-						},
-					},
 				}
 				hc := hypershiftv1beta1.HostedCluster{
 					ObjectMeta: metav1.ObjectMeta{

@@ -230,23 +230,13 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 	// In the case of private clusters, the domain will be the ingress of the private router
 	if endpointAccess == hypershiftv1beta1.Private {
 		service := corev1.Service{}
-		query := types.NamespacedName{
-			Name:      "private-router",
-			Namespace: monitor.Namespace,
-		}
-
-		err := s.Client.Get(s.Ctx, query, &service)
+		err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "private-router", Namespace: monitor.Namespace}, &service)
 		if err != nil {
 			return "", fmt.Errorf("could not retrieve private router in namespace '%s'; Reason: %s", monitor.Namespace, err.Error())
 		}
 
-		// Ensure all load balancers are available before attempting to check ingress
-		condition := meta.FindStatusCondition(clusterHCP.Status.Conditions, string(hypershiftv1beta1.InfrastructureReady))
-		if condition == nil || condition.Status != metav1.ConditionTrue {
-			return "", fmt.Errorf("cluster infrastructure is not yet available")
-		}
-
 		ingress := service.Status.LoadBalancer.Ingress[0].Hostname
+		fmt.Printf("here with %s\n", ingress)
 		return ingress, nil
 	}
 
