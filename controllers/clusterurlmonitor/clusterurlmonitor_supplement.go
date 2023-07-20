@@ -12,7 +12,6 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,7 +98,6 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
-
 		err = isClusterVersionAvailable(hcp)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
@@ -220,34 +218,25 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve HostedControlPlane for hosted cluster: %w", err)
 	}
+
 	clusterAnnotation := clusterHCP.Annotations[hcpClusterAnnotation]
 	annotationTokens := strings.Split(clusterAnnotation, "/")
 	if len(annotationTokens) != 2 {
 		return "", fmt.Errorf("invalid annotation for HostedControlPlane '%s': expected <namespace>/<hostedcluster name>, got %s", clusterHCP.Name, clusterAnnotation)
 	}
 
-	service := corev1.Service{}
-	query := types.NamespacedName{
-		Name:      "private-router",
-		Namespace: monitor.Namespace,
+	// Retrieve hostedCluster using HCP annotation
+	hostedCluster := hypershiftv1beta1.HostedCluster{}
+	hcReq := types.NamespacedName{
+		Namespace: annotationTokens[0],
+		Name:      annotationTokens[1],
 	}
-
-	err = s.Client.Get(s.Ctx, query, &service)
+	err = s.Client.Get(s.Ctx, hcReq, &hostedCluster)
 	if err != nil {
-		return "", fmt.Errorf("could not retrieve private router in namespace '%s'; Reason: %s", monitor.Namespace, err.Error())
+		return "", err
 	}
 
-	// Ensure all load balancers are available before attempting to check ingress
-	condition := meta.FindStatusCondition(clusterHCP.Status.Conditions, string(hypershiftv1beta1.InfrastructureReady))
-	if condition == nil || condition.Status != metav1.ConditionTrue {
-		return "", fmt.Errorf("cluster infrastructure is not yet available")
-	}
-
-	ingresses := service.Status.LoadBalancer.Ingress
-	if len(ingresses) > 0 {
-		return ingresses[0].Hostname, nil
-	}
-	return "", fmt.Errorf("no ingresses found")
+	return removeSubdomain("rosa", hostedCluster.Spec.DNS.BaseDomain)
 }
 
 func removeSubdomain(subdomain, clusterURL string) (string, error) {

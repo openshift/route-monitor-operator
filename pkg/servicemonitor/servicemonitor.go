@@ -181,14 +181,9 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 					Interval: rhobsv1.Duration(ServiceMonitorPeriod),
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
-					TLSConfig: &rhobsv1.TLSConfig{
-						SafeTLSConfig: rhobsv1.SafeTLSConfig{
-							InsecureSkipVerify: true,
-						},
-					},
-					Path:   "/probe",
-					Scheme: "http",
-					Params: params,
+					Path:          "/probe",
+					Scheme:        "http",
+					Params:        params,
 					MetricRelabelConfigs: []*rhobsv1.RelabelConfig{
 						{
 							Replacement: routeURL,
