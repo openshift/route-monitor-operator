@@ -77,28 +77,20 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 								},
 							},
 						},
-						Status: hypershiftv1beta1.HostedControlPlaneStatus{
-							Conditions: []metav1.Condition{{
-								Type:   string(hypershiftv1beta1.InfrastructureReady),
-								Status: metav1.ConditionTrue,
-							}},
-						},
 					}
-					svc := corev1.Service{
+					hc := hypershiftv1beta1.HostedCluster{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "private-router",
-							Namespace: "fake-namespace",
+							Name:      "test-hc",
+							Namespace: "test-ns",
 						},
-						Status: corev1.ServiceStatus{
-							LoadBalancer: corev1.LoadBalancerStatus{
-								Ingress: []corev1.LoadBalancerIngress{{
-									Hostname: "testdomain.devshift.org",
-								}},
+						Spec: hypershiftv1beta1.HostedClusterSpec{
+							DNS: hypershiftv1beta1.DNSSpec{
+								BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
 							},
 						},
 					}
 					testObjs = append(testObjs, &hcp)
-					testObjs = append(testObjs, &svc)
+					testObjs = append(testObjs, &hc)
 				})
 
 				It("should return a cluster URL", func() {
@@ -127,6 +119,73 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 					err := reconciler.Client.Status().Update(context.TODO(), &infra)
 					Expect(err).ToNot(HaveOccurred())
 
+					domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(domain).To(Equal(expectedDomain))
+				})
+			})
+		})
+
+		Describe("Private clusters", func() {
+			const (
+				expectedDomain = "testprivate.devshift.org"
+			)
+			Context("HyperShift", func() {
+				BeforeEach(func() {
+					clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+
+					hcp := hypershiftv1beta1.HostedControlPlane{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hcp",
+							Namespace: "fake-namespace",
+							Annotations: map[string]string{
+								"hypershift.openshift.io/cluster": "test-ns/test-hc",
+							},
+						},
+						Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+							Platform: hypershiftv1beta1.PlatformSpec{
+								AWS: &hypershiftv1beta1.AWSPlatformSpec{
+									EndpointAccess: hypershiftv1beta1.Private,
+								},
+							},
+						},
+						Status: hypershiftv1beta1.HostedControlPlaneStatus{
+							Conditions: []metav1.Condition{{
+								Type:   string(hypershiftv1beta1.InfrastructureReady),
+								Status: metav1.ConditionTrue,
+							}},
+						},
+					}
+					hc := hypershiftv1beta1.HostedCluster{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-hc",
+							Namespace: "test-ns",
+						},
+						Spec: hypershiftv1beta1.HostedClusterSpec{
+							DNS: hypershiftv1beta1.DNSSpec{
+								BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
+							},
+						},
+					}
+					svc := corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "private-router",
+							Namespace: "fake-namespace",
+						},
+						Status: corev1.ServiceStatus{
+							LoadBalancer: corev1.LoadBalancerStatus{
+								Ingress: []corev1.LoadBalancerIngress{{
+									Hostname: "testprivate.devshift.org",
+								}},
+							},
+						},
+					}
+					testObjs = append(testObjs, &hcp)
+					testObjs = append(testObjs, &hc)
+					testObjs = append(testObjs, &svc)
+				})
+
+				It("should return a cluster URL", func() {
 					domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(domain).To(Equal(expectedDomain))

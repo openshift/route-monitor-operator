@@ -72,7 +72,7 @@ objects:
                               spec:
                                   domainRef: hcp
                                   port: "443"
-                                  prefix: https://
+                                  prefix: https://api.
                                   slo:
                                       targetAvailabilityPercent: "99.0"
                                   suffix: /livez
