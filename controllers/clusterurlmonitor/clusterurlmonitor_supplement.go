@@ -246,11 +246,8 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 			return "", fmt.Errorf("cluster infrastructure is not yet available")
 		}
 
-		ingresses := service.Status.LoadBalancer.Ingress
-		if len(ingresses) > 0 {
-			return ingresses[0].Hostname, nil
-		}
-		return "", fmt.Errorf("ingresses are not available")
+		ingress := service.Status.LoadBalancer.Ingress[0].Hostname
+		return ingress, nil
 	}
 
 	// Retrieve hostedCluster using HCP annotation
