@@ -50,6 +50,11 @@ spec:
                 description: Foo is an example field of ClusterUrlMonitor. Edit ClusterUrlMonitor_types.go
                   to remove/update
                 type: string
+              skipPrometheusRule:
+                description: SkipPrometheusRule instructs the controller to skip the
+                  creation of PrometheusRule CRs. One common use-case for is for alerts
+                  that are defined separately, such as for hosted clusters.
+                type: boolean
               slo:
                 description: SloSpec defines what is the percentage
                 properties:

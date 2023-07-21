@@ -25,6 +25,20 @@ const (
 
 // Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
 func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	// If .spec.skipPrometheusRule is true, ensure that the PrometheusRule does NOT exist
+	if clusterUrlMonitor.Spec.SkipPrometheusRule {
+		// Cleanup any existing PrometheusRules and update the status
+		if err := s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef); err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+		updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
+		if updated {
+			return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
+		}
+
+		return utilreconcile.ContinueReconcile()
+	}
+
 	// We shouldn't create prometheusrules for HCP clusterUrlMonitors, since alerting is implemented in the upstream RHOBS tenant
 	if clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
 		return utilreconcile.ContinueReconcile()
