@@ -5,6 +5,7 @@
 package controllers
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -57,48 +58,48 @@ func (mr *MockMonitorResourceHandlerMockRecorder) DeleteFinalizer(o, finalizerKe
 }
 
 // GetHCP mocks base method.
-func (m *MockMonitorResourceHandler) GetHCP(ns string) (v1beta1.HostedControlPlane, error) {
+func (m *MockMonitorResourceHandler) GetHCP(ctx context.Context, ns string) (v1beta1.HostedControlPlane, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHCP", ns)
+	ret := m.ctrl.Call(m, "GetHCP", ctx, ns)
 	ret0, _ := ret[0].(v1beta1.HostedControlPlane)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetHCP indicates an expected call of GetHCP.
-func (mr *MockMonitorResourceHandlerMockRecorder) GetHCP(ns interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) GetHCP(ctx, ns interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHCP", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHCP), ns)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHCP", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHCP), ctx, ns)
 }
 
 // GetHypershiftClusterID mocks base method.
-func (m *MockMonitorResourceHandler) GetHypershiftClusterID(ns string) (string, error) {
+func (m *MockMonitorResourceHandler) GetHypershiftClusterID(ctx context.Context, ns string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHypershiftClusterID", ns)
+	ret := m.ctrl.Call(m, "GetHypershiftClusterID", ctx, ns)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetHypershiftClusterID indicates an expected call of GetHypershiftClusterID.
-func (mr *MockMonitorResourceHandlerMockRecorder) GetHypershiftClusterID(ns interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) GetHypershiftClusterID(ctx, ns interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHypershiftClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHypershiftClusterID), ns)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHypershiftClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetHypershiftClusterID), ctx, ns)
 }
 
 // GetOSDClusterID mocks base method.
-func (m *MockMonitorResourceHandler) GetOSDClusterID() (string, error) {
+func (m *MockMonitorResourceHandler) GetOSDClusterID(ctx context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOSDClusterID")
+	ret := m.ctrl.Call(m, "GetOSDClusterID", ctx)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOSDClusterID indicates an expected call of GetOSDClusterID.
-func (mr *MockMonitorResourceHandlerMockRecorder) GetOSDClusterID() *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) GetOSDClusterID(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOSDClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetOSDClusterID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOSDClusterID", reflect.TypeOf((*MockMonitorResourceHandler)(nil).GetOSDClusterID), ctx)
 }
 
 // ParseMonitorSLOSpecs mocks base method.
@@ -160,33 +161,33 @@ func (mr *MockMonitorResourceHandlerMockRecorder) SetResourceReference(reference
 }
 
 // UpdateMonitorResource mocks base method.
-func (m *MockMonitorResourceHandler) UpdateMonitorResource(cr client.Object) (reconcile.Result, error) {
+func (m *MockMonitorResourceHandler) UpdateMonitorResource(ctx context.Context, cr client.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateMonitorResource", cr)
+	ret := m.ctrl.Call(m, "UpdateMonitorResource", ctx, cr)
 	ret0, _ := ret[0].(reconcile.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateMonitorResource indicates an expected call of UpdateMonitorResource.
-func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResource(cr interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResource(ctx, cr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResource", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResource), cr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResource", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResource), ctx, cr)
 }
 
 // UpdateMonitorResourceStatus mocks base method.
-func (m *MockMonitorResourceHandler) UpdateMonitorResourceStatus(cr client.Object) (reconcile.Result, error) {
+func (m *MockMonitorResourceHandler) UpdateMonitorResourceStatus(ctx context.Context, cr client.Object) (reconcile.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateMonitorResourceStatus", cr)
+	ret := m.ctrl.Call(m, "UpdateMonitorResourceStatus", ctx, cr)
 	ret0, _ := ret[0].(reconcile.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateMonitorResourceStatus indicates an expected call of UpdateMonitorResourceStatus.
-func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResourceStatus(cr interface{}) *gomock.Call {
+func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResourceStatus(ctx, cr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResourceStatus", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResourceStatus), cr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMonitorResourceStatus", reflect.TypeOf((*MockMonitorResourceHandler)(nil).UpdateMonitorResourceStatus), ctx, cr)
 }
 
 // MockServiceMonitorHandler is a mock of ServiceMonitorHandler interface.
@@ -213,59 +214,59 @@ func (m *MockServiceMonitorHandler) EXPECT() *MockServiceMonitorHandlerMockRecor
 }
 
 // DeleteServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error {
+func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", serviceMonitorRef, hcp)
+	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", ctx, serviceMonitorRef, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteServiceMonitorDeployment indicates an expected call of DeleteServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(serviceMonitorRef, hcp interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(ctx, serviceMonitorRef, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), serviceMonitorRef, hcp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), ctx, serviceMonitorRef, hcp)
 }
 
 // HypershiftUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) HypershiftUpdateServiceMonitorDeployment(template v10.ServiceMonitor) error {
+func (m *MockServiceMonitorHandler) HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template v10.ServiceMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HypershiftUpdateServiceMonitorDeployment", template)
+	ret := m.ctrl.Call(m, "HypershiftUpdateServiceMonitorDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // HypershiftUpdateServiceMonitorDeployment indicates an expected call of HypershiftUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorDeployment(template interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HypershiftUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).HypershiftUpdateServiceMonitorDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HypershiftUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).HypershiftUpdateServiceMonitorDeployment), ctx, template)
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) UpdateServiceMonitorDeployment(template v1.ServiceMonitor) error {
+func (m *MockServiceMonitorHandler) UpdateServiceMonitorDeployment(ctx context.Context, template v1.ServiceMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateServiceMonitorDeployment", template)
+	ret := m.ctrl.Call(m, "UpdateServiceMonitorDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateServiceMonitorDeployment indicates an expected call of UpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) UpdateServiceMonitorDeployment(template interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) UpdateServiceMonitorDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).UpdateServiceMonitorDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).UpdateServiceMonitorDeployment), ctx, template)
 }
 
 // MockPrometheusRuleHandler is a mock of PrometheusRuleHandler interface.
@@ -292,31 +293,31 @@ func (m *MockPrometheusRuleHandler) EXPECT() *MockPrometheusRuleHandlerMockRecor
 }
 
 // DeletePrometheusRuleDeployment mocks base method.
-func (m *MockPrometheusRuleHandler) DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error {
+func (m *MockPrometheusRuleHandler) DeletePrometheusRuleDeployment(ctx context.Context, prometheusRuleRef v1alpha1.NamespacedName) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePrometheusRuleDeployment", prometheusRuleRef)
+	ret := m.ctrl.Call(m, "DeletePrometheusRuleDeployment", ctx, prometheusRuleRef)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeletePrometheusRuleDeployment indicates an expected call of DeletePrometheusRuleDeployment.
-func (mr *MockPrometheusRuleHandlerMockRecorder) DeletePrometheusRuleDeployment(prometheusRuleRef interface{}) *gomock.Call {
+func (mr *MockPrometheusRuleHandlerMockRecorder) DeletePrometheusRuleDeployment(ctx, prometheusRuleRef interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).DeletePrometheusRuleDeployment), prometheusRuleRef)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).DeletePrometheusRuleDeployment), ctx, prometheusRuleRef)
 }
 
 // UpdatePrometheusRuleDeployment mocks base method.
-func (m *MockPrometheusRuleHandler) UpdatePrometheusRuleDeployment(template v1.PrometheusRule) error {
+func (m *MockPrometheusRuleHandler) UpdatePrometheusRuleDeployment(ctx context.Context, template v1.PrometheusRule) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePrometheusRuleDeployment", template)
+	ret := m.ctrl.Call(m, "UpdatePrometheusRuleDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdatePrometheusRuleDeployment indicates an expected call of UpdatePrometheusRuleDeployment.
-func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(template interface{}) *gomock.Call {
+func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).UpdatePrometheusRuleDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).UpdatePrometheusRuleDeployment), ctx, template)
 }
 
 // MockBlackBoxExporterHandler is a mock of BlackBoxExporterHandler interface.
@@ -343,31 +344,31 @@ func (m *MockBlackBoxExporterHandler) EXPECT() *MockBlackBoxExporterHandlerMockR
 }
 
 // EnsureBlackBoxExporterResourcesAbsent mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent() error {
+func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent")
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // EnsureBlackBoxExporterResourcesAbsent indicates an expected call of EnsureBlackBoxExporterResourcesAbsent.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesAbsent() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesAbsent(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesAbsent))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesAbsent), ctx)
 }
 
 // EnsureBlackBoxExporterResourcesExist mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist() error {
+func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist")
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // EnsureBlackBoxExporterResourcesExist indicates an expected call of EnsureBlackBoxExporterResourcesExist.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesExist() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesExist(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesExist))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesExist), ctx)
 }
 
 // GetBlackBoxExporterNamespace mocks base method.
@@ -385,16 +386,16 @@ func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace(
 }
 
 // ShouldDeleteBlackBoxExporterResources mocks base method.
-func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources")
+	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources", ctx)
 	ret0, _ := ret[0].(blackboxexporter.ShouldDeleteBlackBoxExporter)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) ShouldDeleteBlackBoxExporterResources() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) ShouldDeleteBlackBoxExporterResources(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).ShouldDeleteBlackBoxExporterResources))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).ShouldDeleteBlackBoxExporterResources), ctx)
 }

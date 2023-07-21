@@ -37,13 +37,11 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 
 	JustBeforeEach(func() {
 		client := buildClient(testObjs...)
-		ctx := context.TODO()
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
 			Log:    constinit.Logger,
 			Client: client,
 			Scheme: constinit.Scheme,
-			Common: reconcileCommon.NewMonitorResourceCommon(ctx, client),
-			Ctx:    ctx,
+			Common: reconcileCommon.NewMonitorResourceCommon(client),
 		}
 	})
 
@@ -86,7 +84,7 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 			})
 
 			It("should return a cluster URL", func() {
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				domain, err := reconciler.GetClusterDomain(context.TODO(), clusterUrlMonitor)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(domain).To(Equal(expectedDomain))
 			})
@@ -111,7 +109,7 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 				err := reconciler.Client.Status().Update(context.TODO(), &infra)
 				Expect(err).ToNot(HaveOccurred())
 
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				domain, err := reconciler.GetClusterDomain(context.TODO(), clusterUrlMonitor)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(domain).To(Equal(expectedDomain))
 			})
@@ -123,7 +121,7 @@ func buildClient(objs ...client.Object) client.Client {
 	var err error
 	err = hypershiftv1beta1.AddToScheme(constinit.Scheme)
 	Expect(err).ToNot(HaveOccurred())
-	err = configv1.AddToScheme(constinit.Scheme)
+	err = configv1.Install(constinit.Scheme)
 	Expect(err).ToNot(HaveOccurred())
 
 	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme)

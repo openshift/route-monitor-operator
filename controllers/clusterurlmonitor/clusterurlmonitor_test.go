@@ -1,6 +1,7 @@
 package clusterurlmonitor_test
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/mock/gomock"
@@ -81,17 +82,17 @@ var _ = Describe("Clusterurlmonitor", func() {
 			suffix = "/suffix"
 		})
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsureServiceMonitorExists(clusterUrlMonitor)
+			res, err = reconciler.EnsureServiceMonitorExists(context.TODO(), clusterUrlMonitor)
 		})
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // fetching domain
-				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(context.TODO(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
-				mockCommon.EXPECT().GetOSDClusterID().Times(1)
+				mockCommon.EXPECT().GetOSDClusterID(context.TODO()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, ns).Times(1).Return(true, nil)
-				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(context.TODO(), &clusterUrlMonitor).Times(1)
 			})
 			It("creates a ServiceMonitor and updates the ServiceRef", func() {
 				Expect(err).NotTo(HaveOccurred())
@@ -106,7 +107,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			err error
 		)
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsurePrometheusRuleExists(clusterUrlMonitor)
+			res, err = reconciler.EnsurePrometheusRuleExists(context.TODO(), clusterUrlMonitor)
 		})
 		When("the ClusterUrlMonitor has an invalid slo value", func() {
 			BeforeEach(func() {
@@ -115,7 +116,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("", err)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err)
 				// It deletes old pormetheus rule deployment if still there
-				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{}).Times(1)
 			})
 			It("sets the error in the ClusterUrlMonitor and stops processing", func() {
@@ -129,7 +130,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, gomock.Any()).Times(1).Return(false, nil)
 			})
 			It("doesn't update the clusterUrlMonitor reference and continues reconciling", func() {
@@ -143,10 +144,10 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, ns).Times(1).Return(true, nil)
-				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(context.TODO(), &clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)
 			})
 
 			It("should create one and update the clusterURLMonitor", func() {
@@ -166,44 +167,24 @@ var _ = Describe("Clusterurlmonitor", func() {
 			clusterUrlMonitor.Finalizers = []string{clusterurlmonitor.FinalizerKey}
 		})
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
+			res, err = reconciler.EnsureMonitorAndDependenciesAbsent(context.TODO(), clusterUrlMonitor)
 		})
-		When("the ClusterUrlMonitor CR is not being deleted", func() {
-			It("does nothing", func() {
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(reconcile.ContinueOperation()))
-			})
-		})
-
 		When("the ClusterUrlMonitor CR is being deleted", func() {
 			BeforeEach(func() {
 				clusterUrlMonitor.DeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
 			})
 			When("the ServiceMonitor still exists", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
-					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, gomock.Any()).Times(1)
+					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					gomock.InOrder(
 						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.FinalizerKey).Times(1).Return(true),
-						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.PrevFinalizerKey).Times(1),
 					)
-					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
+					mockCommon.EXPECT().UpdateMonitorResource(context.TODO(), &clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
 
 				})
-				When("the blackboxexporter needs to be cleaned up", func() {
-					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.DeleteBlackBoxExporter, nil)
-						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
-					})
-					It("removes the servicemonitor, the blackbox exporter and cleans up the finalizer", func() {
-						Expect(err).NotTo(HaveOccurred())
-						Expect(res).To(Equal(reconcile.StopOperation()))
-					})
-				})
-
 				When("the blackboxexporter doesn't need to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.KeepBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(blackboxexporter.KeepBlackBoxExporter, nil)
 					})
 					It("removes the servicemonitor and cleans up the finalizer", func() {
 						Expect(err).NotTo(HaveOccurred())

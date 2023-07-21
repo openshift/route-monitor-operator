@@ -12,7 +12,6 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,14 +31,12 @@ func (_ *ResourceComparer) DeepEqual(x, y interface{}) bool {
 
 type MonitorResourceCommon struct {
 	Client   client.Client
-	Ctx      context.Context
 	Comparer ResourceComparerInterface
 }
 
-func NewMonitorResourceCommon(ctx context.Context, c client.Client) *MonitorResourceCommon {
+func NewMonitorResourceCommon(c client.Client) *MonitorResourceCommon {
 	return &MonitorResourceCommon{
 		Client:   c,
-		Ctx:      ctx,
 		Comparer: &ResourceComparer{},
 	}
 }
@@ -124,8 +121,8 @@ func (u *MonitorResourceCommon) SetFinalizer(o v1.Object, finalizerKey string) b
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR in reconcile loops
-func (u *MonitorResourceCommon) UpdateMonitorResource(cr client.Object) (reconcile.Result, error) {
-	if err := u.Client.Update(u.Ctx, cr); err != nil {
+func (u *MonitorResourceCommon) UpdateMonitorResource(ctx context.Context, cr client.Object) (reconcile.Result, error) {
+	if err := u.Client.Update(ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
 	// After Updating watched CR we need to requeue, to prevent that two reconcile threads are running
@@ -133,8 +130,8 @@ func (u *MonitorResourceCommon) UpdateMonitorResource(cr client.Object) (reconci
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR Status in reconcile loops
-func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr client.Object) (reconcile.Result, error) {
-	if err := u.Client.Status().Update(u.Ctx, cr); err != nil {
+func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(ctx context.Context, cr client.Object) (reconcile.Result, error) {
+	if err := u.Client.Status().Update(ctx, cr); err != nil {
 		return reconcile.RequeueReconcileWith(err)
 	}
 	// After Updating watched CR we need to requeue, to prevent that two reconcile threads are running
@@ -142,9 +139,9 @@ func (u *MonitorResourceCommon) UpdateMonitorResourceStatus(cr client.Object) (r
 }
 
 // GetOSDClusterID returns the ID for the cluster based on its ClusterVersion
-func (u *MonitorResourceCommon) GetOSDClusterID() (string, error) {
+func (u *MonitorResourceCommon) GetOSDClusterID(ctx context.Context) (string, error) {
 	var version configv1.ClusterVersion
-	err := u.Client.Get(u.Ctx, client.ObjectKey{Name: "version"}, &version)
+	err := u.Client.Get(ctx, client.ObjectKey{Name: "version"}, &version)
 	if err != nil {
 		return "", err
 	}
@@ -152,8 +149,8 @@ func (u *MonitorResourceCommon) GetOSDClusterID() (string, error) {
 }
 
 // GetHypershiftClusterID returns the ID for a hosted cluster based on the HCP object in the same namespace as the provided ClusterURLMonitor
-func (u *MonitorResourceCommon) GetHypershiftClusterID(ns string) (string, error) {
-	hcp, err := u.GetHCP(ns)
+func (u *MonitorResourceCommon) GetHypershiftClusterID(ctx context.Context, ns string) (string, error) {
+	hcp, err := u.GetHCP(ctx, ns)
 	if err != nil {
 		return "", err
 	}
@@ -161,10 +158,10 @@ func (u *MonitorResourceCommon) GetHypershiftClusterID(ns string) (string, error
 }
 
 // GetHCP returns the HostedControlPlane object in the namespace provided. If more than one HCP object exists in the same namespace, an error is returned
-func (u *MonitorResourceCommon) GetHCP(ns string) (hypershiftv1beta1.HostedControlPlane, error) {
+func (u *MonitorResourceCommon) GetHCP(ctx context.Context, ns string) (hypershiftv1beta1.HostedControlPlane, error) {
 	// Retrieve the HostedControlPlane in order to lookup the associated hostedCluster object
 	hcpList := hypershiftv1beta1.HostedControlPlaneList{}
-	err := u.Client.List(u.Ctx, &hcpList, client.InNamespace(ns))
+	err := u.Client.List(ctx, &hcpList, client.InNamespace(ns))
 	if err != nil {
 		return hypershiftv1beta1.HostedControlPlane{}, err
 	}
@@ -172,10 +169,4 @@ func (u *MonitorResourceCommon) GetHCP(ns string) (hypershiftv1beta1.HostedContr
 		return hypershiftv1beta1.HostedControlPlane{}, fmt.Errorf("invalid number of HostedControlPlanes detected in namespace '%s': expected 1, got %d", ns, len(hcpList.Items))
 	}
 	return hcpList.Items[0], nil
-}
-
-func (u *MonitorResourceCommon) GetServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
-	serviceMonitor := monitoringv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, &serviceMonitor)
-	return serviceMonitor, err
 }

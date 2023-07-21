@@ -1,9 +1,9 @@
 package clusterurlmonitor
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -12,11 +12,9 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 const (
@@ -24,13 +22,13 @@ const (
 )
 
 // Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
-func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
 	// We shouldn't create prometheusrules for HCP clusterUrlMonitors, since alerting is implemented in the upstream RHOBS tenant
 	if clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
 		return utilreconcile.ContinueReconcile()
 	}
 
-	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
+	clusterDomain, err := s.GetClusterDomain(ctx, clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -40,23 +38,23 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	parsedSlo, err := s.Common.ParseMonitorSLOSpecs(clusterUrl, clusterUrlMonitor.Spec.Slo)
 
 	if s.Common.SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err) {
-		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(ctx, &clusterUrlMonitor)
 	}
 	if parsedSlo == "" {
-		err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
+		err = s.Prom.DeletePrometheusRuleDeployment(ctx, clusterUrlMonitor.Status.PrometheusRuleRef)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 		updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
 		if updated {
-			return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
+			return s.Common.UpdateMonitorResourceStatus(ctx, &clusterUrlMonitor)
 		}
 		return utilreconcile.StopReconcile()
 	}
 
 	namespacedName := types.NamespacedName{Namespace: clusterUrlMonitor.Namespace, Name: clusterUrlMonitor.Name}
 	template := alert.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
-	err = s.Prom.UpdatePrometheusRuleDeployment(template)
+	err = s.Prom.UpdatePrometheusRuleDeployment(ctx, template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -64,7 +62,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	// Update PrometheusRuleReference in ClusterUrlMonitor if necessary
 	updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, namespacedName)
 	if updated {
-		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(ctx, &clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
@@ -77,8 +75,8 @@ func isClusterVersionAvailable(hcp hypershiftv1beta1.HostedControlPlane) error {
 }
 
 // Takes care that right ServiceMonitor for the defined ClusterURLMonitor are in place
-func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
+func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	clusterDomain, err := s.GetClusterDomain(ctx, clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -90,11 +88,11 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	var id string
 	if isHCP {
 		var hcp hypershiftv1beta1.HostedControlPlane
-		id, err = s.Common.GetHypershiftClusterID(clusterUrlMonitor.Namespace)
+		id, err = s.Common.GetHypershiftClusterID(ctx, clusterUrlMonitor.Namespace)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
-		hcp, err = s.Common.GetHCP(clusterUrlMonitor.Namespace)
+		hcp, err = s.Common.GetHCP(ctx, clusterUrlMonitor.Namespace)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
@@ -103,13 +101,13 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 	} else {
-		id, err = s.Common.GetOSDClusterID()
+		id, err = s.Common.GetOSDClusterID(ctx)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 	}
 
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(ctx, clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -119,93 +117,48 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if updated {
-		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResourceStatus(ctx, &clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()
 }
 
 // Ensures that all dependencies related to a ClusterUrlMonitor are deleted
-func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	if clusterUrlMonitor.DeletionTimestamp == nil {
-		return utilreconcile.ContinueReconcile()
-	}
-
-	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-
-	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
+func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources(ctx)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
-		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
+		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent(ctx)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 	}
 
-	err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
+	err = s.Prom.DeletePrometheusRuleDeployment(ctx, clusterUrlMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	if s.Common.DeleteFinalizer(&clusterUrlMonitor, FinalizerKey) {
-		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
-		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
+		return s.Common.UpdateMonitorResource(ctx, &clusterUrlMonitor)
 	}
 
 	return utilreconcile.ContinueReconcile()
-}
-
-func (s *ClusterUrlMonitorReconciler) EnsureFinalizerSet(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	if s.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
-		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
-		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
-	}
-	return utilreconcile.ContinueReconcile()
-}
-
-// GetClusterUrlMonitor return the ClusterUrlMonitor that is tested
-func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1alpha1.ClusterUrlMonitor, utilreconcile.Result, error) {
-	ClusterUrlMonitor := v1alpha1.ClusterUrlMonitor{}
-	err := s.Client.Get(s.Ctx, req.NamespacedName, &ClusterUrlMonitor)
-	if err != nil {
-		// If this is an unknown error
-		if !k8serrors.IsNotFound(err) {
-			res, err := utilreconcile.RequeueReconcileWith(err)
-			return v1alpha1.ClusterUrlMonitor{}, res, err
-		}
-		s.Log.V(2).Info("StopRequeue", "As ClusterUrlMonitor is 'NotFound', stopping requeue", nil)
-
-		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
-	}
-
-	// if the resource is empty, we should terminate
-	emptyClustUrlMonitor := v1alpha1.ClusterUrlMonitor{}
-	if reflect.DeepEqual(ClusterUrlMonitor, emptyClustUrlMonitor) {
-		return v1alpha1.ClusterUrlMonitor{}, utilreconcile.StopOperation(), nil
-	}
-
-	return ClusterUrlMonitor, utilreconcile.ContinueOperation(), nil
 }
 
 // GetClusterDomain returns the baseDomain for a cluster, using the correct method based on it's type
-func (s *ClusterUrlMonitorReconciler) GetClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
+func (s *ClusterUrlMonitorReconciler) GetClusterDomain(ctx context.Context, monitor v1alpha1.ClusterUrlMonitor) (string, error) {
 	if monitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
-		return s.getHypershiftClusterDomain(monitor)
+		return s.getHypershiftClusterDomain(ctx, monitor)
 	}
-	return s.getInfraClusterDomain()
+	return s.getInfraClusterDomain(ctx)
 }
 
 // getInfraClusterDomain returns a normal OSD/ROSA cluster's domain based on it's infrastructure object
-func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain() (string, error) {
+func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain(ctx context.Context) (string, error) {
 	clusterInfra := configv1.Infrastructure{}
-	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterInfra)
+	err := s.Client.Get(ctx, types.NamespacedName{Name: "cluster"}, &clusterInfra)
 	if err != nil {
 		return "", err
 	}
@@ -213,8 +166,8 @@ func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain() (string, error) {
 }
 
 // getHypershiftClusterDomain returns a hypershift hosted cluster's domain based on it's hostedCluster object
-func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
-	clusterHCP, err := s.Common.GetHCP(monitor.Namespace)
+func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(ctx context.Context, monitor v1alpha1.ClusterUrlMonitor) (string, error) {
+	clusterHCP, err := s.Common.GetHCP(ctx, monitor.Namespace)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve HostedControlPlane for hosted cluster: %w", err)
 	}
@@ -231,7 +184,7 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 		Namespace: annotationTokens[0],
 		Name:      annotationTokens[1],
 	}
-	err = s.Client.Get(s.Ctx, hcReq, &hostedCluster)
+	err = s.Client.Get(ctx, hcReq, &hostedCluster)
 	if err != nil {
 		return "", err
 	}

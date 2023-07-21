@@ -1,207 +1,189 @@
-package servicemonitor_test
+package servicemonitor
 
 import (
-	"github.com/golang/mock/gomock"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"context"
-
-	// tested package
+	"testing"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
-	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
-
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	utilmock "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
-	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-type ResourceComparerMockHelper struct {
-	CalledTimes int
-	ReturnValue bool
+func TestTemplateAndUpdateServiceMonitorDeployment(t *testing.T) {
+	const (
+		routeURL                  = "example.com"
+		blackBoxExporterNamespace = "blackbox-namespace"
+		clusterID                 = "test-id"
+		serviceMonitorName        = "test-name"
+		serviceMonitorNamespace   = "test-namespace"
+	)
+
+	var namespacedName = types.NamespacedName{
+		Namespace: serviceMonitorNamespace,
+		Name:      serviceMonitorName,
+	}
+
+	tests := []struct {
+		name  string
+		objs  []client.Object
+		isHCP bool
+	}{
+		{
+			name:  "Creating for Classic OSD",
+			isHCP: false,
+		},
+		{
+			name: "Updating for Classic OSD",
+			objs: []client.Object{
+				&monitoringv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      serviceMonitorName,
+						Namespace: serviceMonitorNamespace,
+					},
+					Spec: monitoringv1.ServiceMonitorSpec{
+						NamespaceSelector: monitoringv1.NamespaceSelector{
+							MatchNames: []string{blackBoxExporterNamespace},
+						},
+					},
+				},
+			},
+			isHCP: false,
+		},
+		{
+			name:  "Creating for HCP",
+			isHCP: true,
+		},
+		{
+			name: "Updating for HCP",
+			objs: []client.Object{
+				&rhobsv1.ServiceMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      serviceMonitorName,
+						Namespace: serviceMonitorNamespace,
+					},
+					Spec: rhobsv1.ServiceMonitorSpec{
+						NamespaceSelector: rhobsv1.NamespaceSelector{
+							MatchNames: []string{blackBoxExporterNamespace},
+						},
+					},
+				},
+			},
+			isHCP: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := rhobsv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := monitoringv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
+
+			serviceMonitor := NewServiceMonitor(fake.NewClientBuilder().WithScheme(s).WithObjects(test.objs...).Build())
+			if err := serviceMonitor.TemplateAndUpdateServiceMonitorDeployment(context.TODO(), routeURL, blackBoxExporterNamespace, namespacedName, clusterID, test.isHCP); err != nil {
+				t.Error(err)
+			}
+
+			params := map[string][]string{
+				"module": {"http_2xx"},
+				"target": {routeURL},
+			}
+			if test.isHCP {
+				template := serviceMonitor.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
+				sm := new(rhobsv1.ServiceMonitor)
+				if err := serviceMonitor.Client.Get(context.TODO(), namespacedName, sm); err != nil {
+					t.Errorf("expected no err, got %v", err)
+				}
+				assert.Equal(t, template.Spec, sm.Spec)
+			} else {
+				template := serviceMonitor.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
+				sm := new(monitoringv1.ServiceMonitor)
+				if err := serviceMonitor.Client.Get(context.TODO(), namespacedName, sm); err != nil {
+					t.Errorf("expected no err, got %v", err)
+				}
+				assert.Equal(t, template.Spec, sm.Spec)
+			}
+		})
+	}
 }
 
-var _ = Describe("CR Deployment Handling", func() {
+func TestDeleteServiceMonitorDeployment(t *testing.T) {
 	var (
-		ctx                  context.Context
-		mockClient           *clientmocks.MockClient
-		mockCtrl             *gomock.Controller
-		mockResourceComparer *utilmock.MockResourceComparerInterface
-
-		deepEqual ResourceComparerMockHelper
-		get       testhelper.MockHelper
-		create    testhelper.MockHelper
-		update    testhelper.MockHelper
-		delete    testhelper.MockHelper
-
-		serviceMonitorRef v1alpha1.NamespacedName
-		serviceMonitor    monitoringv1.ServiceMonitor
-		sm                servicemonitor.ServiceMonitor
-		err               error
-	)
-	BeforeEach(func() {
-		ctx = constinit.Context
-		mockCtrl = gomock.NewController(GinkgoT())
-		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
-
-		deepEqual = ResourceComparerMockHelper{}
-		get = testhelper.MockHelper{}
-		create = testhelper.MockHelper{}
-		update = testhelper.MockHelper{}
-		delete = testhelper.MockHelper{}
-
-		serviceMonitorRef = v1alpha1.NamespacedName{}
-		serviceMonitor = monitoringv1.ServiceMonitor{}
-
-		sm = servicemonitor.ServiceMonitor{
-			Client:   mockClient,
-			Ctx:      ctx,
-			Comparer: mockResourceComparer,
+		objs = []client.Object{
+			&monitoringv1.ServiceMonitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-name",
+					Namespace: "test-namespace",
+				},
+			},
+			&rhobsv1.ServiceMonitor{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-name",
+					Namespace: "test-namespace",
+				},
+			},
 		}
-	})
-	JustBeforeEach(func() {
+		serviceMonitorRef = v1alpha1.NamespacedName{
+			Name:      "test-name",
+			Namespace: "test-namespace",
+		}
+	)
 
-		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
-			Return(deepEqual.ReturnValue).
-			Times(deepEqual.CalledTimes)
+	tests := []struct {
+		name  string
+		isHCP bool
+	}{
+		{
+			name:  "Delete for classic OSD",
+			isHCP: false,
+		},
+		{
+			name:  "Delete for HCP",
+			isHCP: true,
+		},
+	}
 
-		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(update.ErrorResponse).
-			Times(update.CalledTimes)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := rhobsv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
 
-		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(get.ErrorResponse).
-			Times(get.CalledTimes)
+			if err := monitoringv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
 
-		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-			Return(create.ErrorResponse).
-			Times(create.CalledTimes)
+			serviceMonitor := NewServiceMonitor(fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build())
+			if err := serviceMonitor.DeleteServiceMonitorDeployment(context.TODO(), serviceMonitorRef, test.isHCP); err != nil {
+				t.Error(err)
+			}
 
-		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(delete.ErrorResponse).
-			Times(delete.CalledTimes)
-
-	})
-	AfterEach(func() {
-		mockCtrl.Finish()
-	})
-	Describe("UpdateServiceMonitorDeployment", func() {
-		BeforeEach(func() {
-			get.CalledTimes = 1
+			// Ensure the "other" servicemonitor is still present
+			// for HyperShift we don't expect to delete monitoringv1, otherwise we don't expect to delete rhobsv1
+			if test.isHCP {
+				sm := new(monitoringv1.ServiceMonitor)
+				if err := serviceMonitor.Client.Get(context.TODO(), types.NamespacedName{Namespace: serviceMonitorRef.Namespace, Name: serviceMonitorRef.Name}, sm); err != nil {
+					t.Errorf("expected no err, got %v", err)
+				}
+				assert.NotNil(t, sm)
+			} else {
+				sm := new(rhobsv1.ServiceMonitor)
+				if err := serviceMonitor.Client.Get(context.TODO(), types.NamespacedName{Namespace: serviceMonitorRef.Namespace, Name: serviceMonitorRef.Name}, sm); err != nil {
+					t.Errorf("expected no err, got %v", err)
+				}
+				assert.NotNil(t, sm)
+			}
 		})
-		JustBeforeEach(func() {
-			err = sm.UpdateServiceMonitorDeployment(serviceMonitor)
-		})
-		When("The Client failed to fetch existing deployments", func() {
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should return the received error", func() {
-				Expect(err).To(Equal(consterror.CustomError))
-			})
-		})
-		Describe("No ServiceMonitor has been deployed yet", func() {
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create.CalledTimes = 1
-			})
-			It("tryies to creates one", func() {
-				Expect(err).NotTo(HaveOccurred())
-			})
-			When("an error appeared during the creation", func() {
-				BeforeEach(func() {
-					create.ErrorResponse = consterror.CustomError
-				})
-				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
-				})
-			})
-		})
-		Describe("A ServiceMonitor has been deployed already", func() {
-			BeforeEach(func() {
-				deepEqual.CalledTimes = 1
-			})
-			When("the template changed", func() {
-				BeforeEach(func() {
-					deepEqual.ReturnValue = false
-					update.CalledTimes = 1
-				})
-				It("updates the existing deployment", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-				When("The Client failed to update the existing deployments", func() {
-					BeforeEach(func() {
-						update.ErrorResponse = consterror.CustomError
-					})
-					It("should return the received error", func() {
-						Expect(err).To(Equal(consterror.CustomError))
-					})
-				})
-			})
-			When("the existing ServiceMonitor is equal to the template", func() {
-				BeforeEach(func() {
-					deepEqual.ReturnValue = true
-				})
-				It("does nothing", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-		})
-	})
-	Describe("DeleteServiceMonitorDeployment", func() {
-		JustBeforeEach(func() {
-			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, false)
-		})
-		When("The ServiceMonitorRef is not set", func() {
-			BeforeEach(func() {
-				serviceMonitorRef = v1alpha1.NamespacedName{}
-			})
-			It("does nothing", func() {
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		Describe("The ServiceMonitorRef is set", func() {
-			BeforeEach(func() {
-				serviceMonitorRef = v1alpha1.NamespacedName{Name: "test", Namespace: "test"}
-				get.CalledTimes = 1
-			})
-			When("the client failed to fetch the deployment", func() {
-				BeforeEach(func() {
-					get.ErrorResponse = consterror.CustomError
-				})
-				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
-				})
-			})
-			When("the ServiceMonitorDeployment doesnt exist", func() {
-				BeforeEach(func() {
-					get.ErrorResponse = consterror.NotFoundErr
-				})
-				It("does nothing", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-			When("the ServiceMonitorDeployment exists", func() {
-				BeforeEach(func() {
-					delete.CalledTimes = 1
-				})
-				It("deletes the Deployment", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-				When("the client failed to delete the deployment", func() {
-					BeforeEach(func() {
-						delete.ErrorResponse = consterror.CustomError
-					})
-					It("returns the received error", func() {
-						Expect(err).To(Equal(consterror.CustomError))
-					})
-				})
-			})
-		})
-	})
-})
+	}
+}

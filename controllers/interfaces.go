@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
@@ -33,11 +34,11 @@ type MonitorResourceHandler interface {
 
 	// UpdateMonitorResource updates the Spec of the ClusterURLMonitor & RouteMonitor CR
 	// Should be called after object that triggered reconcile loop has been changed
-	UpdateMonitorResource(cr client.Object) (utilreconcile.Result, error)
+	UpdateMonitorResource(ctx context.Context, cr client.Object) (utilreconcile.Result, error)
 
 	// UpdateMonitorResourceStatus updates the State Field of the ClusterURLMonitor & RouteMonitor
 	// Should be called after object that triggered reconcile loop has been changed
-	UpdateMonitorResourceStatus(cr client.Object) (utilreconcile.Result, error)
+	UpdateMonitorResourceStatus(ctx context.Context, cr client.Object) (utilreconcile.Result, error)
 
 	// SetFinalizer adds finalizerKey to an object
 	SetFinalizer(o v1.Object, finalizerKey string) bool
@@ -46,46 +47,46 @@ type MonitorResourceHandler interface {
 	DeleteFinalizer(o v1.Object, finalizerKey string) bool
 
 	// GetClusterID fetches the Cluster ID
-	GetOSDClusterID() (string, error)
+	GetOSDClusterID(ctx context.Context) (string, error)
 
 	// GetHypershiftClusterID returns the Cluster ID based on the HostedControlPlane object in the provided namespace
-	GetHypershiftClusterID(ns string) (string, error)
+	GetHypershiftClusterID(ctx context.Context, ns string) (string, error)
 
 	// GetHCP fetches the HostedControlPlane for the hosted cluster the provided ClusterURLMonitor tracks
-	GetHCP(ns string) (hypershiftv1beta1.HostedControlPlane, error)
+	GetHCP(ctx context.Context, ns string) (hypershiftv1beta1.HostedControlPlane, error)
 }
 
 type ServiceMonitorHandler interface {
 	// UpdateServiceMonitorDeployment ensures that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one.
 	// If the template changed, it will update the existing deployment
-	UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error
+	UpdateServiceMonitorDeployment(ctx context.Context, template monitoringv1.ServiceMonitor) error
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
+	TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
 
 	// DeleteServiceMonitorDeployment deletes a ServiceMonitor refrenced by a namespaced name
-	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
+	DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
 
 	// HypershiftUpdateServiceMonitorDeployment is for HyperShift cluster to ensure that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one. If the template changed, it will update the existing deployment
-	HypershiftUpdateServiceMonitorDeployment(template rhobsv1.ServiceMonitor) error
+	HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template rhobsv1.ServiceMonitor) error
 }
 
 type PrometheusRuleHandler interface {
 	// UpdatePrometheusRuleDeployment ensures that a PrometheusRule deployment according
 	// to the template exists. If none exists, it will create a new one.
 	// If the template changed, it will update the existing deployment
-	UpdatePrometheusRuleDeployment(template monitoringv1.PrometheusRule) error
+	UpdatePrometheusRuleDeployment(ctx context.Context, template monitoringv1.PrometheusRule) error
 
 	// DeletePrometheusRuleDeployment deletes a PrometheusRule refrenced by a namespaced name
-	DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error
+	DeletePrometheusRuleDeployment(ctx context.Context, prometheusRuleRef v1alpha1.NamespacedName) error
 }
 
 type BlackBoxExporterHandler interface {
-	EnsureBlackBoxExporterResourcesExist() error
-	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
+	EnsureBlackBoxExporterResourcesExist(ctx context.Context) error
+	EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error
+	ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
 	GetBlackBoxExporterNamespace() string
 }

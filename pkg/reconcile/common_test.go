@@ -9,7 +9,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -28,7 +27,6 @@ type ResourceComparerMockHelper struct {
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx                  context.Context
 		mockClient           *clientmocks.MockClient
 		mockCtrl             *gomock.Controller
 		mockResourceComparer *utilmock.MockResourceComparerInterface
@@ -42,7 +40,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		rc reconcilecommon.MonitorResourceCommon
 	)
 	BeforeEach(func() {
-		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
@@ -55,7 +52,6 @@ var _ = Describe("CR Deployment Handling", func() {
 
 		rc = reconcilecommon.MonitorResourceCommon{
 			Client:   mockClient,
-			Ctx:      ctx,
 			Comparer: mockResourceComparer,
 		}
 	})
@@ -202,7 +198,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			}
 		})
 		JustBeforeEach(func() {
-			res, err = rc.UpdateMonitorResource(&routeMonitor)
+			res, err = rc.UpdateMonitorResource(context.TODO(), &routeMonitor)
 		})
 		When("when updating the monitor failed", func() {
 			BeforeEach(func() {
@@ -300,7 +296,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			}
 		})
 		JustBeforeEach(func() {
-			res, err = rc.UpdateMonitorResourceStatus(&routeMonitor)
+			res, err = rc.UpdateMonitorResourceStatus(context.TODO(), &routeMonitor)
 
 		})
 		When("when updating the monitor failed", func() {

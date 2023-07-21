@@ -18,47 +18,46 @@ package routemonitor
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/go-logr/logr"
-	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+const FinalizerKey string = "routemonitor.routemonitoroperator.monitoring.openshift.io/finalizer"
+
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
-	Client           client.Client
-	Ctx              context.Context
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
+	client.Client
+	Scheme *runtime.Scheme
+	Log    logr.Logger
+
 	BlackBoxExporter controllers.BlackBoxExporterHandler
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
-	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string) *RouteMonitorReconciler {
 	client := mgr.GetClient()
-	ctx := context.Background()
 	return &RouteMonitorReconciler{
 		Client:           client,
-		Ctx:              ctx,
-		Log:              log,
 		Scheme:           mgr.GetScheme(),
-		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
-		Prom:             alert.NewPrometheusRule(ctx, client),
-		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
+		BlackBoxExporter: blackboxexporter.New(client, blackboxExporterImage, blackboxExporterNamespace),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
+		Prom:             alert.NewPrometheusRule(client),
+		Common:           reconcileCommon.NewMonitorResourceCommon(client),
 	}
 }
 
@@ -74,99 +73,96 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 // +kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get;list;watch
 
 func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Ctx = ctx
-	log := r.Log.WithName("Reconcile").WithValues("name", req.Name, "namespace", req.Namespace)
+	r.Log = ctrllog.FromContext(ctx).WithName("controller").WithName("RouteMonitor")
 
-	log.V(2).Info("Entering GetRouteMonitor")
-	routeMonitor, res, err := r.GetRouteMonitor(req)
-	if err != nil {
-		log.Error(err, "Failed to retreive RouteMonitor. Requeueing...")
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		return utilreconcile.Stop()
+	routeMonitor := new(v1alpha1.RouteMonitor)
+	if err := r.Get(ctx, req.NamespacedName, routeMonitor); err != nil {
+		// Ignore not-found errors, since they can't be fixed by an immediate
+		// requeue (we'll need to wait for a new notification).
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Handle deletion of RouteMonitor Resource
-	shouldDelete := finalizer.WasDeleteRequested(&routeMonitor)
-	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
-
-	if shouldDelete {
-		_, err := r.EnsureMonitorAndDependenciesAbsent(routeMonitor)
-		if err != nil {
-			log.Error(err, "Failed to delete RouteMonitor. Requeueing...")
-			return utilreconcile.RequeueWith(err)
+	if routeMonitor.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The ClusterUrlMonitor is not being deleted, so if it does not have our finalizer,
+		// then lets add the finalizer and update the object.
+		if !controllerutil.ContainsFinalizer(routeMonitor, FinalizerKey) {
+			controllerutil.AddFinalizer(routeMonitor, FinalizerKey)
+			if err := r.Update(ctx, routeMonitor); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
-		log.Info("Successfully deleted RouteMonitor. Finished reconcile.")
-		return utilreconcile.Stop()
+	} else {
+		if err := r.EnsureMonitorAndDependenciesAbsent(ctx, *routeMonitor); err != nil {
+			r.Log.Error(err, "failed to delete RouteMonitor")
+			return ctrl.Result{}, err
+		}
+
+		// Finished cleaning up dependent resources, remove finalizer
+		controllerutil.RemoveFinalizer(routeMonitor, FinalizerKey)
+		if err := r.Update(ctx, routeMonitor); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		r.Log.Info("Successfully deleted RouteMonitor. Finished reconcile.")
+		// Stop reconciliation as the item has been deleted
+		return ctrl.Result{}, nil
 	}
 
-	log.V(2).Info("Entering EnsureFinalizerSet")
-	res, err = r.EnsureFinalizerSet(routeMonitor)
-	if err != nil {
-		log.Error(err, "Failed to set RouteMonitor's finalizer. Requeueing...")
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		log.Info("Successfully set RouteMonitor finalizers. Stopping...")
-		return utilreconcile.Stop()
-	}
-
-	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
+	r.Log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go
-	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
+	err := r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist(ctx)
 	if err != nil {
-		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
+		r.Log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.V(2).Info("Entering GetRoute")
-	route, err := r.GetRoute(routeMonitor)
+	r.Log.V(2).Info("Entering GetRoute")
+	route, err := r.GetRoute(ctx, *routeMonitor)
 	if err != nil {
-		log.Error(err, "Failed to get Route. Requeueing...")
+		r.Log.Error(err, "Failed to get Route. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.V(2).Info("Entering EnsureRouteURLExists")
-	res, err = r.EnsureRouteURLExists(route, routeMonitor)
+	r.Log.V(2).Info("Entering EnsureRouteURLExists")
+	res, err := r.EnsureRouteURLExists(ctx, route, *routeMonitor)
 	if err != nil {
-		log.Error(err, "Failed to get RouteURL for RouteMonitor. Requeueing...")
-		return utilreconcile.RequeueWith(err)
-	}
-	if res.ShouldStop() {
-		log.Info("Successfully patched RouteMonitor with RouteURL. Stopping...")
-		return utilreconcile.Stop()
-	}
-
-	log.V(2).Info("Entering EnsureServiceMonitorExists")
-	res, err = r.EnsureServiceMonitorExists(routeMonitor)
-	if err != nil {
-		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
+		r.Log.Error(err, "Failed to get RouteURL for RouteMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
-		log.Info("Successfully patched RouteMonitor with ServiceMonitorRef. Stopping...")
+		r.Log.Info("Successfully patched RouteMonitor with RouteURL. Stopping...")
 		return utilreconcile.Stop()
 	}
 
-	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
+	r.Log.V(2).Info("Entering EnsureServiceMonitorExists")
+	res, err = r.EnsureServiceMonitorExists(ctx, *routeMonitor)
+	if err != nil {
+		r.Log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
+		return utilreconcile.RequeueWith(err)
+	}
+	if res.ShouldStop() {
+		r.Log.Info("Successfully patched RouteMonitor with ServiceMonitorRef. Stopping...")
+		return utilreconcile.Stop()
+	}
+
+	r.Log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
 	// result is silenced as it's the end of the function, if this moves add it back
-	res, err = r.EnsurePrometheusRuleExists(routeMonitor)
+	res, err = r.EnsurePrometheusRuleExists(ctx, *routeMonitor)
 	if err != nil {
-		log.Error(err, "Failed to set PrometheusRule. Requeueing...")
+		r.Log.Error(err, "Failed to set PrometheusRule. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {
-		log.Info("Successfully patched RouteMonitor with PrometheusRuleRef. Stopping...")
+		r.Log.Info("Successfully patched RouteMonitor with PrometheusRuleRef. Stopping...")
 		return utilreconcile.Stop()
 	}
 
-	log.Info("All operations for RouteMonitor completed. Finished Reconcile.")
-	return utilreconcile.Stop()
+	r.Log.Info("All operations for RouteMonitor completed. Finished Reconcile.")
+	return ctrl.Result{}, nil
 }
 
 func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&monitoringv1alpha1.RouteMonitor{}).
+		For(&v1alpha1.RouteMonitor{}).
 		Complete(r)
 }

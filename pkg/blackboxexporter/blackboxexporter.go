@@ -1,13 +1,11 @@
 package blackboxexporter
 
 import (
+	"context"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 
-	"context"
-
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,26 +19,24 @@ import (
 
 type BlackBoxExporter struct {
 	Client         client.Client
-	Log            logr.Logger
-	Ctx            context.Context
 	Image          string
 	NamespacedName types.NamespacedName
 }
 
-func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
+func New(client client.Client, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
 	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
-	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName}
+	return &BlackBoxExporter{client, blackBoxImage, blackboxNamespacedName}
 }
 
 func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 	return b.NamespacedName.Namespace
 }
 
-func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	objectsDependingOnExporter := []v1.Object{}
 
 	routeMonitors := &v1alpha1.RouteMonitorList{}
-	if err := b.Client.List(b.Ctx, routeMonitors); err != nil {
+	if err := b.Client.List(ctx, routeMonitors); err != nil {
 		return blackboxexporter.KeepBlackBoxExporter, err
 	}
 	for i := range routeMonitors.Items {
@@ -48,29 +44,29 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 	}
 
 	clusterUrlMonitors := &v1alpha1.ClusterUrlMonitorList{}
-	if err := b.Client.List(b.Ctx, clusterUrlMonitors); err != nil {
+	if err := b.Client.List(ctx, clusterUrlMonitors); err != nil {
 		return blackboxexporter.KeepBlackBoxExporter, err
 	}
 	for i := range clusterUrlMonitors.Items {
 		objectsDependingOnExporter = append(objectsDependingOnExporter, &clusterUrlMonitors.Items[i])
 	}
-	b.Log.V(4).Info("Number of objects depending on BlackBoxExporter:", "amountOfObjects", len(objectsDependingOnExporter))
+	//b.Log.V(4).Info("Number of objects depending on BlackBoxExporter:", "amountOfObjects", len(objectsDependingOnExporter))
 
 	if len(objectsDependingOnExporter) == 1 && finalizer.WasDeleteRequested(objectsDependingOnExporter[0]) {
-		b.Log.V(3).Info("Deleting BlackBoxResources: decided to clean BlackBoxExporter resources")
+		//b.Log.V(3).Info("Deleting BlackBoxResources: decided to clean BlackBoxExporter resources")
 		return blackboxexporter.DeleteBlackBoxExporter, nil
 	}
 	return blackboxexporter.KeepBlackBoxExporter, nil
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists(ctx context.Context) error {
 	resource := appsv1.Deployment{}
 	populationFunc := func() appsv1.Deployment {
 		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
 	}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.NamespacedName, &resource)
+	err := b.Client.Get(ctx, b.NamespacedName, &resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -80,7 +76,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 		// populate the resource with the template
 		resource := populationFunc()
 		// and create it
-		err = b.Client.Create(b.Ctx, &resource)
+		err = b.Client.Create(ctx, &resource)
 		if err != nil {
 			return err
 		}
@@ -88,12 +84,12 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	return nil
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists(ctx context.Context) error {
 	resource := corev1.Service{}
 	populationFunc := func() corev1.Service { return templateForBlackBoxExporterService(b.NamespacedName) }
 
 	// Does the resource already exist?
-	if err := b.Client.Get(b.Ctx, b.NamespacedName, &resource); err != nil {
+	if err := b.Client.Get(ctx, b.NamespacedName, &resource); err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
 			// return unexpectedly
@@ -102,7 +98,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 		// populate the resource with the template
 		resource := populationFunc()
 		// and create it
-		if err = b.Client.Create(b.Ctx, &resource); err != nil {
+		if err = b.Client.Create(ctx, &resource); err != nil {
 			return err
 		}
 	}
@@ -187,11 +183,11 @@ func templateForBlackBoxExporterService(blackboxNamespacedName types.NamespacedN
 	return svc
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentAbsent() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentAbsent(ctx context.Context) error {
 	resource := &appsv1.Deployment{}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.NamespacedName, resource)
+	err := b.Client.Get(ctx, b.NamespacedName, resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -201,18 +197,18 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentAbsent() error {
 		// Resource doesn't exist, nothing to do
 		return nil
 	}
-	err = b.Client.Delete(b.Ctx, resource)
+	err = b.Client.Delete(ctx, resource)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceAbsent() error {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceAbsent(ctx context.Context) error {
 	resource := &corev1.Service{}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.NamespacedName, resource)
+	err := b.Client.Get(ctx, b.NamespacedName, resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -222,33 +218,33 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceAbsent() error {
 		// Resource doesn't exist, nothing to do
 		return nil
 	}
-	err = b.Client.Delete(b.Ctx, resource)
+	err = b.Client.Delete(ctx, resource)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
-	b.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
-	if err := b.EnsureBlackBoxExporterServiceAbsent(); err != nil {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error {
+	//b.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
+	if err := b.EnsureBlackBoxExporterServiceAbsent(ctx); err != nil {
 		return err
 	}
-	b.Log.V(2).Info("Entering EnsureBlackBoxExporterDeploymentAbsent")
-	if err := b.EnsureBlackBoxExporterDeploymentAbsent(); err != nil {
+	//b.Log.V(2).Info("Entering EnsureBlackBoxExporterDeploymentAbsent")
+	if err := b.EnsureBlackBoxExporterDeploymentAbsent(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesExist() error {
-	if err := b.EnsureBlackBoxExporterDeploymentExists(); err != nil {
+func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesExist(ctx context.Context) error {
+	if err := b.EnsureBlackBoxExporterDeploymentExists(ctx); err != nil {
 		return err
 	}
 	// Creating Service after because:
 	//
 	// A Service should not point to an empty target (Deployment)
-	if err := b.EnsureBlackBoxExporterServiceExists(); err != nil {
+	if err := b.EnsureBlackBoxExporterServiceExists(ctx); err != nil {
 		return err
 	}
 	return nil
