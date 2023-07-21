@@ -37,6 +37,13 @@ type ClusterUrlMonitorSpec struct {
 	// +kubebuilder:default:="infra"
 	// +optional
 	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
+
+	// +kubebuilder:default:false
+	// +kubebuilder:validation:Optional
+
+	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
+	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
+	SkipPrometheusRule bool `json:"skipPrometheusRule"`
 }
 
 // ClusterDomainRef defines the object used determine the cluster's domain
