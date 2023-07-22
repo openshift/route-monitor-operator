@@ -1,145 +1,119 @@
-package alert_test
+package alert
 
 import (
 	"context"
-	"github.com/golang/mock/gomock"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"testing"
 
-	// tested package
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/alert"
-	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-var _ = Describe("CR Deployment Handling", func() {
-	var (
-		mockClient *clientmocks.MockClient
-		mockCtrl   *gomock.Controller
-
-		get    testhelper.MockHelper
-		create testhelper.MockHelper
-		update testhelper.MockHelper
-		delete testhelper.MockHelper
-
-		prometheusRuleRef v1alpha1.NamespacedName
-		prometheusRule    monitoringv1.PrometheusRule
-		pr                alert.PrometheusRule
-		err               error
+func TestTemplateAndUpdatePrometheusRuleDeployment(t *testing.T) {
+	const (
+		url                     = "example.com"
+		percent                 = "99"
+		prometheusRuleName      = "test-name"
+		prometheusRuleNamespace = "test-namespace"
 	)
-	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
-		mockClient = clientmocks.NewMockClient(mockCtrl)
 
-		get = testhelper.MockHelper{}
-		create = testhelper.MockHelper{}
-		update = testhelper.MockHelper{}
-		delete = testhelper.MockHelper{}
+	var namespacedName = types.NamespacedName{
+		Namespace: prometheusRuleNamespace,
+		Name:      prometheusRuleName,
+	}
 
-		prometheusRuleRef = v1alpha1.NamespacedName{}
-		prometheusRule = monitoringv1.PrometheusRule{}
+	tests := []struct {
+		name string
+		objs []client.Object
+	}{
+		{
+			name: "Creating for Classic OSD",
+		},
+		{
+			name: "Updating for Classic OSD",
+			objs: []client.Object{
+				&monitoringv1.PrometheusRule{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      prometheusRuleName,
+						Namespace: prometheusRuleNamespace,
+					},
+					Spec: monitoringv1.PrometheusRuleSpec{},
+				},
+			},
+		},
+	}
 
-		pr = alert.PrometheusRule{
-			Client: mockClient,
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := monitoringv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
+
+			prometheusRule := NewPrometheusRule(fake.NewClientBuilder().WithScheme(s).WithObjects(test.objs...).Build())
+			template := TemplateForPrometheusRuleResource(url, percent, namespacedName)
+			if err := prometheusRule.UpdatePrometheusRuleDeployment(context.TODO(), template); err != nil {
+				t.Error(err)
+			}
+
+			pr := new(monitoringv1.PrometheusRule)
+			if err := prometheusRule.Client.Get(context.TODO(), namespacedName, pr); err != nil {
+				t.Errorf("expected no err, got %v", err)
+			}
+			assert.Equal(t, template.Spec, pr.Spec)
+		})
+	}
+}
+
+func TestDeletePrometheusRuleDeployment(t *testing.T) {
+	var (
+		objs = []client.Object{
+			&monitoringv1.PrometheusRule{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-name",
+					Namespace: "test-namespace",
+				},
+			},
 		}
-	})
-	JustBeforeEach(func() {
-		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(update.ErrorResponse).
-			Times(update.CalledTimes)
+	)
 
-		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(get.ErrorResponse).
-			Times(get.CalledTimes)
+	tests := []struct {
+		name              string
+		prometheusRuleRef v1alpha1.NamespacedName
+	}{
+		{
+			name: "Delete",
+			prometheusRuleRef: v1alpha1.NamespacedName{
+				Name:      "test-name",
+				Namespace: "test-namespace",
+			},
+		},
+		{
+			name:              "Empty ref",
+			prometheusRuleRef: v1alpha1.NamespacedName{},
+		},
+	}
 
-		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-			Return(create.ErrorResponse).
-			Times(create.CalledTimes)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := monitoringv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
 
-		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(delete.ErrorResponse).
-			Times(delete.CalledTimes)
-	})
-	AfterEach(func() {
-		mockCtrl.Finish()
-	})
-	Describe("UpdatePrometheusRuleDeployment", func() {
-		BeforeEach(func() {
-			get.CalledTimes = 1
+			prometheusRule := NewPrometheusRule(fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build())
+			if err := prometheusRule.DeletePrometheusRuleDeployment(context.TODO(), test.prometheusRuleRef); err != nil {
+				t.Error(err)
+			}
+
+			if err := prometheusRule.DeletePrometheusRuleDeployment(context.TODO(), test.prometheusRuleRef); err != nil {
+				t.Errorf("expected no err when deleting a second time, got %v", err)
+			}
 		})
-		JustBeforeEach(func() {
-			err = pr.UpdatePrometheusRuleDeployment(context.TODO(), prometheusRule)
-		})
-		When("the Client failed to fetch existing deployments", func() {
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should return the received error", func() {
-				Expect(err).To(Equal(consterror.CustomError))
-			})
-		})
-		Describe("no ServiceMonitor has been deployed yet", func() {
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create.CalledTimes = 1
-			})
-			It("tryies to creates one", func() {
-				Expect(err).NotTo(HaveOccurred())
-			})
-			When("an error appeared during the creation", func() {
-				BeforeEach(func() {
-					create.ErrorResponse = consterror.CustomError
-				})
-				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
-				})
-			})
-		})
-	})
-	Describe("DeletePrometheusRuleDeployment", func() {
-		JustBeforeEach(func() {
-			err = pr.DeletePrometheusRuleDeployment(context.TODO(), prometheusRuleRef)
-		})
-		When("The PrometheusRuleRef is not set", func() {
-			BeforeEach(func() {
-				prometheusRuleRef = v1alpha1.NamespacedName{}
-			})
-			It("does nothing", func() {
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		Describe("The PrometheusRuleRef is set", func() {
-			BeforeEach(func() {
-				prometheusRuleRef = v1alpha1.NamespacedName{Name: "test", Namespace: "test"}
-				delete.CalledTimes = 1
-			})
-			When("the PrometheusRule Deployment doesnt exist", func() {
-				BeforeEach(func() {
-					get.ErrorResponse = consterror.NotFoundErr
-				})
-				It("does nothing", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-			})
-			When("the PrometheusRule Deployment exists", func() {
-				BeforeEach(func() {
-					delete.CalledTimes = 1
-				})
-				It("deletes the PrometheusRule", func() {
-					Expect(err).NotTo(HaveOccurred())
-				})
-				When("the client failed to delete the deployment", func() {
-					BeforeEach(func() {
-						delete.ErrorResponse = consterror.CustomError
-					})
-					It("returns the received error", func() {
-						Expect(err).To(Equal(consterror.CustomError))
-					})
-				})
-			})
-		})
-	})
-})
+	}
+}

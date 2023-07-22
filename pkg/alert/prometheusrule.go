@@ -12,9 +12,9 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	kerr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,7 +36,7 @@ func (u *PrometheusRule) UpdatePrometheusRuleDeployment(ctx context.Context, tem
 	deployedPrometheusRule := &monitoringv1.PrometheusRule{}
 	if err := u.Client.Get(ctx, namespacedName, deployedPrometheusRule); err != nil {
 		// No similar Prometheus Rule exists
-		if !k8serrors.IsNotFound(err) {
+		if !kerr.IsNotFound(err) {
 			return err
 		}
 		return u.Client.Create(ctx, &template)
