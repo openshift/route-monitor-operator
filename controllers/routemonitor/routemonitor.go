@@ -57,7 +57,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
-		Prom:             alert.NewPrometheusRule(ctx, client),
+		Prom:             alert.NewPrometheusRule(client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
@@ -151,7 +151,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
 	// result is silenced as it's the end of the function, if this moves add it back
-	res, err = r.EnsurePrometheusRuleExists(routeMonitor)
+	res, err = r.EnsurePrometheusRuleExists(ctx, routeMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set PrometheusRule. Requeueing...")
 		return utilreconcile.RequeueWith(err)

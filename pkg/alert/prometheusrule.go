@@ -22,54 +22,50 @@ import (
 
 type PrometheusRule struct {
 	Client client.Client
-	Ctx    context.Context
 }
 
-func NewPrometheusRule(ctx context.Context, c client.Client) *PrometheusRule {
+func NewPrometheusRule(c client.Client) *PrometheusRule {
 	return &PrometheusRule{
 		Client: c,
-		Ctx:    ctx,
 	}
 }
 
 // Creates or Updates PrometheusRule Deployment according to the template
-func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.PrometheusRule) error {
+func (u *PrometheusRule) UpdatePrometheusRuleDeployment(ctx context.Context, template monitoringv1.PrometheusRule) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedPrometheusRule := &monitoringv1.PrometheusRule{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedPrometheusRule)
-	if err != nil {
+	if err := u.Client.Get(ctx, namespacedName, deployedPrometheusRule); err != nil {
 		// No similar Prometheus Rule exists
 		if !k8serrors.IsNotFound(err) {
 			return err
 		}
-		return u.Client.Create(u.Ctx, &template)
+		return u.Client.Create(ctx, &template)
 	}
 	if !reflect.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
-		// Update existing PrometheuesRule for the case that the template changed
+		// Update existing PrometheusRule for the case that the template changed
 		deployedPrometheusRule.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedPrometheusRule)
+		return u.Client.Update(ctx, deployedPrometheusRule)
 	}
 	return nil
 }
 
-func (u *PrometheusRule) DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error {
-	// nothing to delete, stopping early
-	if prometheusRuleRef == (v1alpha1.NamespacedName{}) {
+func (u *PrometheusRule) DeletePrometheusRuleDeployment(ctx context.Context, prometheusRuleRef v1alpha1.NamespacedName) error {
+	if prometheusRuleRef.Name == "" || prometheusRuleRef.Namespace == "" {
 		return nil
 	}
-	namespacedName := types.NamespacedName{Name: prometheusRuleRef.Name, Namespace: prometheusRuleRef.Namespace}
-	resource := &monitoringv1.PrometheusRule{}
-	// Does the resource already exist?
-	err := u.Client.Get(u.Ctx, namespacedName, resource)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			// If this is an unknown error
-			return err
-		}
-		// Resource doesn't exist, nothing to do
-		return nil
+
+	resource := &monitoringv1.PrometheusRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      prometheusRuleRef.Name,
+			Namespace: prometheusRuleRef.Namespace,
+		},
 	}
-	return u.Client.Delete(u.Ctx, resource)
+
+	if err := u.Client.Delete(ctx, resource); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	return nil
 }
 
 type multiWindowMultiBurnAlertRule struct {
@@ -91,10 +87,10 @@ func alertThreshold(windowSize, percent, label, burnRate string) string {
 
 func sufficientProbes(windowSize, label string) string {
 	window, _ := prometheus.ParseDuration(windowSize)
-	window_duration := time.Duration(window)
+	windowDuration := time.Duration(window)
 	mPeriod, _ := prometheus.ParseDuration(servicemonitor.MetricsScrapeInterval)
-	mPeriod_duration := time.Duration(mPeriod)
-	necessaryProbesInWindow := int(window_duration.Minutes() / mPeriod_duration.Minutes() * 0.5)
+	mPeriodDuration := time.Duration(mPeriod)
+	necessaryProbesInWindow := int(windowDuration.Minutes() / mPeriodDuration.Minutes() * 0.5)
 
 	rule := "sum(count_over_time(probe_success{" + label + "}[" + windowSize + "]))" +
 		" > " + strconv.Itoa(necessaryProbesInWindow)
@@ -138,7 +134,6 @@ func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
 func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
-
 	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
 		{

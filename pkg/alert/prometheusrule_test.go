@@ -2,7 +2,6 @@ package alert_test
 
 import (
 	"context"
-
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -11,7 +10,6 @@ import (
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -19,7 +17,6 @@ import (
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx        context.Context
 		mockClient *clientmocks.MockClient
 		mockCtrl   *gomock.Controller
 
@@ -34,7 +31,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		err               error
 	)
 	BeforeEach(func() {
-		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 
@@ -48,7 +44,6 @@ var _ = Describe("CR Deployment Handling", func() {
 
 		pr = alert.PrometheusRule{
 			Client: mockClient,
-			Ctx:    ctx,
 		}
 	})
 	JustBeforeEach(func() {
@@ -76,7 +71,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			get.CalledTimes = 1
 		})
 		JustBeforeEach(func() {
-			err = pr.UpdatePrometheusRuleDeployment(prometheusRule)
+			err = pr.UpdatePrometheusRuleDeployment(context.TODO(), prometheusRule)
 		})
 		When("the Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
@@ -106,7 +101,7 @@ var _ = Describe("CR Deployment Handling", func() {
 	})
 	Describe("DeletePrometheusRuleDeployment", func() {
 		JustBeforeEach(func() {
-			err = pr.DeletePrometheusRuleDeployment(prometheusRuleRef)
+			err = pr.DeletePrometheusRuleDeployment(context.TODO(), prometheusRuleRef)
 		})
 		When("The PrometheusRuleRef is not set", func() {
 			BeforeEach(func() {
@@ -119,15 +114,7 @@ var _ = Describe("CR Deployment Handling", func() {
 		Describe("The PrometheusRuleRef is set", func() {
 			BeforeEach(func() {
 				prometheusRuleRef = v1alpha1.NamespacedName{Name: "test", Namespace: "test"}
-				get.CalledTimes = 1
-			})
-			When("the client failed to fetch the PrometheusRule", func() {
-				BeforeEach(func() {
-					get.ErrorResponse = consterror.CustomError
-				})
-				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
-				})
+				delete.CalledTimes = 1
 			})
 			When("the PrometheusRule Deployment doesnt exist", func() {
 				BeforeEach(func() {

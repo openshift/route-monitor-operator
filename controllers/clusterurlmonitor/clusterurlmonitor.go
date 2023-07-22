@@ -58,7 +58,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
-		Prom:             alert.NewPrometheusRule(ctx, client),
+		Prom:             alert.NewPrometheusRule(client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
@@ -132,7 +132,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
-	res, err = r.EnsurePrometheusRuleExists(clusterUrlMonitor)
+	res, err = r.EnsurePrometheusRuleExists(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set PrometheusRule. Requeueing...")
 		return utilreconcile.RequeueWith(err)

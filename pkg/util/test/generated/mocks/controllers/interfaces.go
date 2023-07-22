@@ -293,31 +293,31 @@ func (m *MockPrometheusRuleHandler) EXPECT() *MockPrometheusRuleHandlerMockRecor
 }
 
 // DeletePrometheusRuleDeployment mocks base method.
-func (m *MockPrometheusRuleHandler) DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error {
+func (m *MockPrometheusRuleHandler) DeletePrometheusRuleDeployment(ctx context.Context, prometheusRuleRef v1alpha1.NamespacedName) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePrometheusRuleDeployment", prometheusRuleRef)
+	ret := m.ctrl.Call(m, "DeletePrometheusRuleDeployment", ctx, prometheusRuleRef)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeletePrometheusRuleDeployment indicates an expected call of DeletePrometheusRuleDeployment.
-func (mr *MockPrometheusRuleHandlerMockRecorder) DeletePrometheusRuleDeployment(prometheusRuleRef interface{}) *gomock.Call {
+func (mr *MockPrometheusRuleHandlerMockRecorder) DeletePrometheusRuleDeployment(ctx, prometheusRuleRef interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).DeletePrometheusRuleDeployment), prometheusRuleRef)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).DeletePrometheusRuleDeployment), ctx, prometheusRuleRef)
 }
 
 // UpdatePrometheusRuleDeployment mocks base method.
-func (m *MockPrometheusRuleHandler) UpdatePrometheusRuleDeployment(template v1.PrometheusRule) error {
+func (m *MockPrometheusRuleHandler) UpdatePrometheusRuleDeployment(ctx context.Context, template v1.PrometheusRule) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePrometheusRuleDeployment", template)
+	ret := m.ctrl.Call(m, "UpdatePrometheusRuleDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdatePrometheusRuleDeployment indicates an expected call of UpdatePrometheusRuleDeployment.
-func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(template interface{}) *gomock.Call {
+func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).UpdatePrometheusRuleDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).UpdatePrometheusRuleDeployment), ctx, template)
 }
 
 // MockBlackBoxExporterHandler is a mock of BlackBoxExporterHandler interface.

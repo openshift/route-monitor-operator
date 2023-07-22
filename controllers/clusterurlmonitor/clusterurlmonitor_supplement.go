@@ -25,11 +25,11 @@ const (
 )
 
 // Takes care that right PrometheusRules for the defined ClusterURLMonitor are in place
-func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
 	// If .spec.skipPrometheusRule is true, ensure that the PrometheusRule does NOT exist
 	if clusterUrlMonitor.Spec.SkipPrometheusRule {
 		// Cleanup any existing PrometheusRules and update the status
-		if err := s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef); err != nil {
+		if err := s.Prom.DeletePrometheusRuleDeployment(ctx, clusterUrlMonitor.Status.PrometheusRuleRef); err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 		updated, _ := s.Common.SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
@@ -58,7 +58,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 		return s.Common.UpdateMonitorResourceStatus(&clusterUrlMonitor)
 	}
 	if parsedSlo == "" {
-		err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
+		err = s.Prom.DeletePrometheusRuleDeployment(ctx, clusterUrlMonitor.Status.PrometheusRuleRef)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
@@ -71,7 +71,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 
 	namespacedName := types.NamespacedName{Namespace: clusterUrlMonitor.Namespace, Name: clusterUrlMonitor.Name}
 	template := alert.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
-	err = s.Prom.UpdatePrometheusRuleDeployment(template)
+	err = s.Prom.UpdatePrometheusRuleDeployment(ctx, template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -162,7 +162,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx con
 		}
 	}
 
-	err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)
+	err = s.Prom.DeletePrometheusRuleDeployment(ctx, clusterUrlMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

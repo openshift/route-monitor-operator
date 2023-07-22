@@ -20,11 +20,11 @@ import (
 )
 
 // Ensures that all PrometheusRules CR are created according to the RouteMonitor
-func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	// If .spec.skipPrometheusRule is true, ensure that the PrometheusRule does NOT exist
 	if routeMonitor.Spec.SkipPrometheusRule {
 		// Cleanup any existing PrometheusRules and update the status
-		if err := r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef); err != nil {
+		if err := r.Prom.DeletePrometheusRuleDeployment(ctx, routeMonitor.Status.PrometheusRuleRef); err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
 		updated, _ := r.Common.SetResourceReference(&routeMonitor.Status.PrometheusRuleRef, types.NamespacedName{})
@@ -41,7 +41,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 	}
 	if parsedSlo == "" {
 		// Delete existing PrometheusRules if required
-		err = r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
+		err = r.Prom.DeletePrometheusRuleDeployment(ctx, routeMonitor.Status.PrometheusRuleRef)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}
@@ -55,7 +55,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 	// Update PrometheusRule from templates
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
 	template := alert.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
-	err = r.Prom.UpdatePrometheusRuleDeployment(template)
+	err = r.Prom.UpdatePrometheusRuleDeployment(ctx, template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -123,7 +123,7 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.
 	}
 
 	log.V(2).Info("Entering ensurePrometheusRuleResourceAbsent")
-	err = r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
+	err = r.Prom.DeletePrometheusRuleDeployment(ctx, routeMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

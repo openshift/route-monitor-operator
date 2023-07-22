@@ -107,7 +107,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			err error
 		)
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsurePrometheusRuleExists(clusterUrlMonitor)
+			res, err = reconciler.EnsurePrometheusRuleExists(context.TODO(), clusterUrlMonitor)
 		})
 		When("the ClusterUrlMonitor has an invalid slo value", func() {
 			BeforeEach(func() {
@@ -116,7 +116,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("", err)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err)
 				// It deletes old pormetheus rule deployment if still there
-				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{}).Times(1)
 			})
 			It("sets the error in the ClusterUrlMonitor and stops processing", func() {
@@ -130,7 +130,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, gomock.Any()).Times(1).Return(false, nil)
 			})
 			It("doesn't update the clusterUrlMonitor reference and continues reconciling", func() {
@@ -144,7 +144,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any()).Times(1)
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, ns).Times(1).Return(true, nil)
 				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)
@@ -182,7 +182,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			})
 			When("the ServiceMonitor still exists", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
+					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(context.TODO(), clusterUrlMonitor.Status.ServiceMonitorRef, gomock.Any()).Times(1)
 					gomock.InOrder(
 						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.FinalizerKey).Times(1).Return(true),

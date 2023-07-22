@@ -163,7 +163,7 @@ var _ = Describe("Routemonitor", func() {
 				Times(deleteServiceMonitorDeployment.CalledTimes).
 				Return(deleteServiceMonitorDeployment.ErrorResponse)
 
-			mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(gomock.Any()).
+			mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), gomock.Any()).
 				Times(deletePrometheusRuleDeployment.CalledTimes).
 				Return(deletePrometheusRuleDeployment.ErrorResponse)
 
@@ -640,7 +640,7 @@ var _ = Describe("Routemonitor", func() {
 			err  error
 		)
 		JustBeforeEach(func() {
-			resp, err = routeMonitorReconciler.EnsurePrometheusRuleExists(routeMonitor)
+			resp, err = routeMonitorReconciler.EnsurePrometheusRuleExists(context.TODO(), routeMonitor)
 		})
 		Describe("The RouteMonitor settings are INVALID", func() {
 			BeforeEach(func() {
@@ -677,7 +677,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				When("the PrometheusRule deletion fails", func() {
 					BeforeEach(func() {
-						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef).Times(1).Return(consterror.CustomError)
+						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), routeMonitor.Status.PrometheusRuleRef).Times(1).Return(consterror.CustomError)
 					})
 					It("should reconcile with the particular error", func() {
 						Expect(err).To(Equal(consterror.CustomError))
@@ -686,7 +686,7 @@ var _ = Describe("Routemonitor", func() {
 				})
 				When("the PrometheusRule deletion was successful", func() {
 					BeforeEach(func() {
-						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef).Times(1)
+						mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), routeMonitor.Status.PrometheusRuleRef).Times(1)
 					})
 					When("updating PrometheusRuleRef in the RouteMonitor fails", func() {
 						BeforeEach(func() {
@@ -718,7 +718,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update the PrometheusRule failed", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Return(consterror.CustomError)
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any()).Return(consterror.CustomError)
 				})
 				It("requeues with the error", func() {
 					Expect(err).To(Equal(consterror.CustomError))
@@ -727,7 +727,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update of the PrometheusRule succeded", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any())
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(context.TODO(), gomock.Any())
 				})
 				When("a new PrometheusRule was created", func() {
 					BeforeEach(func() {
