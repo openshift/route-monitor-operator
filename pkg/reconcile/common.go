@@ -3,15 +3,14 @@ package reconcileCommon
 import (
 	"context"
 	"fmt"
-	"reflect"
 
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,27 +19,15 @@ import (
 
 //go:generate mockgen -source $GOFILE -destination ../util/test/generated/mocks/reconcile/common.go -package $GOPACKAGE
 
-type ResourceComparerInterface interface {
-	DeepEqual(x, y interface{}) bool
-}
-
-type ResourceComparer struct{}
-
-func (_ *ResourceComparer) DeepEqual(x, y interface{}) bool {
-	return reflect.DeepEqual(x, y)
-}
-
 type MonitorResourceCommon struct {
-	Client   client.Client
-	Ctx      context.Context
-	Comparer ResourceComparerInterface
+	Client client.Client
+	Ctx    context.Context
 }
 
 func NewMonitorResourceCommon(ctx context.Context, c client.Client) *MonitorResourceCommon {
 	return &MonitorResourceCommon{
-		Client:   c,
-		Ctx:      ctx,
-		Comparer: &ResourceComparer{},
+		Client: c,
+		Ctx:    ctx,
 	}
 }
 

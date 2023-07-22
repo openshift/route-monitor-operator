@@ -3,13 +3,13 @@ package alert
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 
 	prometheus "github.com/prometheus/common/model"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,16 +21,14 @@ import (
 )
 
 type PrometheusRule struct {
-	Client   client.Client
-	Ctx      context.Context
-	Comparer util.ResourceComparerInterface
+	Client client.Client
+	Ctx    context.Context
 }
 
 func NewPrometheusRule(ctx context.Context, c client.Client) *PrometheusRule {
 	return &PrometheusRule{
-		Client:   c,
-		Ctx:      ctx,
-		Comparer: &util.ResourceComparer{},
+		Client: c,
+		Ctx:    ctx,
 	}
 }
 
@@ -46,7 +44,7 @@ func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.Pr
 		}
 		return u.Client.Create(u.Ctx, &template)
 	}
-	if !u.Comparer.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
+	if !reflect.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
 		// Update existing PrometheuesRule for the case that the template changed
 		deployedPrometheusRule.Spec = template.Spec
 		return u.Client.Update(u.Ctx, deployedPrometheusRule)

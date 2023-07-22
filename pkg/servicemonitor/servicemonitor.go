@@ -2,10 +2,10 @@ package servicemonitor
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
-	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,16 +15,14 @@ import (
 )
 
 type ServiceMonitor struct {
-	Client   client.Client
-	Ctx      context.Context
-	Comparer util.ResourceComparerInterface
+	Client client.Client
+	Ctx    context.Context
 }
 
 func NewServiceMonitor(ctx context.Context, c client.Client) *ServiceMonitor {
 	return &ServiceMonitor{
-		Client:   c,
-		Ctx:      ctx,
-		Comparer: &util.ResourceComparer{},
+		Client: c,
+		Ctx:    ctx,
 	}
 }
 
@@ -60,7 +58,7 @@ func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template monitoringv1.Se
 		}
 		return u.Client.Create(u.Ctx, &template)
 	}
-	if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
+	if !reflect.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
 		// Update existing ServiceMonitor for the case that the template changed
 		deployedServiceMonitor.Spec = template.Spec
 		return u.Client.Update(u.Ctx, deployedServiceMonitor)
@@ -80,7 +78,7 @@ func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(template rhobs
 		}
 		return u.Client.Create(u.Ctx, &template)
 	}
-	if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
+	if !reflect.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
 		// Update existing ServiceMonitor for the case that the template changed
 		deployedServiceMonitor.Spec = template.Spec
 		return u.Client.Update(u.Ctx, deployedServiceMonitor)

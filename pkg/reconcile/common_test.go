@@ -17,7 +17,6 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
-	utilmock "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/reconcile"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 )
 
@@ -28,16 +27,14 @@ type ResourceComparerMockHelper struct {
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx                  context.Context
-		mockClient           *clientmocks.MockClient
-		mockCtrl             *gomock.Controller
-		mockResourceComparer *utilmock.MockResourceComparerInterface
+		ctx        context.Context
+		mockClient *clientmocks.MockClient
+		mockCtrl   *gomock.Controller
 
-		deepEqual ResourceComparerMockHelper
-		get       testhelper.MockHelper
-		create    testhelper.MockHelper
-		update    testhelper.MockHelper
-		delete    testhelper.MockHelper
+		get    testhelper.MockHelper
+		create testhelper.MockHelper
+		update testhelper.MockHelper
+		delete testhelper.MockHelper
 
 		rc reconcilecommon.MonitorResourceCommon
 	)
@@ -45,26 +42,18 @@ var _ = Describe("CR Deployment Handling", func() {
 		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
 
-		deepEqual = ResourceComparerMockHelper{}
 		get = testhelper.MockHelper{}
 		create = testhelper.MockHelper{}
 		update = testhelper.MockHelper{}
 		delete = testhelper.MockHelper{}
 
 		rc = reconcilecommon.MonitorResourceCommon{
-			Client:   mockClient,
-			Ctx:      ctx,
-			Comparer: mockResourceComparer,
+			Client: mockClient,
+			Ctx:    ctx,
 		}
 	})
 	JustBeforeEach(func() {
-
-		mockResourceComparer.EXPECT().DeepEqual(gomock.Any(), gomock.Any()).
-			Return(deepEqual.ReturnValue).
-			Times(deepEqual.CalledTimes)
-
 		mockClient.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(update.ErrorResponse).
 			Times(update.CalledTimes)
@@ -80,7 +69,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
 			Return(delete.ErrorResponse).
 			Times(delete.CalledTimes)
-
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
