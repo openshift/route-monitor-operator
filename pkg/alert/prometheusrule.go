@@ -92,7 +92,7 @@ func alertThreshold(windowSize, percent, label, burnRate string) string {
 func sufficientProbes(windowSize, label string) string {
 	window, _ := prometheus.ParseDuration(windowSize)
 	window_duration := time.Duration(window)
-	mPeriod, _ := prometheus.ParseDuration(servicemonitor.ServiceMonitorPeriod)
+	mPeriod, _ := prometheus.ParseDuration(servicemonitor.MetricsScrapeInterval)
 	mPeriod_duration := time.Duration(mPeriod)
 	necessaryProbesInWindow := int(window_duration.Minutes() / mPeriod_duration.Minutes() * 0.5)
 

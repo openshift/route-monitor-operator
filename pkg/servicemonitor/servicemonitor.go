@@ -8,7 +8,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,10 +25,12 @@ func NewServiceMonitor(c client.Client) *ServiceMonitor {
 }
 
 const (
-	ServiceMonitorPeriod string = "30s"
-	UrlLabelName         string = "probe_url"
+	MetricsScrapeInterval = "30s"
+	UrlLabelName          = "probe_url"
 )
 
+// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
+// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
 func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool) error {
 	params := map[string][]string{
 		// Currently we only support `http_2xx` as module
@@ -44,14 +46,15 @@ func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(ctx context.C
 	return u.UpdateServiceMonitorDeployment(ctx, s)
 }
 
-// Creates or Updates Service Monitor Deployment according to the template
+// UpdateServiceMonitorDeployment ensures that a ServiceMonitor deployment according
+// to the template exists. If none exists, it will create a new one.
+// If the template changed, it will update the existing deployment
 func (u *ServiceMonitor) UpdateServiceMonitorDeployment(ctx context.Context, template monitoringv1.ServiceMonitor) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedServiceMonitor := &monitoringv1.ServiceMonitor{}
-	err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor)
-	if err != nil {
+	if err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor); err != nil {
 		// No similar ServiceMonitor exists
-		if !k8serrors.IsNotFound(err) {
+		if !kerr.IsNotFound(err) {
 			return err
 		}
 		return u.Client.Create(ctx, &template)
@@ -64,14 +67,14 @@ func (u *ServiceMonitor) UpdateServiceMonitorDeployment(ctx context.Context, tem
 	return nil
 }
 
-// Creates or Updates Service Monitor Deployment according to the template if enable of the hypershift
+// HypershiftUpdateServiceMonitorDeployment is for HyperShift cluster to ensure that a ServiceMonitor deployment according
+// to the template exists. If none exists, it will create a new one. If the template changed, it will update the existing deployment
 func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template rhobsv1.ServiceMonitor) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedServiceMonitor := &rhobsv1.ServiceMonitor{}
-	err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor)
-	if err != nil {
+	if err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor); err != nil {
 		// No similar ServiceMonitor exists
-		if !k8serrors.IsNotFound(err) {
+		if !kerr.IsNotFound(err) {
 			return err
 		}
 		return u.Client.Create(ctx, &template)
@@ -84,41 +87,38 @@ func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(ctx context.Co
 	return nil
 }
 
-// Deletes the ServiceMonitor Deployment
-func (u *ServiceMonitor) DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, isHCPMonitor bool) error {
-	if serviceMonitorRef == (v1alpha1.NamespacedName{}) {
-		return nil
-	}
-	namespacedName := types.NamespacedName{Name: serviceMonitorRef.Name, Namespace: serviceMonitorRef.Namespace}
-
-	if isHCPMonitor {
-		resource := &rhobsv1.ServiceMonitor{}
-		// Does the resource already exist?
-		err := u.Client.Get(ctx, namespacedName, resource)
-		if err != nil {
-			if !k8serrors.IsNotFound(err) {
-				// If this is an unknown error
-				return err
-			}
-			// Resource doesn't exist, nothing to do
-			return nil
-		}
-
-		return u.Client.Delete(ctx, resource)
-	}
-	resource := &monitoringv1.ServiceMonitor{}
-	// Does the resource already exist?
-	err := u.Client.Get(ctx, namespacedName, resource)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			// If this is an unknown error
-			return err
-		}
-		// Resource doesn't exist, nothing to do
+// DeleteServiceMonitorDeployment deletes the corresponding ServiceMonitor
+// servicemonitor.monitoring.rhobs for HCP or
+// servicemonitor.monitoring.coreos.com otherwise
+func (u *ServiceMonitor) DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, isHCP bool) error {
+	if serviceMonitorRef.Name == "" || serviceMonitorRef.Namespace == "" {
 		return nil
 	}
 
-	return u.Client.Delete(ctx, resource)
+	if isHCP {
+		resource := &rhobsv1.ServiceMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceMonitorRef.Name,
+				Namespace: serviceMonitorRef.Namespace,
+			},
+		}
+		if err := u.Client.Delete(ctx, resource); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+
+		return nil
+	}
+	resource := &monitoringv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceMonitorRef.Name,
+			Namespace: serviceMonitorRef.Namespace,
+		},
+	}
+	if err := u.Client.Delete(ctx, resource); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	return nil
 }
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
@@ -133,7 +133,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 				{
 					Port: blackboxexporter.BlackBoxExporterPortName,
 					// Probe every 30s
-					Interval: monitoringv1.Duration(ServiceMonitorPeriod),
+					Interval: MetricsScrapeInterval,
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
 					Path:          "/probe",
@@ -174,7 +174,7 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 				{
 					Port: blackboxexporter.BlackBoxExporterPortName,
 					// Probe every 30s
-					Interval: rhobsv1.Duration(ServiceMonitorPeriod),
+					Interval: MetricsScrapeInterval,
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
 					Path:          "/probe",
