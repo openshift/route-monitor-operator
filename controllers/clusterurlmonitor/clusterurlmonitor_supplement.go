@@ -1,6 +1,7 @@
 package clusterurlmonitor
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -91,7 +92,7 @@ func isClusterVersionAvailable(hcp hypershiftv1beta1.HostedControlPlane) error {
 }
 
 // Takes care that right ServiceMonitor for the defined ClusterURLMonitor are in place
-func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
 	clusterDomain, err := s.GetClusterDomain(clusterUrlMonitor)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
@@ -123,7 +124,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		}
 	}
 
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(ctx, clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -139,13 +140,13 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 }
 
 // Ensures that all dependencies related to a ClusterUrlMonitor are deleted
-func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
+func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.Context, clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
 	if clusterUrlMonitor.DeletionTimestamp == nil {
 		return utilreconcile.ContinueReconcile()
 	}
 
 	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(ctx, clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

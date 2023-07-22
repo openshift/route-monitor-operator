@@ -1,13 +1,15 @@
 package controllers
 
 import (
+	"context"
+
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,10 +42,10 @@ type MonitorResourceHandler interface {
 	UpdateMonitorResourceStatus(cr client.Object) (utilreconcile.Result, error)
 
 	// SetFinalizer adds finalizerKey to an object
-	SetFinalizer(o v1.Object, finalizerKey string) bool
+	SetFinalizer(o metav1.Object, finalizerKey string) bool
 
 	// DeleteFinalizer removes Finalizer from object
-	DeleteFinalizer(o v1.Object, finalizerKey string) bool
+	DeleteFinalizer(o metav1.Object, finalizerKey string) bool
 
 	// GetClusterID fetches the Cluster ID
 	GetOSDClusterID() (string, error)
@@ -59,18 +61,18 @@ type ServiceMonitorHandler interface {
 	// UpdateServiceMonitorDeployment ensures that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one.
 	// If the template changed, it will update the existing deployment
-	UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error
+	UpdateServiceMonitorDeployment(ctx context.Context, template monitoringv1.ServiceMonitor) error
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
+	TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
 
 	// DeleteServiceMonitorDeployment deletes a ServiceMonitor refrenced by a namespaced name
-	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
+	DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
 
 	// HypershiftUpdateServiceMonitorDeployment is for HyperShift cluster to ensure that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one. If the template changed, it will update the existing deployment
-	HypershiftUpdateServiceMonitorDeployment(template rhobsv1.ServiceMonitor) error
+	HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template rhobsv1.ServiceMonitor) error
 }
 
 type PrometheusRuleHandler interface {

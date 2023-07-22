@@ -1,12 +1,13 @@
 package routemonitor_test
 
 import (
+	"context"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"time"
 
 	// tested package
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
@@ -16,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -159,7 +159,7 @@ var _ = Describe("Routemonitor", func() {
 				Times(ensureBlackBoxExporterResourcesExist.CalledTimes).
 				Return(ensureBlackBoxExporterResourcesExist.ErrorResponse)
 
-			mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(gomock.Any(), gomock.Any()).
+			mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(context.TODO(), gomock.Any(), gomock.Any()).
 				Times(deleteServiceMonitorDeployment.CalledTimes).
 				Return(deleteServiceMonitorDeployment.ErrorResponse)
 
@@ -168,7 +168,7 @@ var _ = Describe("Routemonitor", func() {
 				Return(deletePrometheusRuleDeployment.ErrorResponse)
 
 			// act
-			res, err = routeMonitorReconciler.EnsureMonitorAndDependenciesAbsent(routeMonitor)
+			res, err = routeMonitorReconciler.EnsureMonitorAndDependenciesAbsent(context.TODO(), routeMonitor)
 		})
 		When("func ShouldDeleteBlackBoxExporterResources fails unexpectedly", func() {
 			BeforeEach(func() {
@@ -764,7 +764,7 @@ var _ = Describe("Routemonitor", func() {
 			err  error
 		)
 		JustBeforeEach(func() {
-			resp, err = routeMonitorReconciler.EnsureServiceMonitorExists(routeMonitor)
+			resp, err = routeMonitorReconciler.EnsureServiceMonitorExists(context.TODO(), routeMonitor)
 		})
 		When("The RouteUrl is not set", func() {
 			BeforeEach(func() {
@@ -778,7 +778,7 @@ var _ = Describe("Routemonitor", func() {
 		Describe("It updates the ServiceMonitor targeting the blackbox Exporter Namespace", func() {
 			When("the update of the ServiceMonitor fails", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(context.TODO(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
 					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})
@@ -789,7 +789,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update of the ServiceMonitor is successfull", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(context.TODO(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
 					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})

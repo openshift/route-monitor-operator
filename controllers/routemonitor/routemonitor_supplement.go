@@ -1,6 +1,7 @@
 package routemonitor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -68,7 +69,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 }
 
 // Ensures that a ServiceMonitor is created from the RouteMonitor CR
-func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
@@ -83,7 +84,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(ctx, routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -98,7 +99,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 }
 
 // Ensures that all dependencies related to a RouteMonitor are deleted
-func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
+func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
 	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
@@ -117,7 +118,7 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
 	isHCP := false
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
+	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(ctx, routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

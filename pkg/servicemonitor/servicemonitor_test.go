@@ -9,7 +9,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	testhelper "github.com/openshift/route-monitor-operator/pkg/util/test/helper"
@@ -18,7 +17,6 @@ import (
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx        context.Context
 		mockClient *clientmocks.MockClient
 		mockCtrl   *gomock.Controller
 
@@ -33,7 +31,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		err               error
 	)
 	BeforeEach(func() {
-		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 
@@ -47,7 +44,6 @@ var _ = Describe("CR Deployment Handling", func() {
 
 		sm = servicemonitor.ServiceMonitor{
 			Client: mockClient,
-			Ctx:    ctx,
 		}
 	})
 	JustBeforeEach(func() {
@@ -75,7 +71,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			get.CalledTimes = 1
 		})
 		JustBeforeEach(func() {
-			err = sm.UpdateServiceMonitorDeployment(serviceMonitor)
+			err = sm.UpdateServiceMonitorDeployment(context.TODO(), serviceMonitor)
 		})
 		When("The Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
@@ -105,7 +101,7 @@ var _ = Describe("CR Deployment Handling", func() {
 	})
 	Describe("DeleteServiceMonitorDeployment", func() {
 		JustBeforeEach(func() {
-			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, false)
+			err = sm.DeleteServiceMonitorDeployment(context.TODO(), serviceMonitorRef, false)
 		})
 		When("The ServiceMonitorRef is not set", func() {
 			BeforeEach(func() {

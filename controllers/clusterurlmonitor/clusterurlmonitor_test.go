@@ -1,6 +1,7 @@
 package clusterurlmonitor_test
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/mock/gomock"
@@ -81,12 +82,12 @@ var _ = Describe("Clusterurlmonitor", func() {
 			suffix = "/suffix"
 		})
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsureServiceMonitorExists(clusterUrlMonitor)
+			res, err = reconciler.EnsureServiceMonitorExists(context.TODO(), clusterUrlMonitor)
 		})
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // fetching domain
-				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(context.TODO(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().GetOSDClusterID().Times(1)
@@ -166,7 +167,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			clusterUrlMonitor.Finalizers = []string{clusterurlmonitor.FinalizerKey}
 		})
 		JustBeforeEach(func() {
-			res, err = reconciler.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
+			res, err = reconciler.EnsureMonitorAndDependenciesAbsent(context.TODO(), clusterUrlMonitor)
 		})
 		When("the ClusterUrlMonitor CR is not being deleted", func() {
 			It("does nothing", func() {
@@ -182,7 +183,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 			When("the ServiceMonitor still exists", func() {
 				BeforeEach(func() {
 					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
-					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, gomock.Any()).Times(1)
+					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(context.TODO(), clusterUrlMonitor.Status.ServiceMonitorRef, gomock.Any()).Times(1)
 					gomock.InOrder(
 						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.FinalizerKey).Times(1).Return(true),
 						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.PrevFinalizerKey).Times(1),

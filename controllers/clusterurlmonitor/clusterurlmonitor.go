@@ -57,7 +57,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
 		Prom:             alert.NewPrometheusRule(ctx, client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
@@ -92,7 +92,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return utilreconcile.Stop()
 	}
 
-	res, err = r.EnsureMonitorAndDependenciesAbsent(clusterUrlMonitor)
+	res, err = r.EnsureMonitorAndDependenciesAbsent(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to delete ClusterUrlMontior. Requeueing...")
 		return utilreconcile.RequeueWith(err)
@@ -121,7 +121,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	log.V(2).Info("Entering EnsureServiceMonitorExists")
-	res, err = r.EnsureServiceMonitorExists(clusterUrlMonitor)
+	res, err = r.EnsureServiceMonitorExists(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)

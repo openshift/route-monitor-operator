@@ -16,13 +16,11 @@ import (
 
 type ServiceMonitor struct {
 	Client client.Client
-	Ctx    context.Context
 }
 
-func NewServiceMonitor(ctx context.Context, c client.Client) *ServiceMonitor {
+func NewServiceMonitor(c client.Client) *ServiceMonitor {
 	return &ServiceMonitor{
 		Client: c,
-		Ctx:    ctx,
 	}
 }
 
@@ -31,7 +29,7 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool) error {
 	params := map[string][]string{
 		// Currently we only support `http_2xx` as module
 		"module": {"http_2xx"},
@@ -40,54 +38,54 @@ func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, bla
 
 	if isHCPMonitor {
 		s := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
-		return u.HypershiftUpdateServiceMonitorDeployment(s)
+		return u.HypershiftUpdateServiceMonitorDeployment(ctx, s)
 	}
 	s := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
-	return u.UpdateServiceMonitorDeployment(s)
+	return u.UpdateServiceMonitorDeployment(ctx, s)
 }
 
 // Creates or Updates Service Monitor Deployment according to the template
-func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error {
+func (u *ServiceMonitor) UpdateServiceMonitorDeployment(ctx context.Context, template monitoringv1.ServiceMonitor) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedServiceMonitor := &monitoringv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
+	err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor)
 	if err != nil {
 		// No similar ServiceMonitor exists
 		if !k8serrors.IsNotFound(err) {
 			return err
 		}
-		return u.Client.Create(u.Ctx, &template)
+		return u.Client.Create(ctx, &template)
 	}
 	if !reflect.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
 		// Update existing ServiceMonitor for the case that the template changed
 		deployedServiceMonitor.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedServiceMonitor)
+		return u.Client.Update(ctx, deployedServiceMonitor)
 	}
 	return nil
 }
 
 // Creates or Updates Service Monitor Deployment according to the template if enable of the hypershift
-func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(template rhobsv1.ServiceMonitor) error {
+func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template rhobsv1.ServiceMonitor) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedServiceMonitor := &rhobsv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
+	err := u.Client.Get(ctx, namespacedName, deployedServiceMonitor)
 	if err != nil {
 		// No similar ServiceMonitor exists
 		if !k8serrors.IsNotFound(err) {
 			return err
 		}
-		return u.Client.Create(u.Ctx, &template)
+		return u.Client.Create(ctx, &template)
 	}
 	if !reflect.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
 		// Update existing ServiceMonitor for the case that the template changed
 		deployedServiceMonitor.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedServiceMonitor)
+		return u.Client.Update(ctx, deployedServiceMonitor)
 	}
 	return nil
 }
 
 // Deletes the ServiceMonitor Deployment
-func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, isHCPMonitor bool) error {
+func (u *ServiceMonitor) DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, isHCPMonitor bool) error {
 	if serviceMonitorRef == (v1alpha1.NamespacedName{}) {
 		return nil
 	}
@@ -96,7 +94,7 @@ func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alph
 	if isHCPMonitor {
 		resource := &rhobsv1.ServiceMonitor{}
 		// Does the resource already exist?
-		err := u.Client.Get(u.Ctx, namespacedName, resource)
+		err := u.Client.Get(ctx, namespacedName, resource)
 		if err != nil {
 			if !k8serrors.IsNotFound(err) {
 				// If this is an unknown error
@@ -106,11 +104,11 @@ func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alph
 			return nil
 		}
 
-		return u.Client.Delete(u.Ctx, resource)
+		return u.Client.Delete(ctx, resource)
 	}
 	resource := &monitoringv1.ServiceMonitor{}
 	// Does the resource already exist?
-	err := u.Client.Get(u.Ctx, namespacedName, resource)
+	err := u.Client.Get(ctx, namespacedName, resource)
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
 			// If this is an unknown error
@@ -120,7 +118,7 @@ func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alph
 		return nil
 	}
 
-	return u.Client.Delete(u.Ctx, resource)
+	return u.Client.Delete(ctx, resource)
 }
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor

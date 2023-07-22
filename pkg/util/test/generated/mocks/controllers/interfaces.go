@@ -5,6 +5,7 @@
 package controllers
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -213,59 +214,59 @@ func (m *MockServiceMonitorHandler) EXPECT() *MockServiceMonitorHandlerMockRecor
 }
 
 // DeleteServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error {
+func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(ctx context.Context, serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", serviceMonitorRef, hcp)
+	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", ctx, serviceMonitorRef, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteServiceMonitorDeployment indicates an expected call of DeleteServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(serviceMonitorRef, hcp interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(ctx, serviceMonitorRef, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), serviceMonitorRef, hcp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).DeleteServiceMonitorDeployment), ctx, serviceMonitorRef, hcp)
 }
 
 // HypershiftUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) HypershiftUpdateServiceMonitorDeployment(template v10.ServiceMonitor) error {
+func (m *MockServiceMonitorHandler) HypershiftUpdateServiceMonitorDeployment(ctx context.Context, template v10.ServiceMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HypershiftUpdateServiceMonitorDeployment", template)
+	ret := m.ctrl.Call(m, "HypershiftUpdateServiceMonitorDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // HypershiftUpdateServiceMonitorDeployment indicates an expected call of HypershiftUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorDeployment(template interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HypershiftUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).HypershiftUpdateServiceMonitorDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HypershiftUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).HypershiftUpdateServiceMonitorDeployment), ctx, template)
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(ctx context.Context, url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), ctx, url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) UpdateServiceMonitorDeployment(template v1.ServiceMonitor) error {
+func (m *MockServiceMonitorHandler) UpdateServiceMonitorDeployment(ctx context.Context, template v1.ServiceMonitor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateServiceMonitorDeployment", template)
+	ret := m.ctrl.Call(m, "UpdateServiceMonitorDeployment", ctx, template)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateServiceMonitorDeployment indicates an expected call of UpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) UpdateServiceMonitorDeployment(template interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) UpdateServiceMonitorDeployment(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).UpdateServiceMonitorDeployment), template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).UpdateServiceMonitorDeployment), ctx, template)
 }
 
 // MockPrometheusRuleHandler is a mock of PrometheusRuleHandler interface.

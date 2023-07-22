@@ -56,7 +56,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
 		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
+		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
 		Prom:             alert.NewPrometheusRule(ctx, client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
@@ -92,7 +92,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
 
 	if shouldDelete {
-		_, err := r.EnsureMonitorAndDependenciesAbsent(routeMonitor)
+		_, err := r.EnsureMonitorAndDependenciesAbsent(ctx, routeMonitor)
 		if err != nil {
 			log.Error(err, "Failed to delete RouteMonitor. Requeueing...")
 			return utilreconcile.RequeueWith(err)
@@ -139,7 +139,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.V(2).Info("Entering EnsureServiceMonitorExists")
-	res, err = r.EnsureServiceMonitorExists(routeMonitor)
+	res, err = r.EnsureServiceMonitorExists(ctx, routeMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
