@@ -22,7 +22,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
@@ -129,7 +128,7 @@ var _ = Describe("Routemonitor", func() {
 			deleteServiceMonitorDeployment                helper.MockHelper
 			deletePrometheusRuleDeployment                helper.MockHelper
 			deleteFinalizer                               helper.MockHelper
-			shouldDeleteBlackBoxExporterResourcesResponse blackboxexporter.ShouldDeleteBlackBoxExporter
+			shouldDeleteBlackBoxExporterResourcesResponse bool
 
 			res utilreconcile.Result
 			err error
@@ -141,7 +140,7 @@ var _ = Describe("Routemonitor", func() {
 			deleteServiceMonitorDeployment = helper.MockHelper{}
 			deletePrometheusRuleDeployment = helper.MockHelper{}
 			deleteFinalizer = helper.MockHelper{}
-			shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
+			shouldDeleteBlackBoxExporterResourcesResponse = false
 		})
 		JustBeforeEach(func() {
 
@@ -181,7 +180,7 @@ var _ = Describe("Routemonitor", func() {
 		})
 		Describe("ShouldDeleteBlackBoxExporterResources instructs to delete", func() {
 			BeforeEach(func() {
-				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.DeleteBlackBoxExporter
+				shouldDeleteBlackBoxExporterResourcesResponse = true
 				ensureBlackBoxExporterResourcesAbsent.CalledTimes = 1
 			})
 			When("func EnsureBlackBoxExporterServiceAbsent fails unexpectedly", func() {
@@ -254,7 +253,7 @@ var _ = Describe("Routemonitor", func() {
 		When("ShouldDeleteBlackBoxExporterResources instructs to keep the BlackBoxExporter", func() {
 			BeforeEach(func() {
 				shouldDeleteBlackBoxExporterResources.CalledTimes = 1
-				shouldDeleteBlackBoxExporterResourcesResponse = blackboxexporter.KeepBlackBoxExporter
+				shouldDeleteBlackBoxExporterResourcesResponse = false
 				deleteServiceMonitorDeployment.CalledTimes = 1
 				deletePrometheusRuleDeployment.CalledTimes = 1
 			})

@@ -11,7 +11,6 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
-	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -155,7 +154,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx con
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
-	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
+	if shouldDelete == true {
 		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent(ctx)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)

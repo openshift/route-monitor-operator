@@ -13,7 +13,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -193,7 +192,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				})
 				When("the blackboxexporter needs to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(blackboxexporter.DeleteBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(true, nil)
 						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent(context.TODO()).Times(1)
 					})
 					It("removes the servicemonitor, the blackbox exporter and cleans up the finalizer", func() {
@@ -204,7 +203,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 
 				When("the blackboxexporter doesn't need to be cleaned up", func() {
 					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(blackboxexporter.KeepBlackBoxExporter, nil)
+						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(false, nil)
 					})
 					It("removes the servicemonitor and cleans up the finalizer", func() {
 						Expect(err).NotTo(HaveOccurred())

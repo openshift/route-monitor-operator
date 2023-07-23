@@ -1,384 +1,136 @@
-package blackboxexporter_test
+package blackboxexporter
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
-	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
-	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	"github.com/stretchr/testify/assert"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/golang/mock/gomock"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	. "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
-	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-var _ = Describe("Blackboxexporter", func() {
-	var (
-		mockClient *clientmocks.MockClient
-		mockCtrl   *gomock.Controller
+const (
+	testBlackBoxImage     = "blackbox-exporter:latest"
+	testBlackBoxNamespace = "test-namespace"
+)
 
-		blackboxExporter BlackBoxExporter
+func TestEnsureBlackBoxExporterDeployment(t *testing.T) {
+	tests := []struct {
+		name string
+		objs []client.Object
+	}{
+		{
+			name: "Ensure creation and deletion are idempotent",
+		},
+	}
 
-		get    helper.MockHelper
-		delete helper.MockHelper
-		create helper.MockHelper
-		list   helper.MockHelper
-	)
-	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
-		mockClient = clientmocks.NewMockClient(mockCtrl)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := corev1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
 
-		get = helper.MockHelper{}
-		delete = helper.MockHelper{}
-		create = helper.MockHelper{}
-		list = helper.MockHelper{}
-	})
-	JustBeforeEach(func() {
-		blackboxExporter = BlackBoxExporter{
-			Log:    constinit.Logger,
-			Client: mockClient,
-		}
+			if err := appsv1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
 
-		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(get.ErrorResponse).
-			Times(get.CalledTimes)
+			bbe := New(fake.NewClientBuilder().WithScheme(s).WithObjects(test.objs...).Build(), testBlackBoxImage, testBlackBoxNamespace)
+			if err := bbe.EnsureBlackBoxExporterResourcesExist(context.TODO()); err != nil {
+				t.Error(err)
+			}
 
-		mockClient.EXPECT().Delete(gomock.Any(), gomock.Any()).
-			Return(delete.ErrorResponse).
-			Times(delete.CalledTimes)
+			dep := &appsv1.Deployment{}
+			if err := bbe.Client.Get(context.TODO(), types.NamespacedName{Name: blackboxExporterName, Namespace: testBlackBoxNamespace}, dep); err != nil {
+				t.Errorf("expected no err, got %v", err)
+			}
 
-		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
-			Return(create.ErrorResponse).
-			Times(create.CalledTimes)
-	})
-	AfterEach(func() {
-		mockCtrl.Finish()
-	})
-	Describe("DeleteBlackBoxExporterService", func() {
-		BeforeEach(func() {
-			get.CalledTimes = 1
+			svc := &corev1.Service{}
+			if err := bbe.Client.Get(context.TODO(), types.NamespacedName{Name: blackboxExporterName, Namespace: testBlackBoxNamespace}, svc); err != nil {
+				t.Errorf("expected no err, got %v", err)
+			}
+
+			if err := bbe.EnsureBlackBoxExporterResourcesExist(context.TODO()); err != nil {
+				t.Error(err)
+			}
+
+			if err := bbe.EnsureBlackBoxExporterResourcesAbsent(context.TODO()); err != nil {
+				t.Errorf("failed to ensure blackbox exporter resources absent: %v", err)
+			}
+
+			if err := bbe.EnsureBlackBoxExporterResourcesAbsent(context.TODO()); err != nil {
+				t.Errorf("failed to ensure blackbox exporter resources absent a second time: %v", err)
+			}
 		})
+	}
+}
 
-		When("'Get' return an error", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("'Get' return an 'NotFound' error", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-			})
-			It("should do nothing", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("'Delete' return an an  error", func() {
-			// Arrange
-			BeforeEach(func() {
-				delete = helper.CustomErrorHappensOnce()
-			})
-			It("should do nothing", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("'Delete' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				delete.CalledTimes = 1
-			})
-			It("should succeed", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-	})
-	Describe("DeleteBlackBoxExporterDeployment", func() {
-		BeforeEach(func() {
-			get.CalledTimes = 1
-		})
-
-		When("'Get' return an error", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should bubble the error up", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("'Get' return an 'NotFound' error", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-			})
-			It("should do nothing", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-		When("'Delete' return an an  error", func() {
-			// Arrange
-			BeforeEach(func() {
-				delete = helper.CustomErrorHappensOnce()
-			})
-			It("should do nothing", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("'Delete' succeeds", func() {
-			// Arrange
-			BeforeEach(func() {
-				delete.CalledTimes = 1
-			})
-			It("should succeed", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
-	})
-	Describe("CreateBlackBoxExporterDeployment", func() {
-		BeforeEach(func() {
-			// Arrange
-			get.CalledTimes = 1
-
-		})
-
-		When("the resource(deployment) Exists", func() {
-			It("should call `Get` and not call `Create`", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-
-			})
-		})
-		When("the resource(deployment) is Not Found", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create.CalledTimes = 1
-			})
-			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the resource(deployment) Get fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
-			})
-			It("should return the error and not call `Create`", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-		When("the resource(deployment) Create fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.ErrorResponse = consterror.NotFoundErr
-				create = helper.CustomErrorHappensOnce()
-			})
-			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-	})
-	Describe("CreateBlackBoxExporterService", func() {
-
-		When("the resource(service) Exists", func() {
-			// Arrange
-			BeforeEach(func() {
-				get.CalledTimes = 1
-			})
-			It("should call `Get` and not call `Create`", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceExists(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-
-			})
-		})
-		When("the resource(service) is Not Found", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.NotFoundErrorHappensOnce()
-				create.CalledTimes = 1
-			})
-			It("should call `Get` successfully and `Create` the resource(service)", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceExists(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-		When("the resource(service) Get fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.CustomErrorHappensOnce()
-			})
-			It("should return the error and not call `Create`", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceExists(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-		When("the resource(service) Create fails unexpectedly", func() {
-			// Arrange
-			BeforeEach(func() {
-				get = helper.NotFoundErrorHappensOnce()
-				create = helper.CustomErrorHappensOnce()
-			})
-			It("should call `Get` Successfully and call `Create` but return the error", func() {
-				// Act
-				err := blackboxExporter.EnsureBlackBoxExporterServiceExists(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-	})
-	Describe("ShouldDeleteBlackBoxExporterResources", func() {
-		var (
-			routeMonitor       v1alpha1.RouteMonitor
-			routeMonitors      v1alpha1.RouteMonitorList
-			clusterUrlMonitors v1alpha1.ClusterUrlMonitorList
-		)
-		JustBeforeEach(func() {
-			gomock.InOrder(
-				mockClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(list.ErrorResponse).SetArg(1, routeMonitors).Times(1),
-				mockClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(list.ErrorResponse).SetArg(1, clusterUrlMonitors).AnyTimes(),
-			)
-		})
-		BeforeEach(func() {
-			list.CalledTimes = 2
-		})
-
-		JustBeforeEach(func() {
-			routeMonitor.DeletionTimestamp = &metav1.Time{Time: time.Unix(0, 0)}
-		})
-		When("the `List` command fails", func() {
-			// Arrange
-			BeforeEach(func() {
-				list = helper.CustomErrorHappensOnce()
-			})
-			It("should fail with the List error", func() {
-				// Act
-				_, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources(context.TODO())
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
-			})
-		})
-
-		When("there are many RouteMonitors", func() {
-			var (
-				routeMonitorSecond v1alpha1.RouteMonitor
-			)
-
-			BeforeEach(func() {
-				routeMonitor.ObjectMeta = metav1.ObjectMeta{
-					Name:      "fake-name",
-					Namespace: "fake-namespace",
-				}
-				routeMonitorSecond.ObjectMeta = metav1.ObjectMeta{
-					Name:      routeMonitor.Name + "-but-different",
-					Namespace: routeMonitor.Namespace,
-				}
-				routeMonitors.Items = []v1alpha1.RouteMonitor{
-					routeMonitor,
-					routeMonitorSecond,
-				}
-			})
-			It("should return 'false' for too many RouteMonitors", func() {
-				// Act
-				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackboxexporter.KeepBlackBoxExporter))
-
-			})
-		})
-
-		When("there is just one RouteMonitor, and it's being deleted", func() {
-			BeforeEach(func() {
-				clusterUrlMonitors.Items = []v1alpha1.ClusterUrlMonitor{}
-				routeMonitors.Items = []v1alpha1.RouteMonitor{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:              "fake-route-monitor",
-							Namespace:         "fake-route-monitor-namespace",
-							DeletionTimestamp: &metav1.Time{Time: time.Unix(0, 0)},
+func TestShouldDeleteBlackboxExporterResources(t *testing.T) {
+	tests := []struct {
+		name     string
+		objs     []client.Object
+		expected bool
+	}{
+		{
+			name: "only one object with deletion timestamp",
+			objs: []client.Object{
+				&v1alpha1.ClusterUrlMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-clusterurlmonitor",
+						Namespace: "test-namespace",
+						DeletionTimestamp: &metav1.Time{
+							Time: time.Now(),
 						},
 					},
-				}
-			})
-			// Arrange
-			It("should return 'true'", func() {
-				// Act
-				res, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources(context.TODO())
-				// Assert
-				Expect(err).NotTo(HaveOccurred())
-				Expect(res).To(Equal(blackboxexporter.DeleteBlackBoxExporter))
-			})
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "many objects",
+			objs: []client.Object{
+				&v1alpha1.ClusterUrlMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-clusterurlmonitor",
+						Namespace: "test-namespace",
+						DeletionTimestamp: &metav1.Time{
+							Time: time.Now(),
+						},
+					},
+				},
+				&v1alpha1.RouteMonitor{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-routemonitor",
+						Namespace: "test-namespace",
+					},
+				},
+			},
+			expected: false,
+		},
+	}
 
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			if err := v1alpha1.AddToScheme(s); err != nil {
+				t.Fatal(err)
+			}
+
+			bbe := New(fake.NewClientBuilder().WithScheme(s).WithObjects(test.objs...).Build(), testBlackBoxImage, testBlackBoxNamespace)
+			actual, err := bbe.ShouldDeleteBlackBoxExporterResources(context.TODO())
+			if err != nil {
+				t.Error(err)
+			}
+
+			assert.Equal(t, test.expected, actual)
 		})
-	})
-
-})
+	}
+}

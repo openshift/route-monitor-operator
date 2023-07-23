@@ -54,7 +54,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Ctx:              ctx,
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
-		BlackBoxExporter: blackboxexporter.New(client, log, blackboxExporterImage, blackboxExporterNamespace),
+		BlackBoxExporter: blackboxexporter.New(client, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
 		Prom:             alert.NewPrometheusRule(client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),

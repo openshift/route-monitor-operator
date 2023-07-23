@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -131,7 +131,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Endpoints: []monitoringv1.Endpoint{
 				{
-					Port: blackboxexporter.BlackBoxExporterPortName,
+					Port: blackboxexporter.ContainerPortName,
 					// Probe every 30s
 					Interval: MetricsScrapeInterval,
 					// Timeout has to be smaller than probe interval
@@ -151,7 +151,7 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 					},
 				}},
 			Selector: metav1.LabelSelector{
-				MatchLabels: blackboxexporter.GenerateBlackBoxExporterLables(),
+				MatchLabels: blackboxexporter.Labels(),
 			},
 			NamespaceSelector: monitoringv1.NamespaceSelector{
 				MatchNames: []string{
@@ -172,7 +172,7 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 		Spec: rhobsv1.ServiceMonitorSpec{
 			Endpoints: []rhobsv1.Endpoint{
 				{
-					Port: blackboxexporter.BlackBoxExporterPortName,
+					Port: blackboxexporter.ContainerPortName,
 					// Probe every 30s
 					Interval: MetricsScrapeInterval,
 					// Timeout has to be smaller than probe interval
@@ -192,7 +192,7 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 					},
 				}},
 			Selector: metav1.LabelSelector{
-				MatchLabels: blackboxexporter.GenerateBlackBoxExporterLables(),
+				MatchLabels: blackboxexporter.Labels(),
 			},
 			NamespaceSelector: rhobsv1.NamespaceSelector{
 				MatchNames: []string{

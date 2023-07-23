@@ -11,7 +11,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v10 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -386,10 +385,10 @@ func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace(
 }
 
 // ShouldDeleteBlackBoxExporterResources mocks base method.
-func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources(ctx context.Context) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources", ctx)
-	ret0, _ := ret[0].(blackboxexporter.ShouldDeleteBlackBoxExporter)
+	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

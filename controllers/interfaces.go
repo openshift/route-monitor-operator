@@ -5,7 +5,6 @@ import (
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -88,6 +87,6 @@ type PrometheusRuleHandler interface {
 type BlackBoxExporterHandler interface {
 	EnsureBlackBoxExporterResourcesExist(ctx context.Context) error
 	EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error
-	ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
+	ShouldDeleteBlackBoxExporterResources(ctx context.Context) (bool, error)
 	GetBlackBoxExporterNamespace() string
 }
