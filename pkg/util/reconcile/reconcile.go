@@ -9,10 +9,6 @@ type Result struct {
 	RequeueAfter time.Duration
 }
 
-func (r Result) RequeueOrStop() bool {
-	return r.Requeue || !r.Continue
-}
-
 func (r Result) ShouldStop() bool {
 	return !r.Continue
 }
@@ -35,11 +31,6 @@ func ContinueOperation() Result {
 
 func StopReconcile() (result Result, err error) {
 	result = StopOperation()
-	return
-}
-
-func RequeueReconcile() (result Result, err error) {
-	result = RequeueOperation()
 	return
 }
 

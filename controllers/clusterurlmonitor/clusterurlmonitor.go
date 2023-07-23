@@ -31,7 +31,6 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
-	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 )
 
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
@@ -86,64 +85,64 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	clusterUrlMonitor, res, err := r.GetClusterUrlMonitor(req)
 	if err != nil {
 		log.Error(err, "Failed to retreive ClusterUrlMonitor. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 	if res.ShouldStop() {
-		return utilreconcile.Stop()
+		return ctrl.Result{}, nil
 	}
 
 	res, err = r.EnsureMonitorAndDependenciesAbsent(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to delete ClusterUrlMontior. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 	if res.ShouldStop() {
 		log.Info("Successfully deleted ClusterUrlMonitor. Finished Reconcile")
-		return utilreconcile.Stop()
+		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Entering EnsureFinalizerSet")
 	res, err = r.EnsureFinalizerSet(clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set ClusterUrlMonitor's Finalizer. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 	if res.ShouldStop() {
 		log.Info("Successfully set ClusterUrlMonitor finalizers. Stopping...")
-		return utilreconcile.Stop()
+		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
 	if err != nil {
 		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 
 	log.V(2).Info("Entering EnsureServiceMonitorExists")
 	res, err = r.EnsureServiceMonitorExists(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 	if res.ShouldStop() {
 		log.Info("Successfully patched ClusterUrlMonitor with ServiceMonitorRef. Stopping...")
-		return utilreconcile.Stop()
+		return ctrl.Result{}, nil
 	}
 
 	log.V(2).Info("Entering EnsurePrometheusRuleResourceExists")
 	res, err = r.EnsurePrometheusRuleExists(ctx, clusterUrlMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set PrometheusRule. Requeueing...")
-		return utilreconcile.RequeueWith(err)
+		return ctrl.Result{}, err
 	}
 	if res.ShouldStop() {
 		log.Info("Successfully patched ClusterUrlMonitor with PrometheusRuleRef. Stopping...")
-		return utilreconcile.Stop()
+		return ctrl.Result{}, nil
 	}
 
 	log.Info("All operations for ClusterUrlMonitor completed. Finished Reconcile.")
-	return utilreconcile.Stop()
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterUrlMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
