@@ -183,17 +183,12 @@ var _ = Describe("Clusterurlmonitor", func() {
 				BeforeEach(func() {
 					mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(context.TODO(), clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
 					mockServiceMonitor.EXPECT().DeleteServiceMonitorDeployment(context.TODO(), clusterUrlMonitor.Status.ServiceMonitorRef, gomock.Any()).Times(1)
-					gomock.InOrder(
-						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.FinalizerKey).Times(1).Return(true),
-						mockCommon.EXPECT().DeleteFinalizer(&clusterUrlMonitor, clusterurlmonitor.PrevFinalizerKey).Times(1),
-					)
-					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
-
 				})
 				When("the blackboxexporter needs to be cleaned up", func() {
 					BeforeEach(func() {
 						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(true, nil)
 						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent(context.TODO()).Times(1)
+						mockCommon.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1)
 					})
 					It("removes the servicemonitor, the blackbox exporter and cleans up the finalizer", func() {
 						Expect(err).NotTo(HaveOccurred())
@@ -204,6 +199,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				When("the blackboxexporter doesn't need to be cleaned up", func() {
 					BeforeEach(func() {
 						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).Return(false, nil)
+						mockCommon.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1)
 					})
 					It("removes the servicemonitor and cleans up the finalizer", func() {
 						Expect(err).NotTo(HaveOccurred())

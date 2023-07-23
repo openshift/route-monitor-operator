@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -166,9 +167,9 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	if s.Common.DeleteFinalizer(&clusterUrlMonitor, FinalizerKey) {
-		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
+	if controllerutil.RemoveFinalizer(&clusterUrlMonitor, FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyway
+		controllerutil.RemoveFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
 	}
 
@@ -176,9 +177,9 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx con
 }
 
 func (s *ClusterUrlMonitorReconciler) EnsureFinalizerSet(clusterUrlMonitor v1alpha1.ClusterUrlMonitor) (utilreconcile.Result, error) {
-	if s.Common.SetFinalizer(&clusterUrlMonitor, FinalizerKey) {
+	if controllerutil.AddFinalizer(&clusterUrlMonitor, FinalizerKey) {
 		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		s.Common.DeleteFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
+		controllerutil.RemoveFinalizer(&clusterUrlMonitor, PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&clusterUrlMonitor)
 	}
 	return utilreconcile.ContinueReconcile()

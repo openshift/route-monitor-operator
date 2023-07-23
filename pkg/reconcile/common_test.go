@@ -2,6 +2,7 @@ package reconcileCommon_test
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -327,7 +328,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			}
 		})
 		JustBeforeEach(func() {
-			res = rc.SetFinalizer(&routeMonitor, finalizerKey)
+			res = controllerutil.AddFinalizer(&routeMonitor, finalizerKey)
 
 		})
 		When("when the object has already a finalizer set", func() {
@@ -362,7 +363,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			}
 		})
 		JustBeforeEach(func() {
-			res = rc.DeleteFinalizer(&routeMonitor, finalizerKey)
+			res = controllerutil.RemoveFinalizer(&routeMonitor, finalizerKey)
 
 		})
 		When("when the object has a finalizer set", func() {

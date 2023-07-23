@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"reflect"
 
-	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
+	routev1 "github.com/openshift/api/route/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // Ensures that all PrometheusRules CR are created according to the RouteMonitor
@@ -129,18 +129,18 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.
 	}
 
 	log.V(2).Info("Entering ensureFinalizerAbsent")
-	if r.Common.DeleteFinalizer(&routeMonitor, consts.FinalizerKey) {
-		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		r.Common.DeleteFinalizer(&routeMonitor, consts.PrevFinalizerKey)
+	if controllerutil.RemoveFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyway
+		controllerutil.RemoveFinalizer(&routeMonitor, consts.PrevFinalizerKey)
 		return r.Common.UpdateMonitorResource(&routeMonitor)
 	}
 	return utilreconcile.StopReconcile()
 }
 
 func (s *RouteMonitorReconciler) EnsureFinalizerSet(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
-	if s.Common.SetFinalizer(&routeMonitor, consts.FinalizerKey) {
-		// ignore the output as we want to remove the PrevFinalizerKey anyways
-		s.Common.DeleteFinalizer(&routeMonitor, consts.PrevFinalizerKey)
+	if controllerutil.AddFinalizer(&routeMonitor, consts.FinalizerKey) {
+		// ignore the output as we want to remove the PrevFinalizerKey anyway
+		controllerutil.RemoveFinalizer(&routeMonitor, consts.PrevFinalizerKey)
 		return s.Common.UpdateMonitorResource(&routeMonitor)
 	}
 	return utilreconcile.ContinueReconcile()

@@ -6,13 +6,11 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -88,26 +86,6 @@ func (u *MonitorResourceCommon) ParseMonitorSLOSpecs(routeURL string, sloSpec v1
 		return "", customerrors.InvalidSLO
 	}
 	return parsedSlo, nil
-}
-
-// Deletes Finalizer on object if defined
-func (u *MonitorResourceCommon) DeleteFinalizer(o v1.Object, finalizerKey string) bool {
-	if finalizer.HasFinalizer(o, finalizerKey) {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
-		finalizer.Remove(o, finalizerKey)
-		return true
-	}
-	return false
-}
-
-// Attaches Finalizer to object
-func (u *MonitorResourceCommon) SetFinalizer(o v1.Object, finalizerKey string) bool {
-	if !finalizer.HasFinalizer(o, finalizerKey) {
-		// if finalizer is still here and ServiceMonitor is deleted, then remove the finalizer
-		finalizer.Add(o, finalizerKey)
-		return true
-	}
-	return false
 }
 
 // Updates the ClusterURLMonitor and RouteMonitor CR in reconcile loops

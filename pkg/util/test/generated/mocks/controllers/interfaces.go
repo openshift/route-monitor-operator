@@ -14,7 +14,6 @@ import (
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v10 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,20 +39,6 @@ func NewMockMonitorResourceHandler(ctrl *gomock.Controller) *MockMonitorResource
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockMonitorResourceHandler) EXPECT() *MockMonitorResourceHandlerMockRecorder {
 	return m.recorder
-}
-
-// DeleteFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) DeleteFinalizer(o v11.Object, finalizerKey string) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteFinalizer", o, finalizerKey)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// DeleteFinalizer indicates an expected call of DeleteFinalizer.
-func (mr *MockMonitorResourceHandlerMockRecorder) DeleteFinalizer(o, finalizerKey interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFinalizer", reflect.TypeOf((*MockMonitorResourceHandler)(nil).DeleteFinalizer), o, finalizerKey)
 }
 
 // GetHCP mocks base method.
@@ -128,20 +113,6 @@ func (m *MockMonitorResourceHandler) SetErrorStatus(errorStatus *string, err err
 func (mr *MockMonitorResourceHandlerMockRecorder) SetErrorStatus(errorStatus, err interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetErrorStatus", reflect.TypeOf((*MockMonitorResourceHandler)(nil).SetErrorStatus), errorStatus, err)
-}
-
-// SetFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) SetFinalizer(o v11.Object, finalizerKey string) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetFinalizer", o, finalizerKey)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SetFinalizer indicates an expected call of SetFinalizer.
-func (mr *MockMonitorResourceHandlerMockRecorder) SetFinalizer(o, finalizerKey interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFinalizer", reflect.TypeOf((*MockMonitorResourceHandler)(nil).SetFinalizer), o, finalizerKey)
 }
 
 // SetResourceReference mocks base method.
