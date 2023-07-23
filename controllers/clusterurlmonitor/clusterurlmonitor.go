@@ -55,7 +55,7 @@ func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterN
 		Ctx:              ctx,
 		Log:              log,
 		Scheme:           mgr.GetScheme(),
-		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
+		BlackBoxExporter: blackboxexporter.New(client, log, blackboxExporterImage, blackboxExporterNamespace),
 		ServiceMonitor:   servicemonitor.NewServiceMonitor(client),
 		Prom:             alert.NewPrometheusRule(client),
 		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
@@ -113,7 +113,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
-	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
+	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist(ctx)
 	if err != nil {
 		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
 		return ctrl.Result{}, err

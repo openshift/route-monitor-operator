@@ -147,15 +147,15 @@ var _ = Describe("Routemonitor", func() {
 
 			shouldDeleteBlackBoxExporterResources.CalledTimes = 1
 
-			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().
+			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent(context.TODO()).
 				Times(ensureBlackBoxExporterResourcesAbsent.CalledTimes).
 				Return(ensureBlackBoxExporterResourcesAbsent.ErrorResponse)
 
-			mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().
+			mockBlackboxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources(context.TODO()).
 				Times(shouldDeleteBlackBoxExporterResources.CalledTimes).
 				Return(shouldDeleteBlackBoxExporterResourcesResponse, shouldDeleteBlackBoxExporterResources.ErrorResponse)
 
-			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesExist().
+			mockBlackboxExporter.EXPECT().EnsureBlackBoxExporterResourcesExist(context.TODO()).
 				Times(ensureBlackBoxExporterResourcesExist.CalledTimes).
 				Return(ensureBlackBoxExporterResourcesExist.ErrorResponse)
 

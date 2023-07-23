@@ -102,7 +102,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(ctx context.Context,
 func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.Context, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
-	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
+	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources(ctx)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -110,7 +110,7 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx context.
 
 	if shouldDeleteBlackBoxResources {
 		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")
-		err := r.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
+		err := r.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent(ctx)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}

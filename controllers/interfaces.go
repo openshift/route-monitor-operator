@@ -86,8 +86,8 @@ type PrometheusRuleHandler interface {
 }
 
 type BlackBoxExporterHandler interface {
-	EnsureBlackBoxExporterResourcesExist() error
-	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
+	EnsureBlackBoxExporterResourcesExist(ctx context.Context) error
+	EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error
+	ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
 	GetBlackBoxExporterNamespace() string
 }

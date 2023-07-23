@@ -151,12 +151,12 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(ctx con
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
+	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources(ctx)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
-		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
+		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent(ctx)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
 		}

@@ -344,31 +344,31 @@ func (m *MockBlackBoxExporterHandler) EXPECT() *MockBlackBoxExporterHandlerMockR
 }
 
 // EnsureBlackBoxExporterResourcesAbsent mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent() error {
+func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent")
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // EnsureBlackBoxExporterResourcesAbsent indicates an expected call of EnsureBlackBoxExporterResourcesAbsent.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesAbsent() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesAbsent(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesAbsent))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesAbsent), ctx)
 }
 
 // EnsureBlackBoxExporterResourcesExist mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist() error {
+func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist")
+	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // EnsureBlackBoxExporterResourcesExist indicates an expected call of EnsureBlackBoxExporterResourcesExist.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesExist() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesExist(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesExist))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesExist), ctx)
 }
 
 // GetBlackBoxExporterNamespace mocks base method.
@@ -386,16 +386,16 @@ func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace(
 }
 
 // ShouldDeleteBlackBoxExporterResources mocks base method.
-func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
+func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources(ctx context.Context) (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources")
+	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources", ctx)
 	ret0, _ := ret[0].(blackboxexporter.ShouldDeleteBlackBoxExporter)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) ShouldDeleteBlackBoxExporterResources() *gomock.Call {
+func (mr *MockBlackBoxExporterHandlerMockRecorder) ShouldDeleteBlackBoxExporterResources(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).ShouldDeleteBlackBoxExporterResources))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).ShouldDeleteBlackBoxExporterResources), ctx)
 }
