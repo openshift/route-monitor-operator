@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -56,7 +54,8 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources(ctx context.Con
 		objectsDependingOnExporter = append(objectsDependingOnExporter, &clusterUrlMonitors.Items[i])
 	}
 
-	if len(objectsDependingOnExporter) == 1 && finalizer.WasDeleteRequested(objectsDependingOnExporter[0]) {
+	// If there's only one clusterurlmonitor/routemonitor left and it's deleting, delete the blackboxexporter
+	if len(objectsDependingOnExporter) == 1 && objectsDependingOnExporter[0].GetDeletionTimestamp() != nil {
 		return true, nil
 	}
 	return false, nil

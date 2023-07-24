@@ -26,7 +26,6 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
-	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,10 +86,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Handle deletion of RouteMonitor Resource
-	shouldDelete := finalizer.WasDeleteRequested(&routeMonitor)
-	log.V(2).Info("Response of WasDeleteRequested", "shouldDelete", shouldDelete)
-
-	if shouldDelete {
+	if routeMonitor.GetDeletionTimestamp() != nil {
 		_, err := r.EnsureMonitorAndDependenciesAbsent(ctx, routeMonitor)
 		if err != nil {
 			log.Error(err, "Failed to delete RouteMonitor. Requeueing...")
