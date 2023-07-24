@@ -10,12 +10,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-//go:generate mockgen -source $GOFILE -destination ../util/test/generated/mocks/reconcile/common.go -package $GOPACKAGE
 
 type MonitorResourceCommon struct {
 	Client client.Client
@@ -137,10 +134,4 @@ func (u *MonitorResourceCommon) GetHCP(ns string) (hypershiftv1beta1.HostedContr
 		return hypershiftv1beta1.HostedControlPlane{}, fmt.Errorf("invalid number of HostedControlPlanes detected in namespace '%s': expected 1, got %d", ns, len(hcpList.Items))
 	}
 	return hcpList.Items[0], nil
-}
-
-func (u *MonitorResourceCommon) GetServiceMonitor(namespacedName types.NamespacedName) (monitoringv1.ServiceMonitor, error) {
-	serviceMonitor := monitoringv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, &serviceMonitor)
-	return serviceMonitor, err
 }
