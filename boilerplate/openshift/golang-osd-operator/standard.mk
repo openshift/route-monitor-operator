@@ -26,6 +26,12 @@ CONTAINER_ENGINE_CONFIG_DIR = .docker
 # also accepts REGISTRY_AUTH_FILE from the env. See
 # https://www.mankier.com/1/podman-login#Options---authfile=path
 export REGISTRY_AUTH_FILE = ${CONTAINER_ENGINE_CONFIG_DIR}/config.json
+# If this configuration file doesn't exist, podman will error out. So
+# we'll create it if it doesn't exist.
+ifeq (,$(wildcard $(REGISTRY_AUTH_FILE)))
+$(shell mkdir -p $(CONTAINER_ENGINE_CONFIG_DIR))
+$(shell echo '{}' > $(REGISTRY_AUTH_FILE))
+endif
 # ==> Docker uses --config=PATH *before* (any) subcommand; so we'll glue
 # that to the CONTAINER_ENGINE variable itself. (NOTE: I tried half a
 # dozen other ways to do this. This was the least ugly one that actually
@@ -99,7 +105,7 @@ GOLANGCI_LINT_CACHE ?= /tmp/golangci-cache
 GOLANGCI_OPTIONAL_CONFIG ?=
 
 ifeq ($(origin TESTTARGETS), undefined)
-TESTTARGETS := $(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/")
+TESTTARGETS := $(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | egrep -v "/(osde2e)/")
 endif
 # ex, -v
 TESTOPTS :=
@@ -187,7 +193,7 @@ OPENAPI_GEN = openapi-gen
 .PHONY: op-generate
 ## CRD v1beta1 is no longer supported.
 op-generate:
-	cd ./api; $(CONTROLLER_GEN) crd:crdVersions=v1 paths=./... output:dir=$(PWD)/deploy/crds
+	cd ./api; $(CONTROLLER_GEN) crd:crdVersions=v1,generateEmbeddedObjectMeta=true paths=./... output:dir=$(PWD)/deploy/crds
 	cd ./api; $(CONTROLLER_GEN) object paths=./...
 
 .PHONY: openapi-generate
@@ -200,7 +206,7 @@ openapi-generate:
 			-p % \
 			-h /dev/null \
 			-r "-"
-	
+
 .PHONY: generate
 generate: op-generate go-generate openapi-generate
 
@@ -221,7 +227,7 @@ SETUP_ENVTEST = setup-envtest
 .PHONY: setup-envtest
 setup-envtest:
 	$(eval KUBEBUILDER_ASSETS := "$(shell $(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir /tmp/envtest/bin)")
-	
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
