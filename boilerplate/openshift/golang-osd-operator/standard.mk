@@ -88,13 +88,14 @@ export HOME=/tmp/home
 endif
 PWD=$(shell pwd)
 
-GOENV=GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=0 GOFLAGS="${GOFLAGS_MOD}"
+GOENV=GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=1 GOFLAGS="${GOFLAGS_MOD}"
 GOBUILDFLAGS=-gcflags="all=-trimpath=${GOPATH}" -asmflags="all=-trimpath=${GOPATH}"
 
 ifeq (${FIPS_ENABLED}, true)
 GOFLAGS_MOD+=-tags=fips_enabled
 GOFLAGS_MOD:=$(strip ${GOFLAGS_MOD})
-GOENV+=GOEXPERIMENT=boringcrypto
+$(warning Setting GOEXPERIMENT=strictfipsruntime,boringcrypto - this generally causes builds to fail unless building inside the provided Dockerfile. If building locally consider calling 'go build .')
+GOENV+=GOEXPERIMENT=strictfipsruntime,boringcrypto
 GOENV:=$(strip ${GOENV})
 endif
 
