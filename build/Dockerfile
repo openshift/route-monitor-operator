@@ -1,4 +1,4 @@
-FROM quay.io/app-sre/boilerplate:image-v3.0.4 AS builder
+FROM quay.io/app-sre/boilerplate:image-v3.0.6 AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -13,7 +13,7 @@ RUN make go-build
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.8-1014
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.8-1037
 WORKDIR /
 COPY --from=builder /workspace/build/_output/bin/* /manager
 USER nonroot:nonroot
