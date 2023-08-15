@@ -173,6 +173,7 @@ boilerplate-update:
 .PHONY: kubectl-package
 kubectl-package:
 ifeq (,$(wildcard bin/kubectl-package))
+	mkdir -p bin
 	wget https://github.com/package-operator/package-operator/releases/latest/download/kubectl-package_$(GOOS)_$(GOARCH) -O bin/kubectl-package
 	chmod 755 bin/kubectl-package
 endif
