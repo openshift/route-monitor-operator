@@ -102,7 +102,7 @@ if [[ -z "$SKIP_SAAS_FILE_CHECKS" ]]; then
             $YQ_CMD '.managedResourceTypes[0]' -
     )
     if [[ "${MANAGED_RESOURCE_TYPE}" == "" ]]; then
-        echo "Unabled to determine if SAAS file managed resource type"
+        echo "Unable to determine if SAAS file managed resource type"
         exit 1
     fi
 
@@ -119,11 +119,7 @@ if [[ -z "$SKIP_SAAS_FILE_CHECKS" ]]; then
     if [[ "$operator_channel" == "production" ]]; then
         if [ -z "$DEPLOYED_HASH" ] ; then
             deployed_hash_yq_filter=".resourceTemplates[].targets[] | select(.namespace.\$ref == \"${resource_template_ns_path}\") | .ref"
-            DEPLOYED_HASH=$(
-                curl -s "${SAAS_FILE_URL}" | \
-                    # Surround yq filter in single quotes
-                    $YQ_CMD "'"${deployed_hash_yq_filter}"'" -
-            )
+            DEPLOYED_HASH="$(curl -s "${SAAS_FILE_URL}" | $YQ_CMD "${deployed_hash_yq_filter}" -)"
         fi
 
         # Ensure that our query for the current deployed hash worked
