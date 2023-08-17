@@ -50,7 +50,7 @@ if [[ -z "$CONTAINER_ENGINE" ]]; then
 else
     yq_image="quay.io/app-sre/yq:4"
     $CONTAINER_ENGINE pull $yq_image
-    YQ_CMD="$CONTAINER_ENGINE run --rm -i $yq_image yq"
+    YQ_CMD="$CONTAINER_ENGINE run --rm -i $yq_image"
 fi
 
 # Get the image URI as repo URL + image digest
