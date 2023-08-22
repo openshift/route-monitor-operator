@@ -1,0 +1,14 @@
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: api
+  namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: resources
+spec:
+  prefix: https://api.
+  port: "443"
+  suffix: /livez
+  slo:
+    targetAvailabilityPercent: "99.0"
+  skipPrometheusRule: true
