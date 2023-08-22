@@ -20,6 +20,8 @@ spec:
     class: hosted-cluster
   - name: deploy
     class: hosted-cluster
+  - name: resources
+    class: hosted-cluster
   availabilityProbes:
   - probes:
     - condition:
