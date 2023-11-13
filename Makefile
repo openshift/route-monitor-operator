@@ -174,7 +174,7 @@ boilerplate-update:
 kubectl-package:
 ifeq (,$(wildcard bin/kubectl-package))
 	mkdir -p bin
-	wget https://github.com/package-operator/package-operator/releases/latest/download/kubectl-package_$(GOOS)_$(GOARCH) -O bin/kubectl-package
+	wget https://github.com/package-operator/package-operator/releases/v1.9.1/download/kubectl-package_$(GOOS)_$(GOARCH) -O bin/kubectl-package
 	chmod 755 bin/kubectl-package
 endif
 
