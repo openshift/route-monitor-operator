@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,8 +75,10 @@ type RouteMonitorList struct {
 
 // BlackBoxExporterSpec references the blackbox exporter pod
 type BlackBoxExporterSpec struct {
-	// +kubebuilder:default:node-role.kubernetes.io/infra
-	ScheduleOn string `json:"scheduleOn,omitempty"`
+	// nodeSelector is a label query to constrain Pods to nodes with specific labels.
+	// The result of matchLabels and matchExpressions are ANDed. An empty label selector
+	// matches all objects. A null label selector matches no objects.
+	NodeSelector corev1.NodeSelectorTerm `json:"nodeSelector"`
 }
 
 func init() {

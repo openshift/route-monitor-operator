@@ -14,7 +14,8 @@ import (
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v10 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
-	v11 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v11 "k8s.io/api/core/v1"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -43,7 +44,7 @@ func (m *MockMonitorResourceHandler) EXPECT() *MockMonitorResourceHandlerMockRec
 }
 
 // DeleteFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) DeleteFinalizer(o v11.Object, finalizerKey string) bool {
+func (m *MockMonitorResourceHandler) DeleteFinalizer(o v12.Object, finalizerKey string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteFinalizer", o, finalizerKey)
 	ret0, _ := ret[0].(bool)
@@ -131,7 +132,7 @@ func (mr *MockMonitorResourceHandlerMockRecorder) SetErrorStatus(errorStatus, er
 }
 
 // SetFinalizer mocks base method.
-func (m *MockMonitorResourceHandler) SetFinalizer(o v11.Object, finalizerKey string) bool {
+func (m *MockMonitorResourceHandler) SetFinalizer(o v12.Object, finalizerKey string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetFinalizer", o, finalizerKey)
 	ret0, _ := ret[0].(bool)
@@ -384,16 +385,16 @@ func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace(
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlackBoxExporterNamespace", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).GetBlackBoxExporterNamespace))
 }
 
-// SetBlackBoxExporterNodesSelectorLabel mocks base method.
-func (m *MockBlackBoxExporterHandler) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string) {
+// SetBlackBoxExporterNodeSelector mocks base method.
+func (m *MockBlackBoxExporterHandler) SetBlackBoxExporterNodeSelector(nodeSelector v11.NodeSelectorTerm) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetBlackBoxExporterNodesSelectorLabel", nodesSelectorLabel)
+	m.ctrl.Call(m, "SetBlackBoxExporterNodeSelector", nodeSelector)
 }
 
-// SetBlackBoxExporterNodesSelectorLabel indicates an expected call of SetBlackBoxExporterNodesSelectorLabel.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel interface{}) *gomock.Call {
+// SetBlackBoxExporterNodeSelector indicates an expected call of SetBlackBoxExporterNodeSelector.
+func (mr *MockBlackBoxExporterHandlerMockRecorder) SetBlackBoxExporterNodeSelector(nodeSelector interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlackBoxExporterNodesSelectorLabel", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).SetBlackBoxExporterNodesSelectorLabel), nodesSelectorLabel)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlackBoxExporterNodeSelector", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).SetBlackBoxExporterNodeSelector), nodeSelector)
 }
 
 // ShouldDeleteBlackBoxExporterResources mocks base method.

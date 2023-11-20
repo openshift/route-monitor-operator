@@ -112,8 +112,8 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return utilreconcile.Stop()
 	}
 
-	if routeMonitor.Spec.BlackBoxExporter.ScheduleOn != "" {
-		r.BlackBoxExporter.SetBlackBoxExporterNodesSelectorLabel(routeMonitor.Spec.BlackBoxExporter.ScheduleOn)
+	if len(routeMonitor.Spec.BlackBoxExporter.NodeSelector.MatchExpressions) > 0 {
+		r.BlackBoxExporter.SetBlackBoxExporterNodeSelector(routeMonitor.Spec.BlackBoxExporter.NodeSelector)
 	}
 	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
 	// Should happen once but cannot input in main.go

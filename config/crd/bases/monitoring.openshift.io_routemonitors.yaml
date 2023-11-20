@@ -3,7 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
   name: routemonitors.monitoring.openshift.io
 spec:
   group: monitoring.openshift.io
@@ -38,8 +39,82 @@ spec:
                 description: BlackBoxExporterSpec references the blackbox exporter
                   pod
                 properties:
-                  scheduleOn:
-                    type: string
+                  nodeSelector:
+                    description: A label selector is a label query over a set of resources.
+                      The result of matchLabels and matchExpressions are ANDed. An
+                      empty label selector matches all objects. A null label selector
+                      matches no objects.
+                    properties:
+                      matchExpressions:
+                        description: A list of node selector requirements by node's
+                          labels.
+                        items:
+                          description: A node selector requirement is a selector that
+                            contains values, a key, and an operator that relates the
+                            key and values.
+                          properties:
+                            key:
+                              description: The label key that the selector applies
+                                to.
+                              type: string
+                            operator:
+                              description: Represents a key's relationship to a set
+                                of values. Valid operators are In, NotIn, Exists,
+                                DoesNotExist. Gt, and Lt.
+                              type: string
+                            values:
+                              description: An array of string values. If the operator
+                                is In or NotIn, the values array must be non-empty.
+                                If the operator is Exists or DoesNotExist, the values
+                                array must be empty. If the operator is Gt or Lt,
+                                the values array must have a single element, which
+                                will be interpreted as an integer. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchFields:
+                        description: A list of node selector requirements by node's
+                          fields.
+                        items:
+                          description: A node selector requirement is a selector that
+                            contains values, a key, and an operator that relates the
+                            key and values.
+                          properties:
+                            key:
+                              description: The label key that the selector applies
+                                to.
+                              type: string
+                            operator:
+                              description: Represents a key's relationship to a set
+                                of values. Valid operators are In, NotIn, Exists,
+                                DoesNotExist. Gt, and Lt.
+                              type: string
+                            values:
+                              description: An array of string values. If the operator
+                                is In or NotIn, the values array must be non-empty.
+                                If the operator is Exists or DoesNotExist, the values
+                                array must be empty. If the operator is Gt or Lt,
+                                the values array must have a single element, which
+                                will be interpreted as an integer. This array is replaced
+                                during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                    type: object
+                    x-kubernetes-map-type: atomic
+                required:
+                - nodeSelector
                 type: object
               route:
                 description: RouteMonitorRouteSpec references the observed Route resource

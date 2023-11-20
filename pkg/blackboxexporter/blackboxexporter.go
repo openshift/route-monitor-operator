@@ -20,25 +20,33 @@ import (
 )
 
 type BlackBoxExporter struct {
-	Client             client.Client
-	Log                logr.Logger
-	Ctx                context.Context
-	Image              string
-	NamespacedName     types.NamespacedName
-	NodesSelectorLabel string
+	Client         client.Client
+	Log            logr.Logger
+	Ctx            context.Context
+	Image          string
+	NamespacedName types.NamespacedName
+	NodeSelector   corev1.NodeSelectorTerm
 }
 
 func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
 	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
-	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName, "node-role.kubernetes.io/infra"}
+	nodeSelector := corev1.NodeSelectorTerm{
+		MatchExpressions: []corev1.NodeSelectorRequirement{
+			{
+				Key:      "node-role.kubernetes.io/infra",
+				Operator: corev1.NodeSelectorOpExists,
+			},
+		},
+	}
+	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName, nodeSelector}
 }
 
 func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 	return b.NamespacedName.Namespace
 }
 
-func (b *BlackBoxExporter) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string) {
-	b.NodesSelectorLabel = nodesSelectorLabel
+func (b *BlackBoxExporter) SetBlackBoxExporterNodeSelector(nodeSelector corev1.NodeSelectorTerm) {
+	b.NodeSelector = nodeSelector
 }
 
 func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
@@ -71,7 +79,7 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
 	populationFunc := func() appsv1.Deployment {
-		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName, b.NodesSelectorLabel)
+		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName, b.NodeSelector)
 	}
 
 	// Does the resource already exist?
@@ -92,7 +100,8 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	}
 
 	// Is the resouce scheduled on the wrong nodes?
-	if b.NodesSelectorLabel != resource.Spec.Template.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key {
+	if resource.Spec.Template.Spec.Affinity == nil ||
+		b.NodeSelector.String() != resource.Spec.Template.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.String() {
 		// populate the resource with the template
 		resource := populationFunc()
 		// and updated it
@@ -127,7 +136,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName, blackBoxNodesLabel string) appsv1.Deployment {
+func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName, blackBoxNodeSelector corev1.NodeSelectorTerm) appsv1.Deployment {
 	labels := blackboxexporter.GenerateBlackBoxExporterLables()
 	labelSelectors := metav1.LabelSelector{
 		MatchLabels: labels,
@@ -153,20 +162,15 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 					Affinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{{
-								Preference: corev1.NodeSelectorTerm{
-									MatchExpressions: []corev1.NodeSelectorRequirement{{
-										Key:      blackBoxNodesLabel,
-										Operator: corev1.NodeSelectorOpExists,
-									}},
-								},
-								Weight: 1,
+								Preference: blackBoxNodeSelector,
+								Weight:     1,
 							}},
 						},
 					},
 					Tolerations: []corev1.Toleration{{
 						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
-						Key:      blackBoxNodesLabel,
+						Key:      blackBoxNodeSelector.MatchExpressions[0].Key,
 					}},
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,

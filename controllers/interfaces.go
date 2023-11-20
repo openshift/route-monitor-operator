@@ -7,6 +7,7 @@ import (
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,5 +89,5 @@ type BlackBoxExporterHandler interface {
 	EnsureBlackBoxExporterResourcesAbsent() error
 	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
 	GetBlackBoxExporterNamespace() string
-	SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string)
+	SetBlackBoxExporterNodeSelector(nodeSelector corev1.NodeSelectorTerm)
 }

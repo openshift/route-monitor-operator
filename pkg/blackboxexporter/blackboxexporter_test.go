@@ -9,6 +9,7 @@ import (
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/golang/mock/gomock"
@@ -31,6 +32,7 @@ var _ = Describe("Blackboxexporter", func() {
 		get    helper.MockHelper
 		delete helper.MockHelper
 		create helper.MockHelper
+		update helper.MockHelper
 		list   helper.MockHelper
 	)
 	BeforeEach(func() {
@@ -42,6 +44,7 @@ var _ = Describe("Blackboxexporter", func() {
 		get = helper.MockHelper{}
 		delete = helper.MockHelper{}
 		create = helper.MockHelper{}
+		update = helper.MockHelper{}
 		list = helper.MockHelper{}
 	})
 	JustBeforeEach(func() {
@@ -49,6 +52,14 @@ var _ = Describe("Blackboxexporter", func() {
 			Log:    constinit.Logger,
 			Client: mockClient,
 			Ctx:    ctx,
+			NodeSelector: corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "node-role.kubernetes.io/infra",
+						Operator: corev1.NodeSelectorOpExists,
+					},
+				},
+			},
 		}
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -62,6 +73,10 @@ var _ = Describe("Blackboxexporter", func() {
 		mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
 			Return(create.ErrorResponse).
 			Times(create.CalledTimes)
+
+		mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
+			Return(update.ErrorResponse).
+			Times(update.CalledTimes)
 	})
 	AfterEach(func() {
 		mockCtrl.Finish()
@@ -124,7 +139,6 @@ var _ = Describe("Blackboxexporter", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
-
 	})
 	Describe("DeleteBlackBoxExporterDeployment", func() {
 		BeforeEach(func() {
@@ -184,22 +198,23 @@ var _ = Describe("Blackboxexporter", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
-
 	})
 	Describe("CreateBlackBoxExporterDeployment", func() {
 		BeforeEach(func() {
 			// Arrange
 			get.CalledTimes = 1
-
 		})
 
 		When("the resource(deployment) Exists", func() {
+			BeforeEach(func() {
+				// Affinity on the deployment is nil so it will be called
+				update.CalledTimes = 1
+			})
 			It("should call `Get` and not call `Create`", func() {
 				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-
 			})
 		})
 		When("the resource(deployment) is Not Found", func() {
@@ -207,6 +222,7 @@ var _ = Describe("Blackboxexporter", func() {
 			BeforeEach(func() {
 				get.ErrorResponse = consterror.NotFoundErr
 				create.CalledTimes = 1
+				update.CalledTimes = 1
 			})
 			It("should call `Get` successfully and `Create` the resource(deployment)", func() {
 				// Act
@@ -244,7 +260,6 @@ var _ = Describe("Blackboxexporter", func() {
 		})
 	})
 	Describe("CreateBlackBoxExporterService", func() {
-
 		When("the resource(service) Exists", func() {
 			// Arrange
 			BeforeEach(func() {
@@ -255,7 +270,6 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
-
 			})
 		})
 		When("the resource(service) is Not Found", func() {
@@ -333,9 +347,7 @@ var _ = Describe("Blackboxexporter", func() {
 		})
 
 		When("there are many RouteMonitors", func() {
-			var (
-				routeMonitorSecond v1alpha1.RouteMonitor
-			)
+			var routeMonitorSecond v1alpha1.RouteMonitor
 
 			BeforeEach(func() {
 				routeMonitor.ObjectMeta = metav1.ObjectMeta{
@@ -357,7 +369,6 @@ var _ = Describe("Blackboxexporter", func() {
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).To(Equal(blackboxexporter.KeepBlackBoxExporter))
-
 			})
 		})
 
@@ -382,8 +393,6 @@ var _ = Describe("Blackboxexporter", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).To(Equal(blackboxexporter.DeleteBlackBoxExporter))
 			})
-
 		})
 	})
-
 })
