@@ -1,11 +1,11 @@
 package blackboxexporter
 
 import (
+	"context"
+
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
-
-	"context"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,20 +20,25 @@ import (
 )
 
 type BlackBoxExporter struct {
-	Client         client.Client
-	Log            logr.Logger
-	Ctx            context.Context
-	Image          string
-	NamespacedName types.NamespacedName
+	Client             client.Client
+	Log                logr.Logger
+	Ctx                context.Context
+	Image              string
+	NamespacedName     types.NamespacedName
+	NodesSelectorLabel string
 }
 
 func New(client client.Client, log logr.Logger, ctx context.Context, blackBoxImage string, blackBoxExporterNamespace string) *BlackBoxExporter {
 	blackboxNamespacedName := types.NamespacedName{Name: blackboxexporter.BlackBoxExporterName, Namespace: blackBoxExporterNamespace}
-	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName}
+	return &BlackBoxExporter{client, log, ctx, blackBoxImage, blackboxNamespacedName, "node-role.kubernetes.io/infra"}
 }
 
 func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 	return b.NamespacedName.Namespace
+}
+
+func (b *BlackBoxExporter) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string) {
+	b.NodesSelectorLabel = nodesSelectorLabel
 }
 
 func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
@@ -66,7 +71,7 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
 	populationFunc := func() appsv1.Deployment {
-		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
+		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName, b.NodesSelectorLabel)
 	}
 
 	// Does the resource already exist?
@@ -85,6 +90,18 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 			return err
 		}
 	}
+
+	// Is the resouce scheduled on the wrong nodes?
+	if b.NodesSelectorLabel != resource.Spec.Template.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key {
+		// populate the resource with the template
+		resource := populationFunc()
+		// and updated it
+		err = b.Client.Update(b.Ctx, &resource)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -110,10 +127,11 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
+func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName, blackBoxNodesLabel string) appsv1.Deployment {
 	labels := blackboxexporter.GenerateBlackBoxExporterLables()
 	labelSelectors := metav1.LabelSelector{
-		MatchLabels: labels}
+		MatchLabels: labels,
+	}
 	// hardcode the replicasize for no
 	// replicas := m.Spec.Size
 	var replicas int32 = 1
@@ -137,7 +155,7 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{{
 								Preference: corev1.NodeSelectorTerm{
 									MatchExpressions: []corev1.NodeSelectorRequirement{{
-										Key:      "node-role.kubernetes.io/infra",
+										Key:      blackBoxNodesLabel,
 										Operator: corev1.NodeSelectorOpExists,
 									}},
 								},
@@ -148,7 +166,7 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 					Tolerations: []corev1.Toleration{{
 						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
-						Key:      "node-role.kubernetes.io/infra",
+						Key:      blackBoxNodesLabel,
 					}},
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,

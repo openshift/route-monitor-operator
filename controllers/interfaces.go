@@ -88,4 +88,5 @@ type BlackBoxExporterHandler interface {
 	EnsureBlackBoxExporterResourcesAbsent() error
 	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
 	GetBlackBoxExporterNamespace() string
+	SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string)
 }

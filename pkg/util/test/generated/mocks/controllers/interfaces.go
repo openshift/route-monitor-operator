@@ -384,6 +384,18 @@ func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace(
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlackBoxExporterNamespace", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).GetBlackBoxExporterNamespace))
 }
 
+// SetBlackBoxExporterNodesSelectorLabel mocks base method.
+func (m *MockBlackBoxExporterHandler) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetBlackBoxExporterNodesSelectorLabel", nodesSelectorLabel)
+}
+
+// SetBlackBoxExporterNodesSelectorLabel indicates an expected call of SetBlackBoxExporterNodesSelectorLabel.
+func (mr *MockBlackBoxExporterHandlerMockRecorder) SetBlackBoxExporterNodesSelectorLabel(nodesSelectorLabel interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBlackBoxExporterNodesSelectorLabel", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).SetBlackBoxExporterNodesSelectorLabel), nodesSelectorLabel)
+}
+
 // ShouldDeleteBlackBoxExporterResources mocks base method.
 func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
 	m.ctrl.T.Helper()

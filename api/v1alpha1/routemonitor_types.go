@@ -22,8 +22,9 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	Route RouteMonitorRouteSpec `json:"route,omitempty"`
-	Slo   SloSpec               `json:"slo,omitempty"`
+	Route            RouteMonitorRouteSpec `json:"route,omitempty"`
+	Slo              SloSpec               `json:"slo,omitempty"`
+	BlackBoxExporter BlackBoxExporterSpec  `json:"blackBoxExporter,omitempty"`
 
 	// +kubebuilder:default:false
 	// +kubebuilder:validation:Optional
@@ -69,6 +70,12 @@ type RouteMonitorList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RouteMonitor `json:"items"`
+}
+
+// BlackBoxExporterSpec references the blackbox exporter pod
+type BlackBoxExporterSpec struct {
+	// +kubebuilder:default:node-role.kubernetes.io/infra
+	ScheduleOn string `json:"scheduleOn,omitempty"`
 }
 
 func init() {
