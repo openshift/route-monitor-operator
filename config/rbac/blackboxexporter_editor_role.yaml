@@ -1,0 +1,24 @@
+# permissions for end users to edit blackboxexporters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: blackboxexporter-editor-role
+rules:
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - blackboxexporters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - blackboxexporters/status
+  verbs:
+  - get

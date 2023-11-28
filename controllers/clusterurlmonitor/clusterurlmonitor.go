@@ -28,7 +28,6 @@ import (
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -41,25 +40,23 @@ type ClusterUrlMonitorReconciler struct {
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 
-	BlackBoxExporter controllers.BlackBoxExporterHandler
-	ServiceMonitor   controllers.ServiceMonitorHandler
-	Prom             controllers.PrometheusRuleHandler
-	Common           controllers.MonitorResourceHandler
+	ServiceMonitor controllers.ServiceMonitorHandler
+	Prom           controllers.PrometheusRuleHandler
+	Common         controllers.MonitorResourceHandler
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *ClusterUrlMonitorReconciler {
+func NewReconciler(mgr manager.Manager, enablehypershift bool) *ClusterUrlMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()
 	return &ClusterUrlMonitorReconciler{
-		Client:           client,
-		Ctx:              ctx,
-		Log:              log,
-		Scheme:           mgr.GetScheme(),
-		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
-		Prom:             alert.NewPrometheusRule(ctx, client),
-		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
+		Client:         client,
+		Ctx:            ctx,
+		Log:            log,
+		Scheme:         mgr.GetScheme(),
+		ServiceMonitor: servicemonitor.NewServiceMonitor(ctx, client),
+		Prom:           alert.NewPrometheusRule(ctx, client),
+		Common:         reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
 
@@ -111,13 +108,6 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if res.ShouldStop() {
 		log.Info("Successfully set ClusterUrlMonitor finalizers. Stopping...")
 		return utilreconcile.Stop()
-	}
-
-	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
-	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
-	if err != nil {
-		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
-		return utilreconcile.RequeueWith(err)
 	}
 
 	log.V(2).Info("Entering EnsureServiceMonitorExists")

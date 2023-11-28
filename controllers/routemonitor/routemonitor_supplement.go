@@ -83,7 +83,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -101,28 +101,14 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	log := r.Log.WithName("Delete")
 
-	shouldDeleteBlackBoxResources, err := r.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	log.V(2).Info("Response of ShouldDeleteBlackBoxExporterResources", "shouldDeleteBlackBoxResources", shouldDeleteBlackBoxResources)
-
-	if shouldDeleteBlackBoxResources {
-		log.V(2).Info("Entering ensureBlackBoxExporterResourcesAbsent")
-		err := r.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
-	}
-
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
 	isHCP := false
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
+	if err := r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
 	log.V(2).Info("Entering ensurePrometheusRuleResourceAbsent")
-	err = r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
+	err := r.Prom.DeletePrometheusRuleDeployment(routeMonitor.Status.PrometheusRuleRef)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

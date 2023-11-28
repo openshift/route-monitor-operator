@@ -10,7 +10,6 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
-	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -123,7 +122,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		}
 	}
 
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, namespacedName, id, isHCP); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -148,17 +147,6 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
-	}
-
-	shouldDelete, err := s.BlackBoxExporter.ShouldDeleteBlackBoxExporterResources()
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
-	}
-	if shouldDelete == blackboxexporterconsts.DeleteBlackBoxExporter {
-		err := s.BlackBoxExporter.EnsureBlackBoxExporterResourcesAbsent()
-		if err != nil {
-			return utilreconcile.RequeueReconcileWith(err)
-		}
 	}
 
 	err = s.Prom.DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef)

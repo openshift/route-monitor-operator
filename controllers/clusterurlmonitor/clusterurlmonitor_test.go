@@ -12,7 +12,6 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -22,13 +21,12 @@ import (
 
 var _ = Describe("Clusterurlmonitor", func() {
 	var (
-		clusterUrlMonitor    v1alpha1.ClusterUrlMonitor
-		reconciler           clusterurlmonitor.ClusterUrlMonitorReconciler
-		mockClient           *clientmocks.MockClient
-		mockBlackBoxExporter *controllermocks.MockBlackBoxExporterHandler
-		mockCommon           *controllermocks.MockMonitorResourceHandler
-		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
-		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
+		clusterUrlMonitor  v1alpha1.ClusterUrlMonitor
+		reconciler         clusterurlmonitor.ClusterUrlMonitorReconciler
+		mockClient         *clientmocks.MockClient
+		mockCommon         *controllermocks.MockMonitorResourceHandler
+		mockPrometheusRule *controllermocks.MockPrometheusRuleHandler
+		mockServiceMonitor *controllermocks.MockServiceMonitorHandler
 
 		mockCtrl *gomock.Controller
 
@@ -43,7 +41,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
-		mockBlackBoxExporter = controllermocks.NewMockBlackBoxExporterHandler(mockCtrl)
 		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
 		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
 		mockCommon = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
@@ -60,13 +57,12 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor.Spec.Suffix = suffix
 		clusterUrlMonitor.Spec.Port = port
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
-			Log:              constinit.Logger,
-			Client:           mockClient,
-			Scheme:           constinit.Scheme,
-			BlackBoxExporter: mockBlackBoxExporter,
-			Common:           mockCommon,
-			ServiceMonitor:   mockServiceMonitor,
-			Prom:             mockPrometheusRule,
+			Log:            constinit.Logger,
+			Client:         mockClient,
+			Scheme:         constinit.Scheme,
+			Common:         mockCommon,
+			ServiceMonitor: mockServiceMonitor,
+			Prom:           mockPrometheusRule,
 		}
 	})
 
@@ -86,8 +82,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // fetching domain
-				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
-				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().GetOSDClusterID().Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, ns).Times(1).Return(true, nil)
@@ -189,26 +184,6 @@ var _ = Describe("Clusterurlmonitor", func() {
 					)
 					mockCommon.EXPECT().UpdateMonitorResource(&clusterUrlMonitor).Return(reconcile.StopOperation(), nil)
 
-				})
-				When("the blackboxexporter needs to be cleaned up", func() {
-					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.DeleteBlackBoxExporter, nil)
-						mockBlackBoxExporter.EXPECT().EnsureBlackBoxExporterResourcesAbsent().Times(1)
-					})
-					It("removes the servicemonitor, the blackbox exporter and cleans up the finalizer", func() {
-						Expect(err).NotTo(HaveOccurred())
-						Expect(res).To(Equal(reconcile.StopOperation()))
-					})
-				})
-
-				When("the blackboxexporter doesn't need to be cleaned up", func() {
-					BeforeEach(func() {
-						mockBlackBoxExporter.EXPECT().ShouldDeleteBlackBoxExporterResources().Return(blackboxexporter.KeepBlackBoxExporter, nil)
-					})
-					It("removes the servicemonitor and cleans up the finalizer", func() {
-						Expect(err).NotTo(HaveOccurred())
-						Expect(res).To(Equal(reconcile.StopOperation()))
-					})
 				})
 			})
 		})

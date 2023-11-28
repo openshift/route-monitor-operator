@@ -23,7 +23,6 @@ import (
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
-	"github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
@@ -36,29 +35,27 @@ import (
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
-	Client           client.Client
-	Ctx              context.Context
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
-	BlackBoxExporter controllers.BlackBoxExporterHandler
-	ServiceMonitor   controllers.ServiceMonitorHandler
-	Prom             controllers.PrometheusRuleHandler
-	Common           controllers.MonitorResourceHandler
+	Client         client.Client
+	Ctx            context.Context
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
+	ServiceMonitor controllers.ServiceMonitorHandler
+	Prom           controllers.PrometheusRuleHandler
+	Common         controllers.MonitorResourceHandler
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
+func NewReconciler(mgr manager.Manager, enablehypershift bool) *RouteMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()
 	return &RouteMonitorReconciler{
-		Client:           client,
-		Ctx:              ctx,
-		Log:              log,
-		Scheme:           mgr.GetScheme(),
-		BlackBoxExporter: blackboxexporter.New(client, log, ctx, blackboxExporterImage, blackboxExporterNamespace),
-		ServiceMonitor:   servicemonitor.NewServiceMonitor(ctx, client),
-		Prom:             alert.NewPrometheusRule(ctx, client),
-		Common:           reconcileCommon.NewMonitorResourceCommon(ctx, client),
+		Client:         client,
+		Ctx:            ctx,
+		Log:            log,
+		Scheme:         mgr.GetScheme(),
+		ServiceMonitor: servicemonitor.NewServiceMonitor(ctx, client),
+		Prom:           alert.NewPrometheusRule(ctx, client),
+		Common:         reconcileCommon.NewMonitorResourceCommon(ctx, client),
 	}
 }
 
@@ -110,14 +107,6 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if res.ShouldStop() {
 		log.Info("Successfully set RouteMonitor finalizers. Stopping...")
 		return utilreconcile.Stop()
-	}
-
-	log.V(2).Info("Entering EnsureBlackBoxExporterResourcesExist")
-	// Should happen once but cannot input in main.go
-	err = r.BlackBoxExporter.EnsureBlackBoxExporterResourcesExist()
-	if err != nil {
-		log.Error(err, "Failed to create BlackBoxExporter. Requeueing...")
-		return utilreconcile.RequeueWith(err)
 	}
 
 	log.V(2).Info("Entering GetRoute")

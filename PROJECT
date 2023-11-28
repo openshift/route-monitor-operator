@@ -7,18 +7,25 @@ plugins:
 projectName: route-monitor-operator
 repo: github.com/openshift/route-monitor-operator
 resources:
--
-  controller: true
+- controller: true
   domain: openshift.io
   group: monitoring
   kind: RouteMonitor
   path: github.com/openshift/route-monitor-operator/api/v1alpha1
   version: v1alpha1
--
-  controller: true
+- controller: true
   domain: openshift.io
   group: monitoring
   kind: ClusterUrlMonitor
+  path: github.com/openshift/route-monitor-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: monitoring
+  kind: BlackBoxExporter
   path: github.com/openshift/route-monitor-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

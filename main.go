@@ -33,11 +33,13 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
+	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
-	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -116,17 +118,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	routeMonitorReconciler := routemonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
+	routeMonitorReconciler := routemonitor.NewReconciler(mgr, enablehypershift)
 
 	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
 
-	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
+	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, enablehypershift)
 
 	if err = clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "clusterUrlMonitorReconciler")
+		os.Exit(1)
+	}
+
+	blackBoxExporterReconciler := blackboxexporter.NewReconciler(mgr)
+
+	if err = blackBoxExporterReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BlackBoxExporter")
 		os.Exit(1)
 	}
 

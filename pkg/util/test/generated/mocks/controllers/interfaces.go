@@ -10,7 +10,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	v10 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -241,17 +240,17 @@ func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorD
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url string, namespacedName types.NamespacedName, clusterID string, hcp bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, namespacedName, clusterID, hcp)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, namespacedName, clusterID, hcp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, namespacedName, clusterID, hcp)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
@@ -317,84 +316,4 @@ func (m *MockPrometheusRuleHandler) UpdatePrometheusRuleDeployment(template v1.P
 func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePrometheusRuleDeployment", reflect.TypeOf((*MockPrometheusRuleHandler)(nil).UpdatePrometheusRuleDeployment), template)
-}
-
-// MockBlackBoxExporterHandler is a mock of BlackBoxExporterHandler interface.
-type MockBlackBoxExporterHandler struct {
-	ctrl     *gomock.Controller
-	recorder *MockBlackBoxExporterHandlerMockRecorder
-}
-
-// MockBlackBoxExporterHandlerMockRecorder is the mock recorder for MockBlackBoxExporterHandler.
-type MockBlackBoxExporterHandlerMockRecorder struct {
-	mock *MockBlackBoxExporterHandler
-}
-
-// NewMockBlackBoxExporterHandler creates a new mock instance.
-func NewMockBlackBoxExporterHandler(ctrl *gomock.Controller) *MockBlackBoxExporterHandler {
-	mock := &MockBlackBoxExporterHandler{ctrl: ctrl}
-	mock.recorder = &MockBlackBoxExporterHandlerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockBlackBoxExporterHandler) EXPECT() *MockBlackBoxExporterHandlerMockRecorder {
-	return m.recorder
-}
-
-// EnsureBlackBoxExporterResourcesAbsent mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesAbsent() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesAbsent")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnsureBlackBoxExporterResourcesAbsent indicates an expected call of EnsureBlackBoxExporterResourcesAbsent.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesAbsent() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesAbsent", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesAbsent))
-}
-
-// EnsureBlackBoxExporterResourcesExist mocks base method.
-func (m *MockBlackBoxExporterHandler) EnsureBlackBoxExporterResourcesExist() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureBlackBoxExporterResourcesExist")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnsureBlackBoxExporterResourcesExist indicates an expected call of EnsureBlackBoxExporterResourcesExist.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) EnsureBlackBoxExporterResourcesExist() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureBlackBoxExporterResourcesExist", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).EnsureBlackBoxExporterResourcesExist))
-}
-
-// GetBlackBoxExporterNamespace mocks base method.
-func (m *MockBlackBoxExporterHandler) GetBlackBoxExporterNamespace() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlackBoxExporterNamespace")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetBlackBoxExporterNamespace indicates an expected call of GetBlackBoxExporterNamespace.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) GetBlackBoxExporterNamespace() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlackBoxExporterNamespace", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).GetBlackBoxExporterNamespace))
-}
-
-// ShouldDeleteBlackBoxExporterResources mocks base method.
-func (m *MockBlackBoxExporterHandler) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShouldDeleteBlackBoxExporterResources")
-	ret0, _ := ret[0].(blackboxexporter.ShouldDeleteBlackBoxExporter)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ShouldDeleteBlackBoxExporterResources indicates an expected call of ShouldDeleteBlackBoxExporterResources.
-func (mr *MockBlackBoxExporterHandlerMockRecorder) ShouldDeleteBlackBoxExporterResources() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldDeleteBlackBoxExporterResources", reflect.TypeOf((*MockBlackBoxExporterHandler)(nil).ShouldDeleteBlackBoxExporterResources))
 }

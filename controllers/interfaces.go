@@ -3,7 +3,6 @@ package controllers
 import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
@@ -63,7 +62,7 @@ type ServiceMonitorHandler interface {
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
+	TemplateAndUpdateServiceMonitorDeployment(url string, namespacedName types.NamespacedName, clusterID string, hcp bool) error
 
 	// DeleteServiceMonitorDeployment deletes a ServiceMonitor refrenced by a namespaced name
 	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
@@ -81,11 +80,4 @@ type PrometheusRuleHandler interface {
 
 	// DeletePrometheusRuleDeployment deletes a PrometheusRule refrenced by a namespaced name
 	DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error
-}
-
-type BlackBoxExporterHandler interface {
-	EnsureBlackBoxExporterResourcesExist() error
-	EnsureBlackBoxExporterResourcesAbsent() error
-	ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error)
-	GetBlackBoxExporterNamespace() string
 }

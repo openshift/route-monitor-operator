@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestBlackboxexporter(t *testing.T) {
+func TestBlackBoxExporter(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Blackboxexporter Suite")
+	RunSpecs(t, "BlackBoxExporter Suite")
 }

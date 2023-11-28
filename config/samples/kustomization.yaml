@@ -2,4 +2,5 @@
 resources:
 - monitoring_v1alpha1_clusterurlmonitor.yaml
 - monitoring_v1alpha1_routemonitor.yaml
+- monitoring_v1alpha1_blackboxexporter.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
