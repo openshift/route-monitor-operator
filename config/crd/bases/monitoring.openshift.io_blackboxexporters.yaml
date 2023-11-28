@@ -36,10 +36,12 @@ spec:
             description: BlackBoxExporterSpec defines the desired state of BlackBoxExporter
             properties:
               image:
+                default: quay.io/prometheus/blackbox-exporter:master
                 type: string
               nodeSelector:
-                description: NodeSelector defines which nodes is the BlackBoxExporter
-                  gonna run on
+                description: A node selector represents the union of the results of
+                  one or more label queries over a set of nodes; that is, it represents
+                  the OR of the selectors represented by the node selector terms.
                 properties:
                   nodeSelectorTerms:
                     description: Required. A list of node selector terms. The terms

@@ -23,9 +23,11 @@ import (
 
 // BlackBoxExporterSpec defines the desired state of BlackBoxExporter
 type BlackBoxExporterSpec struct {
+    // +kubebuilder:default:="quay.io/prometheus/blackbox-exporter:master"
+    // +optional
 	Image string `json:"image,omitempty"`
 
-	// NodeSelector defines which nodes is the BlackBoxExporter gonna run on
+	// +kubebuilder:validation:Optional
 	NodeSelector corev1.NodeSelector `json:"nodeSelector,omitempty"`
 }
 

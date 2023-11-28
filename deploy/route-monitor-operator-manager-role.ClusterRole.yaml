@@ -93,6 +93,26 @@ rules:
   - apiGroups:
       - monitoring.openshift.io
     resources:
+      - blackboxexporters
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - monitoring.openshift.io
+    resources:
+      - blackboxexporters/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - monitoring.openshift.io
+    resources:
       - clusterurlmonitors
     verbs:
       - create
