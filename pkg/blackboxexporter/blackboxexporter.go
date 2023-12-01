@@ -1,8 +1,11 @@
 package blackboxexporter
 
 import (
+	"reflect"
+
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 
 	"context"
@@ -65,9 +68,7 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
-	populationFunc := func() appsv1.Deployment {
-		return templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
-	}
+	template := b.templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
 
 	// Does the resource already exist?
 	err := b.Client.Get(b.Ctx, b.NamespacedName, &resource)
@@ -77,14 +78,25 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 			// return unexpectedly
 			return err
 		}
-		// populate the resource with the template
-		resource := populationFunc()
 		// and create it
-		err = b.Client.Create(b.Ctx, &resource)
+		err = b.Client.Create(b.Ctx, &template)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// Update the deployment if it's different than the template
+	if !reflect.DeepEqual(resource.Spec, template.Spec) {
+		resource.ObjectMeta.ResourceVersion = ""
+		resource.Spec = template.Spec
+		err = b.Client.Update(b.Ctx, &resource)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -110,7 +122,12 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
+func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
+	nodeLabel := "node-role.kubernetes.io/infra"
+	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.14") && util.ClusterHasPrivateNLB(b.Client) {
+		nodeLabel = "node-role.kubernetes.io/control-plane"
+	}
+
 	labels := blackboxexporter.GenerateBlackBoxExporterLables()
 	labelSelectors := metav1.LabelSelector{
 		MatchLabels: labels}
@@ -137,7 +154,7 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{{
 								Preference: corev1.NodeSelectorTerm{
 									MatchExpressions: []corev1.NodeSelectorRequirement{{
-										Key:      "node-role.kubernetes.io/infra",
+										Key:      nodeLabel,
 										Operator: corev1.NodeSelectorOpExists,
 									}},
 								},
@@ -148,7 +165,7 @@ func templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespa
 					Tolerations: []corev1.Toleration{{
 						Operator: corev1.TolerationOpExists,
 						Effect:   corev1.TaintEffectNoSchedule,
-						Key:      "node-role.kubernetes.io/infra",
+						Key:      nodeLabel,
 					}},
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,
