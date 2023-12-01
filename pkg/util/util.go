@@ -68,7 +68,7 @@ func ClusterHasPrivateNLB(kclient client.Client) (result bool) {
 	}
 
 	if i.Status.EndpointPublishingStrategy.LoadBalancer.Scope == operatorv1.InternalLoadBalancer &&
-		i.Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1.AWSClassicLoadBalancer {
+		i.Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1.AWSNetworkLoadBalancer {
 		return true
 
 	}
