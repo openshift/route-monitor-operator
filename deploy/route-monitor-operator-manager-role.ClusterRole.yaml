@@ -8,7 +8,7 @@ metadata:
   name: route-monitor-operator-manager-role
 rules:
   - apiGroups:
-      - operator
+      - operator.openshift.io
     resources:
       - ingresscontrollers
     verbs:
