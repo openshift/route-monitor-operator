@@ -6,6 +6,14 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+    - operator
+  resources:
+    - ingresscontrollers
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
   - '*'
   resources:
   - services
@@ -22,6 +30,7 @@ rules:
   verbs:
   - create
   - delete
+  - update
   - get
   - list
   - watch
