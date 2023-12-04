@@ -125,7 +125,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
 	nodeLabel := "node-role.kubernetes.io/infra"
 	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.14") && util.ClusterHasPrivateNLB(b.Client) {
-		nodeLabel = "node-role.kubernetes.io/control-plane"
+		nodeLabel = "node-role.kubernetes.io/master"
 	}
 
 	labels := blackboxexporter.GenerateBlackBoxExporterLables()
