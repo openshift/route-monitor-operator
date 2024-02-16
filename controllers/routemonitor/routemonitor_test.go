@@ -778,7 +778,7 @@ var _ = Describe("Routemonitor", func() {
 		Describe("It updates the ServiceMonitor targeting the blackbox Exporter Namespace", func() {
 			When("the update of the ServiceMonitor fails", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(consterror.CustomError)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
 					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})
@@ -789,7 +789,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update of the ServiceMonitor is successfull", func() {
 				BeforeEach(func() {
-					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+					mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 					mockBlackboxExporter.EXPECT().GetBlackBoxExporterNamespace().Return("bla")
 					mockUtils.EXPECT().GetOSDClusterID().Return("test-cluster-id", nil)
 				})

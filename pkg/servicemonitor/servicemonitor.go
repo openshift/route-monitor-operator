@@ -33,10 +33,14 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool, useInsecure bool) error {
+	module := "http_2xx"
+	if useInsecure {
+		module = "insecure_http_2xx"
+	}
+
 	params := map[string][]string{
-		// Currently we only support `http_2xx` as module
-		"module": {"http_2xx"},
+		"module": {module},
 		"target": {routeURL},
 	}
 
@@ -49,6 +53,7 @@ func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, bla
 }
 
 // Creates or Updates Service Monitor Deployment according to the template
+
 func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedServiceMonitor := &monitoringv1.ServiceMonitor{}

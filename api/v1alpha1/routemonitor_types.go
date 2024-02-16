@@ -31,6 +31,13 @@ type RouteMonitorSpec struct {
 	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
 	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
 	SkipPrometheusRule bool `json:"skipPrometheusRule"`
+
+	// +kubebuilder:default:false
+	// +kubebuilder:validation:Optional
+
+	// InsecureSkipTLSVerify indicates that the blackbox exporter module used to probe this route
+	// should *not* use https
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify"`
 }
 
 // RouteMonitorRouteSpec references the observed Route resource
@@ -39,6 +46,17 @@ type RouteMonitorRouteSpec struct {
 	Name string `json:"name,omitempty"`
 	// Namespace is the namespace of the Route
 	Namespace string `json:"namespace,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum:=1
+
+	// Port optionally defines the port we should use while probing
+	Port int64 `json:"port,omitempty"`
+
+	// +kubebuilder:validation:Optional
+
+	// Suffix optionally defines the path we should probe (/livez /readyz etc)
+	Suffix string `json:"suffix,omitempty"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor
