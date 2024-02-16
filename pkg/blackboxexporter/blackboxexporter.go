@@ -121,6 +121,25 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceExists() error {
 	return nil
 }
 
+func (b *BlackBoxExporter) EnsureBlackBoxExporterConfigMapExists() error {
+	resource := corev1.ConfigMap{}
+	populationFunc := func() corev1.ConfigMap { return templateForBlackBoxExporterConfigMap(b.NamespacedName) }
+
+	// Does the resource already exist?
+	if err := b.Client.Get(b.Ctx, b.NamespacedName, &resource); err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return err
+		}
+		// populate the resource with the template
+		resource := populationFunc()
+		// and create it
+		return b.Client.Create(b.Ctx, &resource)
+	}
+	return nil
+}
+
 // deploymentForBlackBoxExporter returns a blackbox deployment
 func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
 	nodeLabel := "node-role.kubernetes.io/infra"
@@ -170,11 +189,33 @@ func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage s
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,
 						Name:  "blackbox-exporter",
+						Args: []string{
+							"--config.file=/config/blackbox.yaml",
+						},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: blackboxexporter.BlackBoxExporterPortNumber,
 							Name:          blackboxexporter.BlackBoxExporterPortName,
 						}},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "blackbox-config",
+								ReadOnly:  true,
+								MountPath: "/config",
+							},
+						},
 					}},
+					Volumes: []corev1.Volume{
+						{
+							Name: "blackbox-config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: blackBoxNamespacedName.Name,
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -202,6 +243,33 @@ func templateForBlackBoxExporterService(blackboxNamespacedName types.NamespacedN
 		},
 	}
 	return svc
+}
+
+func templateForBlackBoxExporterConfigMap(blackboxNamespacedName types.NamespacedName) corev1.ConfigMap {
+	labels := blackboxexporter.GenerateBlackBoxExporterLables()
+
+	cfg := `modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+  insecure_http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      tls_config:
+        insecure_skip_verify: true`
+
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      blackboxNamespacedName.Name,
+			Namespace: blackboxNamespacedName.Namespace,
+			Labels:    labels,
+		},
+		Data: map[string]string{
+			"blackbox.yaml": cfg,
+		},
+	}
+	return cm
 }
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentAbsent() error {
@@ -246,6 +314,27 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterServiceAbsent() error {
 	return nil
 }
 
+func (b *BlackBoxExporter) EnsureBlackBoxExporterConfigMapAbsent() error {
+	resource := &corev1.ConfigMap{}
+
+	// Does the resource already exist?
+	err := b.Client.Get(b.Ctx, b.NamespacedName, resource)
+	if err != nil {
+		// If this is an unknown error
+		if !k8serrors.IsNotFound(err) {
+			// return unexpectedly
+			return err
+		}
+		// Resource doesn't exist, nothing to do
+		return nil
+	}
+	err = b.Client.Delete(b.Ctx, resource)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
 	b.Log.V(2).Info("Entering EnsureBlackBoxExporterServiceAbsent")
 	if err := b.EnsureBlackBoxExporterServiceAbsent(); err != nil {
@@ -255,10 +344,17 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesAbsent() error {
 	if err := b.EnsureBlackBoxExporterDeploymentAbsent(); err != nil {
 		return err
 	}
+	b.Log.V(2).Info("Entering EnsureBlackBoxExporterConfigMapAbsent")
+	if err := b.EnsureBlackBoxExporterConfigMapAbsent(); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterResourcesExist() error {
+	if err := b.EnsureBlackBoxExporterConfigMapExists(); err != nil {
+		return err
+	}
 	if err := b.EnsureBlackBoxExporterDeploymentExists(); err != nil {
 		return err
 	}

@@ -35,6 +35,10 @@ spec:
           spec:
             description: RouteMonitorSpec defines the desired state of RouteMonitor
             properties:
+              insecureSkipTLSVerify:
+                description: InsecureSkipTLSVerify indicates that the blackbox exporter
+                  module used to probe this route should *not* use https
+                type: boolean
               route:
                 description: RouteMonitorRouteSpec references the observed Route resource
                 properties:
@@ -43,6 +47,16 @@ spec:
                     type: string
                   namespace:
                     description: Namespace is the namespace of the Route
+                    type: string
+                  port:
+                    description: Port optionally defines the port we should use while
+                      probing
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  suffix:
+                    description: Suffix optionally defines the path we should probe
+                      (/livez /readyz etc)
                     type: string
                 type: object
               skipPrometheusRule:

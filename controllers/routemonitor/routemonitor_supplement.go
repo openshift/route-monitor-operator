@@ -83,7 +83,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP, routeMonitor.Spec.InsecureSkipTLSVerify); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -198,6 +198,13 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 
 	if extractedRouteURL == "" {
 		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+	}
+
+	if routeMonitor.Spec.Route.Port != 0 {
+		extractedRouteURL = fmt.Sprintf("%s:%d", extractedRouteURL, routeMonitor.Spec.Route.Port)
+	}
+	if routeMonitor.Spec.Route.Suffix != "" {
+		extractedRouteURL = fmt.Sprintf("%s%s", extractedRouteURL, routeMonitor.Spec.Route.Suffix)
 	}
 
 	currentRouteURL := routeMonitor.Status.RouteURL
