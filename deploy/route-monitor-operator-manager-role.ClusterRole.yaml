@@ -64,7 +64,7 @@ rules:
   - apiGroups:
       - hypershift.openshift.io
     resources:
-      - hostedclusters
+      - hostedcontrolplanes
     verbs:
       - get
       - list
@@ -101,9 +101,22 @@ rules:
       - update
       - watch
   - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors/finalizers
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - create
+  - apiGroups:
       - monitoring.openshift.io
     resources:
       - clusterurlmonitors
+      - clusterurlmonitors/finalizers
     verbs:
       - create
       - delete
@@ -124,6 +137,7 @@ rules:
       - monitoring.openshift.io
     resources:
       - routemonitors
+      - routemonitors/finalizers
     verbs:
       - create
       - delete
@@ -152,10 +166,58 @@ rules:
       - update
       - watch
   - apiGroups:
-      - route.openshift.io
+      - monitoring.rhobs
     resources:
-      - routes
+      - servicemonitors/finalizers
     verbs:
       - get
       - list
       - watch
+      - update
+      - patch
+      - delete
+      - create
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - create
+      - delete
+      - update
+      - patch
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes/custom-host
+    verbs:
+      - create
+      - delete
+      - update
+      - patch
+  - apiGroups:
+      - hypershift.openshift.io
+    resources:
+      - hostedcontrolplanes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - hypershift.openshift.io
+    resources:
+      - hostedcontrolplanes/finalizers
+      - hostedcontrolplanes/status
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
+      - create

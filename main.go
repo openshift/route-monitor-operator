@@ -37,6 +37,7 @@ import (
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
+	"github.com/openshift/route-monitor-operator/controllers/hostedcontrolplane"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	// +kubebuilder:scaffold:imports
@@ -130,6 +131,14 @@ func main() {
 	if err = clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "clusterUrlMonitorReconciler")
 		os.Exit(1)
+	}
+
+	if enablehypershift {
+		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, blackboxExporterNamespace)
+		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "HostedCluster")
+			os.Exit(1)
+		}
 	}
 
 	// +kubebuilder:scaffold:builder

@@ -123,7 +123,8 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 		}
 	}
 
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP, false); err != nil {
+	owner := metav1.NewControllerRef(&clusterUrlMonitor.ObjectMeta, clusterUrlMonitor.GroupVersionKind())
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP, false, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

@@ -38,7 +38,20 @@ type RouteMonitorSpec struct {
 	// InsecureSkipTLSVerify indicates that the blackbox exporter module used to probe this route
 	// should *not* use https
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
+	// +kubebuilder:default=monitoring.coreos.com
+
+	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
+	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
 }
+
+const (
+	// The following values should match the kubebuilder-enumerated values for serviceMonitorType above
+	ServiceMonitorTypeCoreOS = "monitoring.coreos.com"
+	ServiceMonitorTypeRHOBS  = "monitoring.rhobs"
+)
 
 // RouteMonitorRouteSpec references the observed Route resource
 type RouteMonitorRouteSpec struct {
