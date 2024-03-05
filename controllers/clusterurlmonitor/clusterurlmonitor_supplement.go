@@ -69,8 +69,8 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	}
 
 	namespacedName := types.NamespacedName{Namespace: clusterUrlMonitor.Namespace, Name: clusterUrlMonitor.Name}
-	template := alert.TemplateForPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
-	err = s.Prom.UpdatePrometheusRuleDeployment(template)
+	template := alert.TemplateForCoreOSPrometheusRuleResource(clusterUrl, parsedSlo, namespacedName)
+	err = s.Prom.UpdateCoreOSPrometheusRuleDeployment(template)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

@@ -75,10 +75,15 @@ type ServiceMonitorHandler interface {
 }
 
 type PrometheusRuleHandler interface {
-	// UpdatePrometheusRuleDeployment ensures that a PrometheusRule deployment according
+	// UpdateCoreOSPrometheusRuleDeployment ensures that a PrometheusRule.monitoring.coreos.com deployment according
 	// to the template exists. If none exists, it will create a new one.
 	// If the template changed, it will update the existing deployment
-	UpdatePrometheusRuleDeployment(template monitoringv1.PrometheusRule) error
+	UpdateCoreOSPrometheusRuleDeployment(template monitoringv1.PrometheusRule) error
+
+	// UpdateRHOBSPrometheusRuleDeployment ensures that a PrometheusRule.monitoring.rhobs deployment according
+	// to the template exists. If none exists, it will create a new one.
+	// If the template changed, it will update the existing deployment
+	UpdateRHOBSPrometheusRuleDeployment(template rhobsv1.PrometheusRule) error
 
 	// DeletePrometheusRuleDeployment deletes a PrometheusRule refrenced by a namespaced name
 	DeletePrometheusRuleDeployment(prometheusRuleRef v1alpha1.NamespacedName) error
