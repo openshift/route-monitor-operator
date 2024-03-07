@@ -77,7 +77,6 @@ rules:
   - watch
 - apiGroups:
   - monitoring.coreos.com
-  - monitoring.rhobs
   resources:
   - prometheusrules
   verbs:
