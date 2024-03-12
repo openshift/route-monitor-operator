@@ -718,7 +718,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update the PrometheusRule failed", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().UpdateCoreOSPrometheusRuleDeployment(gomock.Any()).Return(consterror.CustomError)
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Return(consterror.CustomError)
 				})
 				It("requeues with the error", func() {
 					Expect(err).To(Equal(consterror.CustomError))
@@ -727,7 +727,7 @@ var _ = Describe("Routemonitor", func() {
 			})
 			When("the update of the PrometheusRule succeded", func() {
 				BeforeEach(func() {
-					mockPrometheusRule.EXPECT().UpdateCoreOSPrometheusRuleDeployment(gomock.Any())
+					mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any())
 				})
 				When("a new PrometheusRule was created", func() {
 					BeforeEach(func() {
