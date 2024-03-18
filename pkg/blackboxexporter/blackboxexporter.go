@@ -143,7 +143,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterConfigMapExists() error {
 // deploymentForBlackBoxExporter returns a blackbox deployment
 func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
 	nodeLabel := "node-role.kubernetes.io/infra"
-	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.14") && util.ClusterHasPrivateNLB(b.Client) {
+	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.13") && util.ClusterHasPrivateNLB(b.Client) {
 		nodeLabel = "node-role.kubernetes.io/master"
 	}
 
