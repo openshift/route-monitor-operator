@@ -54,10 +54,18 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 
 	// Update PrometheusRule from templates
 	namespacedName := types.NamespacedName{Namespace: routeMonitor.Namespace, Name: routeMonitor.Name}
-	template := alert.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
-	err = r.Prom.UpdatePrometheusRuleDeployment(template)
-	if err != nil {
-		return utilreconcile.RequeueReconcileWith(err)
+	if routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS {
+		template := alert.TemplateForRHOBSPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
+		err = r.Prom.UpdateRHOBSPrometheusRuleDeployment(template)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
+	} else {
+		template := alert.TemplateForCoreOSPrometheusRuleResource(routeMonitor.Status.RouteURL, parsedSlo, namespacedName)
+		err = r.Prom.UpdateCoreOSPrometheusRuleDeployment(template)
+		if err != nil {
+			return utilreconcile.RequeueReconcileWith(err)
+		}
 	}
 
 	// Update PrometheusRuleReference in RouteMonitor if necessary
@@ -83,11 +91,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
-	useRHOBS := false
-	if routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS {
-		useRHOBS = true
-	}
-
+	useRHOBS := (routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS)
 	owner := metav1.NewControllerRef(&routeMonitor.ObjectMeta, routeMonitor.GroupVersionKind())
 	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, useRHOBS, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)

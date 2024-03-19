@@ -173,9 +173,9 @@ func main() {
 }
 
 // shouldEnableHCP checks for the existence of the 'hostedcontrolplane' CRD to determine whether this controller should be enabled or not:
-//  - if it exists, enable the HCP controller
-//  - if we get an error unrelated to it's existence (ie - kubeapiserver is down) return the error
-//  - if we get an error due to it not existing, disable the HCP controller
+//   - if it exists, enable the HCP controller
+//   - if we get an error unrelated to it's existence (ie - kubeapiserver is down) return the error
+//   - if we get an error due to it not existing, disable the HCP controller
 func shouldEnableHCP(mgr ctrl.Manager) (bool, error) {
 	c, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err != nil {
