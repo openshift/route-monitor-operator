@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
+	v1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,8 +151,19 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 		}
 	}
 
+	// Quick fix to discover the API server port from the service resource
+	apiServerService := v1.Service{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
+	if err != nil {
+		return fmt.Errorf("couldn't query API server service resource: %w", err)
+	}
+	apiServerPort := int64(6443)
+	if len(apiServerService.Spec.Ports) > 0 {
+		apiServerPort = int64(apiServerService.Spec.Ports[0].Port)
+	}
+
 	// Create or update RouteMonitor object
-	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane)
+	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane, apiServerPort)
 	err = r.Client.Create(ctx, &expectedRouteMonitor)
 	if err != nil {
 		if !kerr.IsAlreadyExists(err) {
@@ -211,7 +223,7 @@ func (r *HostedControlPlaneReconciler) buildInternalMonitoringRoute(hostedcontro
 }
 
 // buildInternalMonitoringRouteMonitor constructs the expected RouteMonitor needed to probe a HostedControlPlane's kube-apiserver using cluster-internal routes
-func (r *HostedControlPlaneReconciler) buildInternalMonitoringRouteMonitor(route routev1.Route, hostedcontrolplane *v1beta1.HostedControlPlane) v1alpha1.RouteMonitor {
+func (r *HostedControlPlaneReconciler) buildInternalMonitoringRouteMonitor(route routev1.Route, hostedcontrolplane *v1beta1.HostedControlPlane, apiServerPort int64) v1alpha1.RouteMonitor {
 	routemonitor := v1alpha1.RouteMonitor{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            route.Name,
@@ -225,7 +237,7 @@ func (r *HostedControlPlaneReconciler) buildInternalMonitoringRouteMonitor(route
 			Route: v1alpha1.RouteMonitorRouteSpec{
 				Name:      route.Name,
 				Namespace: route.Namespace,
-				Port:      6443,
+				Port:      apiServerPort,
 				Suffix:    "/livez",
 			},
 			SkipPrometheusRule: false,
@@ -263,8 +275,8 @@ func (r *HostedControlPlaneReconciler) deleteInternalMonitoringObjects(ctx conte
 		log.Info(fmt.Sprintf("Skipped deleting Route %s/%s: already deleted", expectedRoute.Namespace, expectedRoute.Name))
 	}
 
-	// Delete routemonitor
-	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane)
+	// Delete routemonitor, port is not relevant for deletion
+	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane, 6443)
 	err = r.Client.Delete(ctx, &expectedRouteMonitor)
 	if err != nil {
 		if !kerr.IsNotFound(err) {
