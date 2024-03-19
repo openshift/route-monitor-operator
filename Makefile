@@ -180,7 +180,7 @@ endif
 
 .PHONY: package
 package: kubectl-package
-	$(CONTAINER_ENGINE) run --rm -v ${PWD}:/workdir quay.io/app-sre/yq:4 '.spec.template.spec.containers[0].image = "$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME):$(OPERATOR_IMAGE_TAG)" | .spec.template.spec.containers[0].args = .spec.template.spec.containers[0].args + ["--enable-hypershift=true"]' deploy/route-monitor-operator-controller-manager.Deployment.yaml > packaging/06-deploy/route-monitor-operator-controller-manager.Deployment.yaml
+	$(CONTAINER_ENGINE) run --rm -v ${PWD}:/workdir quay.io/app-sre/yq:4 '.spec.template.spec.containers[0].image = "$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME):$(OPERATOR_IMAGE_TAG)"' deploy/route-monitor-operator-controller-manager.Deployment.yaml > packaging/06-deploy/route-monitor-operator-controller-manager.Deployment.yaml
 	$(CONTAINER_ENGINE) login -u $(QUAY_USER) -p $(QUAY_TOKEN) quay.io
 	DOCKER_CONFIG=$(CONTAINER_ENGINE_CONFIG_DIR)/ ./bin/kubectl-package build -t $(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME)-hs-package:$(OPERATOR_IMAGE_TAG) --push packaging/
 	DOCKER_CONFIG=$(CONTAINER_ENGINE_CONFIG_DIR)/ ./bin/kubectl-package build -t $(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(OPERATOR_NAME)-hs-package:latest --push packaging/
