@@ -155,7 +155,7 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 	apiServerService := v1.Service{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
 	if err != nil {
-		return fmt.Errorf("couldn't query API server service resource: %v", err)
+		return fmt.Errorf("couldn't query API server service resource: %w", err)
 	}
 	apiServerPort := int64(6443)
 	if len(apiServerService.Spec.Ports) > 0 {
