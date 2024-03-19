@@ -2,6 +2,7 @@ package finalizer
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -28,11 +29,11 @@ func Add(object metav1.Object, finalizer string) {
 }
 
 // WasDeleteRequested verifies if the resource was requested for deletion
-func WasDeleteRequested(o metav1.Object) bool {
+func WasDeleteRequested(o v1.Object) bool {
 	return o.GetDeletionTimestamp() != nil
 }
 
 // HasFinalizer verifies if a finalizer is placed on the resource
-func HasFinalizer(o metav1.Object, finalizerKey string) bool {
+func HasFinalizer(o v1.Object, finalizerKey string) bool {
 	return Contains(o.GetFinalizers(), finalizerKey)
 }

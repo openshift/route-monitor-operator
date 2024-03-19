@@ -33,7 +33,7 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool, useInsecure bool, owner *metav1.OwnerReference) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool, useInsecure bool) error {
 	module := "http_2xx"
 	if useInsecure {
 		module = "insecure_http_2xx"
@@ -45,10 +45,10 @@ func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, bla
 	}
 
 	if isHCPMonitor {
-		s := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+		s := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
 		return u.HypershiftUpdateServiceMonitorDeployment(s)
 	}
-	s := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+	s := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID)
 	return u.UpdateServiceMonitorDeployment(s)
 }
 
@@ -131,12 +131,11 @@ func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alph
 }
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
-func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string, owner *metav1.OwnerReference) monitoringv1.ServiceMonitor {
+func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string) monitoringv1.ServiceMonitor {
 	return monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            namespacedName.Name,
-			Namespace:       namespacedName.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*owner},
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Endpoints: []monitoringv1.Endpoint{
@@ -173,12 +172,11 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 }
 
 // HyperShiftTemplateForServiceMonitorResource returns a ServiceMonitor for Hypershift
-func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string, owner *metav1.OwnerReference) rhobsv1.ServiceMonitor {
+func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string) rhobsv1.ServiceMonitor {
 	return rhobsv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            namespacedName.Name,
-			Namespace:       namespacedName.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*owner},
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
 		},
 		Spec: rhobsv1.ServiceMonitorSpec{
 			Endpoints: []rhobsv1.Endpoint{

@@ -59,14 +59,6 @@ spec:
                       (/livez /readyz etc)
                     type: string
                 type: object
-              serviceMonitorType:
-                default: monitoring.coreos.com
-                description: ServiceMonitorType dictates the type of ServiceMonitor
-                  the RouteMonitor should create
-                enum:
-                - monitoring.coreos.com
-                - monitoring.rhobs
-                type: string
               skipPrometheusRule:
                 description: SkipPrometheusRule instructs the controller to skip the
                   creation of PrometheusRule CRs. One common use-case for is for alerts

@@ -92,7 +92,7 @@ func (i *Integration) RemoveClusterUrlMonitor(namespace, name string) error {
 		time.Sleep(1 * time.Second)
 	}
 	if t == maxRetries {
-		ginkgo.Fail("ClusterUrlMonitor wasn't removed after %d seconds", maxRetries)
+		ginkgo.Fail("ClusterUrlMonitor didn't appear after %d seconds", maxRetries)
 	}
 	return err
 }
@@ -122,7 +122,7 @@ func (i *Integration) RemoveRouteMonitor(namespace, name string) error {
 		time.Sleep(1 * time.Second)
 	}
 	if t == maxRetries {
-		ginkgo.Fail("RouteMonitor wasn't removed after %d seconds", maxRetries)
+		ginkgo.Fail("RouteMonitor didn't appear after %d seconds", maxRetries)
 	}
 	return err
 }

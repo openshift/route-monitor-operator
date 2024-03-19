@@ -23,9 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers"
@@ -34,7 +32,6 @@ import (
 	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
@@ -153,12 +150,5 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *ClusterUrlMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&monitoringv1alpha1.ClusterUrlMonitor{}).
-		Watches(
-			&source.Kind{Type: &monitoringv1.ServiceMonitor{}},
-			&handler.EnqueueRequestForOwner{
-				OwnerType:    &monitoringv1alpha1.ClusterUrlMonitor{},
-				IsController: true,
-			},
-		).
 		Complete(r)
 }

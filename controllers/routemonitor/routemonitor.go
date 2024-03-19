@@ -28,13 +28,10 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
@@ -173,12 +170,5 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&monitoringv1alpha1.RouteMonitor{}).
-		Watches(
-			&source.Kind{Type: &monitoringv1.ServiceMonitor{}},
-			&handler.EnqueueRequestForOwner{
-				OwnerType:    &monitoringv1alpha1.RouteMonitor{},
-				IsController: true,
-			},
-		).
 		Complete(r)
 }

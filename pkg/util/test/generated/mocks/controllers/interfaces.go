@@ -241,17 +241,17 @@ func (mr *MockServiceMonitorHandlerMockRecorder) HypershiftUpdateServiceMonitorD
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp, useInsecure bool, owner *v11.OwnerReference) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp, useInsecure bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure, owner)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure, owner interface{}) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure, owner)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, hcp, useInsecure)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.
