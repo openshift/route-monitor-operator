@@ -176,7 +176,7 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 			return err
 		}
 		expectedRouteMonitor.ObjectMeta = buildMetadataForUpdate(expectedRouteMonitor.ObjectMeta, actualRouteMonitor.ObjectMeta)
-		err = r.Client.Update(ctx, &expectedRoute)
+		err = r.Client.Update(ctx, &expectedRouteMonitor)
 		if err != nil {
 			return err
 		}
