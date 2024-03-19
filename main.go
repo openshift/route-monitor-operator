@@ -17,19 +17,14 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"os"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -63,7 +58,6 @@ func init() {
 	utilruntime.Must(monitoringopenshiftiov1alpha1.AddToScheme(scheme))
 	utilruntime.Must(hypershiftv1beta1.AddToScheme(scheme))
 	utilruntime.Must(rhobsv1.AddToScheme(scheme))
-	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -139,14 +133,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	enableHCP, err := shouldEnableHCP(mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to determine whether HCP controller should be enabled", "controller", "HostedControlPlane")
-	}
-	if enableHCP {
+	if enablehypershift {
 		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, blackboxExporterNamespace)
 		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane")
+			setupLog.Error(err, "unable to create controller", "controller", "HostedCluster")
 			os.Exit(1)
 		}
 	}
@@ -170,24 +160,4 @@ func main() {
 
 	setupLog.V(1).Info("`mgr.Start` is blocking:",
 		"so this message (or anything that resides after it) won't execute until teardown", nil)
-}
-
-// shouldEnableHCP checks for the existence of the 'hostedcontrolplane' CRD to determine whether this controller should be enabled or not:
-//  - if it exists, enable the HCP controller
-//  - if we get an error unrelated to it's existence (ie - kubeapiserver is down) return the error
-//  - if we get an error due to it not existing, disable the HCP controller
-func shouldEnableHCP(mgr ctrl.Manager) (bool, error) {
-	c, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
-	if err != nil {
-		return false, err
-	}
-
-	err = c.Get(context.TODO(), types.NamespacedName{Name: "hostedcontrolplanes.hypershift.openshift.io"}, &apiextensionsv1.CustomResourceDefinition{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }
