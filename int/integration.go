@@ -226,7 +226,7 @@ func (i *Integration) RouteMonitorWaitForPrometheusRuleCorrectSLO(name types.Nam
 		return err
 	}
 
-	template := alert.TemplateForCoreOSPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
+	template := alert.TemplateForPrometheusRuleResource(routeMonitor.Status.RouteURL, targetSlo, name)
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)
@@ -263,7 +263,7 @@ func (i *Integration) ClusterUrlMonitorWaitForPrometheusRuleCorrectSLO(name type
 		return err
 	}
 
-	template := alert.TemplateForCoreOSPrometheusRuleResource(expectedUrl, targetSlo, name)
+	template := alert.TemplateForPrometheusRuleResource(expectedUrl, targetSlo, name)
 	t := 0
 	for ; t < seconds; t++ {
 		err := i.Client.Get(context.TODO(), name, &prometheusRule)

@@ -129,7 +129,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdateCoreOSPrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, gomock.Any()).Times(1).Return(false, nil)
 			})
 			It("doesn't update the clusterUrlMonitor reference and continues reconciling", func() {
@@ -143,7 +143,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
-				mockPrometheusRule.EXPECT().UpdateCoreOSPrometheusRuleDeployment(gomock.Any()).Times(1)
+				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, ns).Times(1).Return(true, nil)
 				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.StopOperation(), nil)

@@ -12,7 +12,6 @@ import (
 	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -36,29 +35,9 @@ func NewPrometheusRule(ctx context.Context, c client.Client) *PrometheusRule {
 }
 
 // Creates or Updates PrometheusRule Deployment according to the template
-func (u *PrometheusRule) UpdateCoreOSPrometheusRuleDeployment(template monitoringv1.PrometheusRule) error {
+func (u *PrometheusRule) UpdatePrometheusRuleDeployment(template monitoringv1.PrometheusRule) error {
 	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
 	deployedPrometheusRule := &monitoringv1.PrometheusRule{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedPrometheusRule)
-	if err != nil {
-		// No similar Prometheus Rule exists
-		if !k8serrors.IsNotFound(err) {
-			return err
-		}
-		return u.Client.Create(u.Ctx, &template)
-	}
-	if !u.Comparer.DeepEqual(template.Spec, deployedPrometheusRule.Spec) {
-		// Update existing PrometheuesRule for the case that the template changed
-		deployedPrometheusRule.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedPrometheusRule)
-	}
-	return nil
-}
-
-// Creates or Updates PrometheusRule Deployment according to the template
-func (u *PrometheusRule) UpdateRHOBSPrometheusRuleDeployment(template rhobsv1.PrometheusRule) error {
-	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
-	deployedPrometheusRule := &rhobsv1.PrometheusRule{}
 	err := u.Client.Get(u.Ctx, namespacedName, deployedPrometheusRule)
 	if err != nil {
 		// No similar Prometheus Rule exists
@@ -125,8 +104,8 @@ func sufficientProbes(windowSize, label string) string {
 	return rule
 }
 
-// renderCoreOS creates a monitoring.coreos.com rule for the defined multiwindow multi-burn rate alert
-func (r *multiWindowMultiBurnAlertRule) renderCoreOS(url string, percent string, namespacedName types.NamespacedName) monitoringv1.Rule {
+// render creates a monitoring rule for the defined multiwindow multi-burn rate alert
+func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, namespacedName types.NamespacedName) monitoringv1.Rule {
 	labelSelector := fmt.Sprintf(`%s="%s"`, servicemonitor.UrlLabelName, url)
 
 	alertString := "" +
@@ -149,30 +128,6 @@ func (r *multiWindowMultiBurnAlertRule) renderCoreOS(url string, percent string,
 	}
 }
 
-// renderRHOBS creates a monitoring.rhobs rule for the defined multiwindow multi-burn rate alert
-func (r *multiWindowMultiBurnAlertRule) renderRHOBS(url string, percent string, namespacedName types.NamespacedName) rhobsv1.Rule {
-	labelSelector := fmt.Sprintf(`%s="%s"`, servicemonitor.UrlLabelName, url)
-
-	alertString := "" +
-		alertThreshold(r.shortWindow, percent, labelSelector, r.burnRate) +
-		" and " +
-		sufficientProbes(r.shortWindow, labelSelector) +
-		"\nand\n" +
-		alertThreshold(r.longWindow, percent, labelSelector, r.burnRate) +
-		" and " +
-		sufficientProbes(r.longWindow, labelSelector)
-
-	return rhobsv1.Rule{
-		Alert:  namespacedName.Name + "-ErrorBudgetBurn",
-		Expr:   intstr.FromString(alertString),
-		Labels: r.renderLabels(url, namespacedName.Namespace),
-		Annotations: map[string]string{
-			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", url),
-		},
-		For: r.duration,
-	}
-}
-
 func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[string]string {
 	return map[string]string{
 		servicemonitor.UrlLabelName: url,
@@ -183,8 +138,8 @@ func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[
 	}
 }
 
-// TemplateForCoreOSPrometheusRuleResource returns a PrometheusRule
-func TemplateForCoreOSPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
+// TemplateForPrometheusRuleResource returns a PrometheusRule
+func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
 
 	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
@@ -219,7 +174,7 @@ func TemplateForCoreOSPrometheusRuleResource(url, percent string, namespacedName
 	}
 
 	for _, alertrule := range alertRules { // Create all the alerts
-		rules = append(rules, alertrule.renderCoreOS(url, percent, namespacedName))
+		rules = append(rules, alertrule.render(url, percent, namespacedName))
 	}
 
 	resource := monitoringv1.PrometheusRule{
@@ -229,62 +184,6 @@ func TemplateForCoreOSPrometheusRuleResource(url, percent string, namespacedName
 		},
 		Spec: monitoringv1.PrometheusRuleSpec{
 			Groups: []monitoringv1.RuleGroup{
-				{
-					Name:  "SLOs-probe",
-					Rules: rules,
-				},
-			},
-		},
-	}
-	return resource
-}
-
-// TemplateForRHOBSPrometheusRuleResource returns a PrometheusRule
-func TemplateForRHOBSPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) rhobsv1.PrometheusRule {
-
-	rules := []rhobsv1.Rule{}
-	alertRules := []multiWindowMultiBurnAlertRule{
-		{
-			duration:    "2m",
-			severity:    "critical",
-			longWindow:  "1h",
-			shortWindow: "5m",
-			burnRate:    "14.40",
-		},
-		{
-			duration:    "15m",
-			severity:    "critical",
-			longWindow:  "6h",
-			shortWindow: "30m",
-			burnRate:    "6",
-		},
-		{
-			duration:    "1h",
-			severity:    "warning",
-			longWindow:  "1d",
-			shortWindow: "2h",
-			burnRate:    "3",
-		},
-		{
-			duration:    "3h",
-			severity:    "warning",
-			longWindow:  "3d",
-			shortWindow: "6h",
-			burnRate:    "1",
-		},
-	}
-
-	for _, alertrule := range alertRules { // Create all the alerts
-		rules = append(rules, alertrule.renderRHOBS(url, percent, namespacedName))
-	}
-
-	resource := rhobsv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespacedName.Name,
-			Namespace: namespacedName.Namespace,
-		},
-		Spec: rhobsv1.PrometheusRuleSpec{
-			Groups: []rhobsv1.RuleGroup{
 				{
 					Name:  "SLOs-probe",
 					Rules: rules,

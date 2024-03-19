@@ -95,7 +95,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			get.CalledTimes = 1
 		})
 		JustBeforeEach(func() {
-			err = pr.UpdateCoreOSPrometheusRuleDeployment(prometheusRule)
+			err = pr.UpdatePrometheusRuleDeployment(prometheusRule)
 		})
 		When("the Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
