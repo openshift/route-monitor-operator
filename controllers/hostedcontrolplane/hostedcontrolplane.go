@@ -247,7 +247,10 @@ func (r *HostedControlPlaneReconciler) buildOwnerReferences(hostedcontrolplane *
 
 // finalizeHostedControlPlane cleans up HostedControlPlane-related objects managed by the HostedControlPlaneReconciler
 func (r *HostedControlPlaneReconciler) finalizeHostedControlPlane(ctx context.Context, log logr.Logger, hostedcontrolplane *v1beta1.HostedControlPlane) error {
-	r.deleteInternalMonitoringObjects(ctx, log, hostedcontrolplane)
+	err := r.deleteInternalMonitoringObjects(ctx, log, hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup internal monitoring resources: %w", err)
+	}
 	return nil
 }
 
