@@ -251,10 +251,10 @@ func templateForBlackBoxExporterConfigMap(blackboxNamespacedName types.Namespace
 	cfg := `modules:
   http_2xx:
     prober: http
-    timeout: 5s
+    timeout: 15s
   insecure_http_2xx:
     prober: http
-    timeout: 5s
+    timeout: 15s
     http:
       tls_config:
         insecure_skip_verify: true`
