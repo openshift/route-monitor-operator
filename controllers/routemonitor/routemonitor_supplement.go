@@ -83,7 +83,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	var err error
 	useRHOBS := (routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS)
 
-	if useRHOBS{
+	if useRHOBS {
 		hcp, err := r.getHostedControlPlane(routeMonitor.Namespace)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
