@@ -86,7 +86,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err != nil {
 		if kerr.IsNotFound(err) {
 			log.Info("HostedControlPlane not found, assumed deleted")
-			return utilreconcile.RequeueWith(nil)
+			return utilreconcile.Stop()
 		}
 		log.Error(err, "unable to fetch HostedControlPlane")
 		return utilreconcile.RequeueWith(err)
@@ -102,7 +102,10 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 		finalizer.Remove(hostedcontrolplane, hostedcontrolplaneFinalizer)
 		err = r.Client.Update(ctx, hostedcontrolplane)
-		return utilreconcile.RequeueWith(nil)
+		if err != nil {
+			return utilreconcile.RequeueWith(err)
+		}
+		return utilreconcile.Stop()
 	}
 
 	if !finalizer.Contains(hostedcontrolplane.Finalizers, hostedcontrolplaneFinalizer) {
@@ -116,7 +119,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Check if the HostedControlPlane is ready
 	if !hostedcontrolplane.Status.Ready {
 		log.Info("skipped deploying monitoring objects: HostedControlPlane not ready")
-		utilreconcile.RequeueWith(nil)
+		return utilreconcile.Stop()
 	}
 
 	log.Info("Deploying internal monitoring objects")
