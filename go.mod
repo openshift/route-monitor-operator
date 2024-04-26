@@ -1,10 +1,9 @@
 module github.com/openshift/route-monitor-operator
 
-go 1.19
+go 1.21
 
 require (
 	github.com/go-logr/logr v1.2.3
-	github.com/golang/mock v1.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/onsi/ginkgo v1.16.5
@@ -14,6 +13,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
 	github.com/prometheus/common v0.42.0
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
+	go.uber.org/mock v0.4.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.26.3
 	k8s.io/apiextensions-apiserver v0.26.3

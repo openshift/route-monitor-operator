@@ -1,14 +1,13 @@
 package alert_test
 
 import (
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 
 	"context"
 
 	// tested package
-
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
