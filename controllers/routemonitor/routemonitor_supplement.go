@@ -14,8 +14,7 @@ import (
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
-
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

@@ -1,17 +1,14 @@
 package servicemonitor_test
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 
-	"context"
-
-	// tested package
-
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
@@ -27,7 +24,6 @@ type ResourceComparerMockHelper struct {
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx                  context.Context
 		mockClient           *clientmocks.MockClient
 		mockCtrl             *gomock.Controller
 		mockResourceComparer *utilmock.MockResourceComparerInterface
@@ -44,7 +40,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		err               error
 	)
 	BeforeEach(func() {
-		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
@@ -60,7 +55,7 @@ var _ = Describe("CR Deployment Handling", func() {
 
 		sm = servicemonitor.ServiceMonitor{
 			Client:   mockClient,
-			Ctx:      ctx,
+			Ctx:      context.Background(),
 			Comparer: mockResourceComparer,
 		}
 	})

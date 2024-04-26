@@ -76,7 +76,7 @@ function verifyForBuildSuccess {
 
 function deployOperator {
   echo -e "\n\nDEPLOYING OPERATOR\n\n"
-  oc delete deployment "route-monitor-operator-controller-manager" -n "$NAMESPACE" || true
+  oc delete deployment "route-monitor-operator-controller-manager" -n "$NAMESPACE" --ignore-not-found
 
   # Override namespace in all objects
   cp -r config{,.bak}
