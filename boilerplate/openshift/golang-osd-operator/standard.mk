@@ -41,7 +41,7 @@ CONTAINER_ENGINE=$(shell command -v podman 2>/dev/null || echo docker --config=$
 endif
 
 # Generate version and tag information from inputs
-COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$$"`..HEAD --count)
+COMMIT_NUMBER=$(shell git rev-list `git rev-list --parents HEAD | grep -E "^[a-f0-9]{40}$$"`..HEAD --count)
 CURRENT_COMMIT=$(shell git rev-parse --short=7 HEAD)
 OPERATOR_VERSION=$(VERSION_MAJOR).$(VERSION_MINOR).$(COMMIT_NUMBER)-$(CURRENT_COMMIT)
 
@@ -52,6 +52,22 @@ OPERATOR_IMAGE_URI=${IMG}
 OPERATOR_IMAGE_URI_LATEST=$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(IMAGE_NAME):latest
 OPERATOR_DOCKERFILE ?=build/Dockerfile
 REGISTRY_IMAGE=$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(IMAGE_NAME)-registry
+
+ifeq ($(SUPPLEMENTARY_IMAGE_NAME),)
+# We need SUPPLEMENTARY_IMAGE to be defined for csv-generate.mk
+SUPPLEMENTARY_IMAGE=""
+else
+# If the configuration specifies a SUPPLEMENTARY_IMAGE_NAME
+# then append the image registry and generate the image URI.
+SUPPLEMENTARY_IMAGE=$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(SUPPLEMENTARY_IMAGE_NAME)
+SUPPLEMENTARY_IMAGE_URI=$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)/$(SUPPLEMENTARY_IMAGE_NAME):${OPERATOR_IMAGE_TAG}
+endif
+
+ifeq ($(EnableOLMSkipRange), true)
+SKIP_RANGE_ENABLED=true
+else
+SKIP_RANGE_ENABLED=false
+endif
 
 # Consumer can optionally define ADDITIONAL_IMAGE_SPECS like:
 #     define ADDITIONAL_IMAGE_SPECS
@@ -106,7 +122,7 @@ GOLANGCI_LINT_CACHE ?= /tmp/golangci-cache
 GOLANGCI_OPTIONAL_CONFIG ?=
 
 ifeq ($(origin TESTTARGETS), undefined)
-TESTTARGETS := $(shell ${GOENV} go list -e ./... | egrep -v "/(vendor)/" | egrep -v "/(osde2e)/")
+TESTTARGETS := $(shell ${GOENV} go list -e ./... | grep -E -v "/(vendor)/" | grep -E -v "/(osde2e)/")
 endif
 # ex, -v
 TESTOPTS :=
@@ -265,7 +281,7 @@ generate-check:
 
 .PHONY: yaml-validate
 yaml-validate: python-venv
-	${PYTHON} ${CONVENTION_DIR}/validate-yaml.py $(shell git ls-files | egrep -v '^(vendor|boilerplate)/' | egrep '.*\.ya?ml')
+	${PYTHON} ${CONVENTION_DIR}/validate-yaml.py $(shell git ls-files | grep -E -v '^(vendor|boilerplate)/' | grep -E '.*\.ya?ml')
 
 .PHONY: olm-deploy-yaml-validate
 olm-deploy-yaml-validate: python-venv
@@ -364,3 +380,11 @@ container-validate:
 .PHONY: container-coverage
 container-coverage:
 	${BOILERPLATE_CONTAINER_MAKE} coverage
+
+.PHONY: rvmo-bundle
+rvmo-bundle:
+	OPERATOR_NAME=$(OPERATOR_NAME) \
+	OPERATOR_VERSION=$(OPERATOR_VERSION) \
+	OPERATOR_OLM_REGISTRY_IMAGE=$(REGISTRY_IMAGE) \
+	TEMPLATE_FILE=$(abspath hack/artifacts/olm-artifacts-template.gotmpl) \
+	bash ${CONVENTION_DIR}/rvmo-bundle.sh

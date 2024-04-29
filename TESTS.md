@@ -2,7 +2,7 @@ The tests suite here starts with a standard of gomock and ginkgo
 
 for a basic understanding of these refer to:
 - [ginkgo's website](https://onsi.github.io/ginkgo/)
-- [gomocks github page](https://github.com/golang/mock)
+- [uber-go/mock](https://github.com/uber-go/mock)
 
 The mocks we mostly use are generated using `make go-generate` which relies on `mockgen`.
 This means you won't need to write your own mocks,

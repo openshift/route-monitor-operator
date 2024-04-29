@@ -11,9 +11,9 @@ import (
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 
 	. "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"

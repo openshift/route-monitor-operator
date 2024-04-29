@@ -1,10 +1,10 @@
 package routemonitor_test
 
 import (
-	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 
 	"time"
 
