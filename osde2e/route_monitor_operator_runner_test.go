@@ -23,6 +23,5 @@ func TestRouteMonitorOperator(t *testing.T) {
 	suiteConfig, reporterConfig := GinkgoConfiguration()
 	reporterConfig.JUnitReport = filepath.Join(testResultsDirectory, jUnitOutputFilename)
 	RunSpecs(t, "Route Monitor Operator", suiteConfig, reporterConfig)
-
 }
 

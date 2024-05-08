@@ -6,33 +6,44 @@ package osde2etests
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/osde2e-common/pkg/clients/openshift"
 	. "github.com/openshift/osde2e-common/pkg/gomega/assertions"
 	. "github.com/openshift/osde2e-common/pkg/gomega/matchers"
+	corev1 "k8s.io/api/core/v1"
+	kubev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	routev1 "github.com/openshift/api/route/v1"
+	routemonitorv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	prometheusop "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 var _ = Describe("Route Monitor Operator", Ordered, func() {
 	var (
-		k8s               *openshift.Client
-		operatorNamespace = "openshift-route-monitor-operator"
-		deploymentName    = "route-monitor-operator-controller-manager"
-		operatorName      = "route-monitor-operator"
-		consoleNamespace  = operatorNamespace
-		consoleName       = "console"
+		k8s *openshift.Client
+		err error
 	)
 	const (
+		operatorNamespace            = "openshift-route-monitor-operator"
+		deploymentName               = "route-monitor-operator-controller-manager"
+		operatorName                 = "route-monitor-operator"
+		consoleName                  = "console"
+		pollingDuration              = 10 * time.Minute
+		routeMonitorName             = "routemonitor-e2e-test"
 		defaultDesiredReplicas int32 = 1
 	)
 	BeforeAll(func(ctx context.Context) {
 		log.SetLogger(GinkgoLogr)
-		var err error
 		k8s, err = openshift.New(GinkgoLogr)
 		Expect(err).ShouldNot(HaveOccurred(), "unable to setup k8s client")
 	})
@@ -48,61 +59,176 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred(), "operator upgrade failed")
 	})
 
-	Context("rmo Route Monitor Operator regression for console", func() {
-		It("has all of the required resources", func(ctx context.Context) {
-			promclient, err := prometheusop.NewForConfig(k8s.GetConfig())
-			Expect(err).ShouldNot(HaveOccurred(), "failed to configure Prometheus-operator clientset")
+	It("has all of the required resources", func(ctx context.Context) {
+		promclient, err := prometheusop.NewForConfig(k8s.GetConfig())
+		Expect(err).ShouldNot(HaveOccurred(), "failed to configure Prometheus-operator clientset")
 
-			_, err = promclient.MonitoringV1().ServiceMonitors(consoleNamespace).Get(ctx, consoleName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred(), "Could not get console serviceMonitor")
-			_, err = promclient.MonitoringV1().PrometheusRules(consoleNamespace).Get(ctx, consoleName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred(), "Could not get console prometheusRule")
-		})
+		_, err = promclient.MonitoringV1().ServiceMonitors(operatorNamespace).Get(ctx, consoleName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Could not get console serviceMonitor")
+		_, err = promclient.MonitoringV1().PrometheusRules(operatorNamespace).Get(ctx, consoleName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Could not get console prometheusRule")
 	})
 
-	// TODO: implement testRouteMonitorCreationWorks
-	/* Context("rmo Route Monitor Operator integration test", func(ctx context.Context) {
-		pollingDuration := 10 * time.Minute
-		It("Creates and deletes a RouteMonitor to see if it works accordingly", func(ctx context.Context) {
-			routeMonitorNamespace := "route-monitor-operator"
-			const routeMonitorName = "routemonitor-e2e-test"
+	It("Creates and deletes a RouteMonitor to see if it works accordingly", func(ctx context.Context) {
+		By("Creating a pod, service and route to monitor with a ServiceMonitor and PrometheusRule")
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      routeMonitorName,
+				Namespace: operatorNamespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "quay.io/jitesoft/nginx:mainline",
+					},
+				},
+			},
+		}
+		clientset, err := kubernetes.NewForConfig(k8s.GetConfig())
+		Expect(err).ShouldNot(HaveOccurred(), "failed to configure Kubernetes clientset")
 
-			By("Creating a pod, service, and route to monitor with a ServiceMonitor and PrometheusRule")
-			// Create Pod
-			pod := createSamplePod(routeMonitorName, routeMonitorNamespace)
-			err := k8s.Create(ctx, &pod)
-			Expect(err).NotTo(HaveOccurred(), "Couldn't create a testing pod")
+		//if the pod already exists, skip creating it
+		currentPod, err := clientset.CoreV1().Pods(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
+		if currentPod == nil {
+			_, err = clientset.CoreV1().Pods(operatorNamespace).Create(ctx, pod, metav1.CreateOptions{})
+			Expect(err).ShouldNot(HaveOccurred(), "Could not create a pod")
+		}
 
-			// Wait for Pod to be running
-			err = waitForPodRunning(ctx, routeMonitorNamespace, routeMonitorName)
-			Expect(err).NotTo(HaveOccurred(), "Pod is not running")
-
-			// Create Service
-			svc := createSampleService(routeMonitorName, routeMonitorNamespace)
-			err = k8s.Create(ctx, &svc)
-			Expect(err).NotTo(HaveOccurred(), "Couldn't create a testing service")
-
-			// Create Route
-			appRoute := createSampleRoute(routeMonitorName, routeMonitorNamespace)
-			err = k8s.Create(ctx, &appRoute)
-			Expect(err).NotTo(HaveOccurred(), "Couldn't create application route")
-
-			Eventually(func() bool {
-				_, err := k8s.CoreV1().Services(routeMonitorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
-				if err != nil {
-					return false
+		By("checking the pod state")
+		var phase kubev1.PodPhase
+		for i := 0; i < 6; i++ {
+			pod, err = clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Couldn't get the testing pod")
+			if pod != nil {
+				phase = pod.Status.Phase
+				// stop checking if Pod has reached state or failed
+				if phase == kubev1.PodRunning || phase == kubev1.PodFailed {
+					break
 				}
-				return true
-			}, pollingDuration, time.Second).Should(BeTrue(), "Failed to verify that resources were created")
+			}
+			GinkgoLogr.Info(fmt.Sprintf("Waiting for Pod '%s/%s' to be %s, currently %s...", pod.Namespace, pod.Name, kubev1.PodRunning, phase))
+			time.Sleep(time.Second * 15)
+		}
+		Expect(phase).To(Equal(kubev1.PodRunning), fmt.Sprintf("pod %s in ns %s is not running, current pod state is %v", routeMonitorName, operatorNamespace, phase))
 
-			By("Deleting the sample RouteMonitor")
-			err := k8s.CoreV1().Services(routeMonitorNamespace).Delete(ctx, routeMonitorName, metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred(), "Couldn't delete the service")
+		By("checking the service")
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      routeMonitorName,
+				Namespace: operatorNamespace,
+				Labels:    map[string]string{routeMonitorName: routeMonitorName},
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Service",
+				APIVersion: "v1",
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt(80),
+						Name:       "web",
+					},
+				},
+				Selector: map[string]string{routeMonitorName: routeMonitorName},
+			},
+		}
 
-			Eventually(func() bool {
-				_, err := k8s.CoreV1().Services(routeMonitorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
-				return err != nil // Expect an error since the resource should not exist
-			}, pollingDuration, time.Second).Should(BeTrue(), "Service still exists after deletion")
+		By("creating the service")
+		err = k8s.Create(ctx, svc)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create service %s/%s", svc.Namespace, svc.Name)
+
+		By("checking the route")
+		appRoute := &routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: operatorNamespace,
+				Name:      routeMonitorName,
+			},
+			Spec: routev1.RouteSpec{
+				To: routev1.RouteTargetReference{
+					Name: routeMonitorName,
+				},
+				TLS: &routev1.TLSConfig{Termination: "edge"},
+			},
+			Status: routev1.RouteStatus{},
+		}
+
+		By("creating the route")
+		err = k8s.Create(ctx, appRoute)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create route %s/%s", appRoute.Namespace, appRoute.Name)
+
+		By("Creating a sample RouteMonitor to monitor the service")
+		rmo := &routemonitorv1alpha1.RouteMonitor{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "RouteMonitor",
+				APIVersion: "monitoring.openshift.io/v1alpha1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: operatorNamespace,
+				Name:      routeMonitorName,
+			},
+			Spec: routemonitorv1alpha1.RouteMonitorSpec{
+				Slo: routemonitorv1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.95",
+				},
+				Route: routemonitorv1alpha1.RouteMonitorRouteSpec{
+					Namespace: operatorNamespace,
+					Name:      routeMonitorName,
+				},
+			},
+		}
+
+		err = k8s.Create(ctx, rmo)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create RouteMonitor %s/%s", rmo.Namespace, rmo.Name)
+
+		// err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+		// 	err = k8s.Get(ctx, rmo.Name, rmo.Namespace, rmo)
+		// 	Expect(err).ShouldNot(HaveOccurred(), "Unable to create RouteMonitor %s/%s", rmo.Namespace, rmo.Name)
+		// 	if err != nil {
+		// 		return false, nil
+		// 	}
+		// 	return true, nil
+		// })
+		// Expect(err).NotTo(HaveOccurred(), "Couldn't create application route monitor")
+
+		promclient, err := prometheusop.NewForConfig(k8s.GetConfig())
+		Expect(err).ShouldNot(HaveOccurred(), "failed to configure Prometheus-operator clientset")
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
+			_, err = promclient.MonitoringV1().ServiceMonitors(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Could not get serviceMonitor")
+			if !k8serrors.IsNotFound(err) {
+				return false, err
+			}
+			_, err = promclient.MonitoringV1().PrometheusRules(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Could not get prometheusRule")
+			if !k8serrors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
 		})
-	}) */
+		Expect(err).NotTo(HaveOccurred(), "dependant resources weren't created via RouteMonitor")
+
+		By("Deleting the sample RouteMonitor")
+		err = k8s.Delete(ctx, rmo)
+		Expect(err).NotTo(HaveOccurred(), "failed to delete RouteMonitor")
+
+		// Deleting a namespace can take a while. If desired, wait for the namespace to delete before returning.
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+			// err = k8s.Get(ctx, routeMonitorName, metav1.GetOptions{})
+			err = k8s.Get(ctx, rmo.Name, rmo.Namespace, rmo)
+			// not sure on that
+			if err == nil {
+				return false, nil
+			}
+			return true, nil
+		})
+		Expect(err).NotTo(HaveOccurred(), "Couldn't delete application route monitor")
+
+		_, err = promclient.MonitoringV1().ServiceMonitors(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
+		Expect(k8serrors.IsNotFound(err)).To(BeTrue(), "sample serviceMonitor still exists, deletion of RouteMonitor didn't clean it up")
+		_, err = promclient.MonitoringV1().PrometheusRules(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
+		Expect(k8serrors.IsNotFound(err)).To(BeTrue(), "sample prometheusRule still exists, deletion of RouteMonitor didn't clean it up")
+	})
 })
