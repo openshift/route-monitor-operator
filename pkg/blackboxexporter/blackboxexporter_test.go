@@ -189,7 +189,7 @@ var _ = Describe("Blackboxexporter", func() {
 	Describe("CreateBlackBoxExporterDeployment", func() {
 		BeforeEach(func() {
 			// Arrange
-			get.CalledTimes = 1
+			get.CalledTimes = 2
 		})
 
 		When("the resource(deployment) is Not Found", func() {
