@@ -173,7 +173,6 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	log.Info("Deploying HTTP Monitor Resources")
 	err = APIClient.deployDynatraceHTTPMonitorResources(ctx, log, hostedcontrolplane, r)
 	if err != nil {
-		log.Info("SUCCESSFULLY Deployed HTTP Monitor Resources")
 		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
 		return utilreconcile.RequeueWith(err)
 	}
@@ -511,7 +510,7 @@ func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolp
 func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
 	monitorConfig := map[string]interface{}{
 		"name":         monitorName,
-		"frequencyMin": 5,
+		"frequencyMin": 1,
 		"enabled":      true,
 		"type":         "HTTP",
 		"script": map[string]interface{}{
@@ -538,7 +537,7 @@ func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clus
 				"localOutage":  false,
 				"localOutagePolicy": map[string]interface{}{
 					"affectedLocations": 1,
-					"consecutiveRuns":   3,
+					"consecutiveRuns":   2,
 				},
 			},
 			"loadingTimeThresholds": map[string]interface{}{
@@ -582,17 +581,18 @@ func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clus
 func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *v1beta1.HostedControlPlane, r *HostedControlPlaneReconciler) error {
 	//if monitor does not exsist and hcp is not marked for deletion and hcp is ready then create http monitor
 	//get apiserver
-	monitorName, err := r.GetAPIServerHostname(hostedcontrolplane, log)
+	APIServerHostname, err := r.GetAPIServerHostname(hostedcontrolplane, log)
 	if err != nil {
 		log.Error(err, "Failed to get APIServer hostname")
 	}
-	// monitorName := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
+	monitorName := strings.Replace(APIServerHostname, "api.", "", 1)
+	// APIServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
 	monitorLocation := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
 
 	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname gives api.cewong-rs1.dgcj.i3.devshift.org
 	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
 
-	apiUrl := fmt.Sprintf("https://%s/livez", monitorName)
+	apiUrl := fmt.Sprintf("https://%s/livez", APIServerHostname)
 
 	dynatraceHttpMonitorId, err := APIClient.getDynatraceHTTPMonitorID(ctx, log, hostedcontrolplane)
 	if err != nil {
