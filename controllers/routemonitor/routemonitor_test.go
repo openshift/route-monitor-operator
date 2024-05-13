@@ -1,6 +1,9 @@
 package routemonitor_test
 
 import (
+	"net/http"
+	"net/http/httptest"
+
 	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -26,6 +29,7 @@ import (
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
+	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
@@ -608,6 +612,39 @@ var _ = Describe("Routemonitor", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).NotTo(BeNil())
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+
+		When("the RouteURL doesn't match the extracted Route and RouteURL doesn't match the Header Location and redirect response is received", func() {
+			var (
+				testServer      *httptest.Server
+				customRouteURL  = "http://redhat.com"
+				defaultRouteURL = "https://www.redhat.com/en"
+			)
+
+			BeforeEach(func() {
+				ingresses = []string{
+					customRouteURL,
+				}
+
+				routeMonitor.Status.RouteURL = defaultRouteURL
+
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Location", defaultRouteURL)
+					w.WriteHeader(http.StatusMovedPermanently)
+				}))
+
+				mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1).Return(reconcile.StopOperation(), nil)
+			})
+
+			AfterEach(func() {
+				testServer.Close()
+			})
+
+			It("should update the RouteURL with the defaultRouteURL", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+				Expect(routeMonitor.Status.RouteURL).To(Equal(defaultRouteURL))
 			})
 		})
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -235,11 +236,17 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 	}
 
 	if currentRouteURL != "" && extractedRouteURL != currentRouteURL {
-		r.Log.V(3).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
+		err := r.checkRedirect(extractedRouteURL, routeMonitor)
+		if err != nil {
+			r.Log.V(3).Error(err, "RouteURL mismatch: failed to check redirects")
+			return utilreconcile.RequeueReconcileWith(err)
+		} else {
+			r.Log.V(3).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
+		}
 	}
 
 	routeMonitor.Status.RouteURL = extractedRouteURL
-	return r.Common.UpdateMonitorResourceStatus(&routeMonitor)
+	return r.Common.UpdateMonitorResource(&routeMonitor)
 }
 
 // getHostedControlPlane retrieves the HostedControlPlane object from the provided namespace. It's expected that only a single HCP object is present in the namespace,
@@ -254,4 +261,30 @@ func (r *RouteMonitorReconciler) getHostedControlPlane(namespace string) (hypers
 		return hypershiftv1beta1.HostedControlPlane{}, fmt.Errorf("unexpected number of HostedControlPlane objects in namespace '%s': expected 1, got %d", namespace, len(hcpList.Items))
 	}
 	return hcpList.Items[0], nil
+}
+
+// checkRedirect makes a HEAD request to the provided URL and handles any redirection responses.
+// If a redirection status code (300-399) is received, it updates the routeMonitor object's InsecureSkipTLSVerify field to true
+// and sets the extractedRouteURL to the redirection location.
+func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMonitor v1alpha1.RouteMonitor) error {
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	resp, err := client.Head(extractedRouteURL)
+	if err != nil {
+		r.Log.V(3).Error(err, "Failed to make HEAD request to the URL")
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		r.Log.V(3).Info("RouteURL mismatch: redirection status code received, taking defaultRouteURL as source of truth")
+		extractedRouteURL = resp.Header.Get("Location")
+		routeMonitor.Spec.InsecureSkipTLSVerify = true
+	}
+
+	return nil
 }
