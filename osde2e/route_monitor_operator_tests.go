@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -52,19 +51,6 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		Expect(routemonitorv1alpha1.AddToScheme(k8s.GetScheme())).Should(Succeed(), "unable to register RouteMonitor scheme")
 	})
 
-	AfterAll(func(ctx context.Context) {
-		By("Deleting test pod " + routeMonitorName)
-		Expect(k8s.Delete(ctx, pod)).Should(Succeed(), "Failed to delete namespace")
-		By("Deleting test service " + routeMonitorName)
-		Expect(k8s.Delete(ctx, svc)).Should(Succeed(), "Failed to delete service")
-		By("Deleting test route " + routeMonitorName)
-		if appRoute != nil {
-			Expect(k8s.Delete(ctx, appRoute)).Should(Succeed(), "Failed to delete route")
-		} else {
-			Expect(err).ShouldNot(HaveOccurred(), "appRoute is nil")
-		}
-	})
-
 	It("is installed", func(ctx context.Context) {
 		By("checking the deployment exists and is available")
 		EventuallyDeployment(ctx, k8s, deploymentName, operatorNamespace).Should(BeAvailable())
@@ -87,9 +73,6 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 
 	It("Creates and deletes a RouteMonitor to see if it works accordingly", func(ctx context.Context) {
 		By("Creating a pod, service and route to monitor with a ServiceMonitor and PrometheusRule")
-		clientset, err := kubernetes.NewForConfig(k8s.GetConfig())
-		Expect(err).ShouldNot(HaveOccurred(), "failed to configure Kubernetes clientset")
-
 		By("Creating the test pod")
 		pod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -105,13 +88,13 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				},
 			},
 		}
-		_, err = clientset.CoreV1().Pods(operatorNamespace).Create(ctx, pod, metav1.CreateOptions{})
+		err = k8s.Create(ctx, pod)
 		Expect(err).ShouldNot(HaveOccurred(), "Could not create a pod")
 
 		By("Checking the pod state")
 		var phase kubev1.PodPhase
 		for i := 0; i < 6; i++ {
-			pod, err = clientset.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			err = k8s.Get(ctx, pod.Name, pod.Namespace, pod)
 			Expect(err).NotTo(HaveOccurred(), "Couldn't get the testing pod")
 			if pod != nil {
 				phase = pod.Status.Phase
@@ -148,11 +131,11 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 			},
 		}
 
-		_, err = clientset.CoreV1().Services(operatorNamespace).Create(ctx, svc, metav1.CreateOptions{})
+		err = k8s.Create(ctx, svc)
 		Expect(err).ShouldNot(HaveOccurred(), "Unable to create service %s/%s", svc.Namespace, svc.Name)
 
 		By("Checking the route")
-		appRoute := &routev1.Route{
+		appRoute = &routev1.Route{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: operatorNamespace,
 				Name:      routeMonitorName,
@@ -221,7 +204,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		err = k8s.Delete(ctx, rmo)
 		Expect(err).NotTo(HaveOccurred(), "failed to delete RouteMonitor")
 
-		// Deleting a namespace can take a while. If desired, wait for the namespace to delete before returning.
+		// wait for the routemonitor to delete before returning.
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 			err = k8s.Get(ctx, rmo.Name, rmo.Namespace, rmo)
 			if k8serrors.IsNotFound(err) {
@@ -238,5 +221,15 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		Expect(k8serrors.IsNotFound(err)).To(BeTrue(), "sample serviceMonitor still exists, deletion of RouteMonitor didn't clean it up")
 		_, err = promclient.MonitoringV1().PrometheusRules(operatorNamespace).Get(ctx, routeMonitorName, metav1.GetOptions{})
 		Expect(k8serrors.IsNotFound(err)).To(BeTrue(), "sample prometheusRule still exists, deletion of RouteMonitor didn't clean it up")
+
+		DeferCleanup(func(ctx context.Context) {
+			By("Cleaning up setup")
+			By("Deleting test pod " + routeMonitorName)
+			Expect(k8s.Delete(ctx, pod)).Should(Succeed(), "Failed to delete pod")
+			By("Deleting test service " + routeMonitorName)
+			Expect(k8s.Delete(ctx, svc)).Should(Succeed(), "Failed to delete service")
+			By("Deleting test route " + routeMonitorName)
+			Expect(k8s.Delete(ctx, appRoute)).Should(Succeed(), "Failed to delete route")
+		})
 	})
 })
