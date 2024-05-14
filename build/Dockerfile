@@ -13,7 +13,7 @@ RUN make go-build
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.9-1161
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.9-1161.1715068733
 WORKDIR /
 COPY --from=builder /workspace/build/_output/bin/* /manager
 USER nonroot:nonroot
