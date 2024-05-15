@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"io"
 	"net/http"
 	"strings"
 
@@ -57,6 +59,7 @@ const (
 	//httpMonitorLabel is added to hcp object to keep track of when to create and delete of dynatrace http monitor
 	httpMonitorLabel = "dynatrace.http.monitor/id"
 
+	//for dynatrace http monitor
 	secretNamespace    = "openshift-route-monitor-operator"
 	secretName         = "dynatrace-token-two"
 	dynatraceApiKey    = "apiToken"
@@ -84,6 +87,78 @@ func NewAPIClient(baseURL, apiToken string) *APIClient {
 		apiToken:   apiToken,
 		httpClient: &http.Client{},
 	}
+}
+
+var publicMonitorTemplate = `
+{
+    "name": "{{.MonitorName}}",
+    "frequencyMin": 1,
+    "enabled": true,
+    "type": "HTTP",
+    "script": {
+        "version": "1.0",
+        "requests": [
+            {
+                "description": "api availability",
+                "url": "{{.ApiUrl}}",
+                "method": "GET",
+                "requestBody": "",
+                "configuration": {
+                    "acceptAnyCertificate": true,
+                    "followRedirects": true
+                },
+                "preProcessingScript": "",
+                "postProcessingScript": ""
+            }
+        ]
+    },
+    "locations": ["{{.DynatraceEquivalentClusterRegionId}}"],
+    "anomalyDetection": {
+        "outageHandling": {
+            "globalOutage": true,
+            "localOutage": false,
+            "localOutagePolicy": {
+                "affectedLocations": 1,
+                "consecutiveRuns": 1
+            }
+        },
+        "loadingTimeThresholds": {
+            "enabled": true,
+            "thresholds": [
+                {
+                    "type": "TOTAL",
+                    "valueMs": 10000
+                }
+            ]
+        }
+    },
+    "tags": [
+        {
+            "key": "clusterId",
+            "value": "{{.ClusterId}}"
+        }
+    ]
+}
+`
+
+type DynatraceMonitorConfig struct {
+	MonitorName                        string
+	ApiUrl                             string
+	DynatraceEquivalentClusterRegionId string
+	ClusterId                          string
+}
+
+type DynatraceCreatedMonitor struct {
+	EntityId string `json:"entityId"`
+}
+
+type DynatraceLocation struct {
+	Locations []struct {
+		Name          string `json:"name"`
+		Type          string `json:"type"`
+		CloudPlatform string `json:"cloudPlatform"`
+		EntityID      string `json:"entityId"`
+	} `json:"locations"`
 }
 
 //end ------------------------------synthetic-monitoring--------------------------
@@ -383,14 +458,14 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 
 // ------------------------------synthetic-monitoring--------------------------
 // helper function to make api requests
-func (APIClient *APIClient) makeRequest(method, path string, body interface{}) (*http.Response, error) {
+func (APIClient *APIClient) makeRequest(method, path string, renderedJSON string) (*http.Response, error) {
 	url := APIClient.baseURL + path
-	var reqBody []byte
-	if body != nil {
-		reqBody, _ = json.Marshal(body)
+	var reqBody io.Reader
+	if renderedJSON != "" {
+		reqBody = bytes.NewBufferString(renderedJSON)
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +553,7 @@ func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolp
 		return "", fmt.Errorf("location not found for region code: %s and region: %s", regionCode, clusterRegion)
 	}
 
-	resp, err := APIClient.makeRequest("GET", "/synthetic/locations", nil)
+	resp, err := APIClient.makeRequest("GET", "/synthetic/locations", "")
 	if err != nil {
 		return "", err
 	}
@@ -489,18 +564,14 @@ func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolp
 	}
 
 	//return location id from response body
-	var data map[string][]map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&data)
+	var locationResponse DynatraceLocation
+	err = json.NewDecoder(resp.Body).Decode(&locationResponse)
 	if err != nil {
 		return "", err
 	}
-	locations, ok := data["locations"]
-	if !ok {
-		return "", fmt.Errorf("locations not found in response")
-	}
-	for _, loc := range locations {
-		if loc["name"] == locationName && loc["type"] == "PUBLIC" && loc["cloudPlatform"] == "AMAZON_EC2" {
-			return loc["entityId"].(string), nil
+	for _, loc := range locationResponse.Locations {
+		if loc.Name == locationName && loc.Type == "PUBLIC" && loc.CloudPlatform == "AMAZON_EC2" {
+			return loc.EntityID, nil
 		}
 	}
 
@@ -508,57 +579,24 @@ func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolp
 }
 
 func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
-	monitorConfig := map[string]interface{}{
-		"name":         monitorName,
-		"frequencyMin": 1,
-		"enabled":      true,
-		"type":         "HTTP",
-		"script": map[string]interface{}{
-			"version": "1.0",
-			"requests": []map[string]interface{}{
-				{
-					"description": "api availability",
-					"url":         apiUrl,
-					"method":      "GET",
-					"requestBody": "",
-					"configuration": map[string]interface{}{
-						"acceptAnyCertificate": true,
-						"followRedirects":      true,
-					},
-					"preProcessingScript":  "",
-					"postProcessingScript": "",
-				},
-			},
-		},
-		"locations": []string{dynatraceEquivalentClusterRegionId},
-		"anomalyDetection": map[string]interface{}{
-			"outageHandling": map[string]interface{}{
-				"globalOutage": true,
-				"localOutage":  false,
-				"localOutagePolicy": map[string]interface{}{
-					"affectedLocations": 1,
-					"consecutiveRuns":   2,
-				},
-			},
-			"loadingTimeThresholds": map[string]interface{}{
-				"enabled": true,
-				"thresholds": []map[string]interface{}{
-					{
-						"type":    "TOTAL",
-						"valueMs": 10000,
-					},
-				},
-			},
-		},
-		"tags": []map[string]interface{}{
-			{
-				"key":   "clusterId",
-				"value": clusterId,
-			},
-		},
+
+	tmpl := template.Must(template.New("jsonTemplate").Parse(publicMonitorTemplate))
+
+	monitorConfig := DynatraceMonitorConfig{
+		MonitorName:                        monitorName,
+		ApiUrl:                             apiUrl,
+		DynatraceEquivalentClusterRegionId: dynatraceEquivalentClusterRegionId,
+		ClusterId:                          clusterId,
 	}
 
-	resp, err := APIClient.makeRequest("POST", "/synthetic/monitors", monitorConfig)
+	var tplBuffer bytes.Buffer
+	err := tmpl.Execute(&tplBuffer, monitorConfig)
+	if err != nil {
+		return "", fmt.Errorf("error rendering JSON template - %v", err)
+	}
+	renderedJSON := tplBuffer.String()
+
+	resp, err := APIClient.makeRequest("POST", "/synthetic/monitors", renderedJSON)
 	if err != nil {
 		return "", err
 	}
@@ -569,12 +607,12 @@ func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clus
 	}
 
 	//return monitor id
-	var createdMonitor map[string]interface{}
+	var createdMonitor DynatraceCreatedMonitor
 	err = json.NewDecoder(resp.Body).Decode(&createdMonitor)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch monitor id - %v", err)
 	}
-	monitorID := createdMonitor["entityId"].(string)
+	monitorID := createdMonitor.EntityId
 	return monitorID, nil
 }
 
@@ -655,7 +693,7 @@ func (APIClient *APIClient) deleteDynatraceHTTPMonitorResources(ctx context.Cont
 func (APIClient *APIClient) deleteDynatraceHTTPMonitor(monitorID string) error {
 	path := fmt.Sprintf("/synthetic/monitors/%s", monitorID)
 
-	resp, err := APIClient.makeRequest("DELETE", path, nil)
+	resp, err := APIClient.makeRequest("DELETE", path, "")
 	if err != nil {
 		return err
 	}
