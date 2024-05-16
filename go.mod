@@ -12,7 +12,6 @@ require (
 	github.com/openshift/api v0.0.0-20230213134911-7ba313770556
 	github.com/openshift/hypershift v0.0.0-20230320142408-f88fd0deab44
 	github.com/openshift/osde2e-common v0.0.0-20240404214304-9eefff9c607b
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.0
 	github.com/prometheus-operator/prometheus-operator/pkg/client v0.64.0
 	github.com/prometheus/common v0.43.0
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
