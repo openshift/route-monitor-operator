@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
@@ -39,7 +40,7 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 		client := buildClient(testObjs...)
 		ctx := context.TODO()
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
-			Log:    constinit.Logger,
+			Log:    logr.Discard(),
 			Client: client,
 			Scheme: constinit.Scheme,
 			Common: reconcileCommon.NewMonitorResourceCommon(ctx, client),
@@ -108,7 +109,7 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 				// Objects cannot be created with a status predefined - it must
 				// be added as an update after creating
 				infra.Status.APIServerURL = fmt.Sprintf("https://api.%s:6443", expectedDomain)
-				err := reconciler.Client.Status().Update(context.TODO(), &infra)
+				err := reconciler.Client.Update(context.TODO(), &infra)
 				Expect(err).ToNot(HaveOccurred())
 
 				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
@@ -120,12 +121,6 @@ var _ = Describe("ClusterUrlMonitorSupplement", func() {
 })
 
 func buildClient(objs ...client.Object) client.Client {
-	var err error
-	err = hypershiftv1beta1.AddToScheme(constinit.Scheme)
-	Expect(err).ToNot(HaveOccurred())
-	err = configv1.AddToScheme(constinit.Scheme)
-	Expect(err).ToNot(HaveOccurred())
-
-	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme)
+	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme).WithStatusSubresource()
 	return builder.Build()
 }

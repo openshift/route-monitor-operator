@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	integration "github.com/openshift/route-monitor-operator/int"
@@ -38,6 +40,7 @@ var _ = Describe("Integrationtests", func() {
 			expectedServiceMonitorName types.NamespacedName
 		)
 		BeforeEach(func() {
+			logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 			clusterUrlMonitorName = "fake-url-monitor"
 			clusterUrlMonitorNamespace = "default"
 

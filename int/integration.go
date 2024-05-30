@@ -8,9 +8,13 @@ import (
 
 	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,19 +37,24 @@ type Integration struct {
 }
 
 func NewIntegration() (*Integration, error) {
+	setupLog := ctrl.Log.WithName("setup")
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(monitoringv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	utilruntime.Must(routev1.AddToScheme(scheme))
 	utilruntime.Must(configv1.AddToScheme(scheme))
-
+	utilruntime.Must(operatorv1.AddToScheme(scheme))
 	utilruntime.Must(monitoringopenshiftiov1alpha1.AddToScheme(scheme))
+	utilruntime.Must(hypershiftv1beta1.AddToScheme(scheme))
+	utilruntime.Must(rhobsv1.AddToScheme(scheme))
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
+		setupLog.Error(err, "unable to start manager")
 		return &Integration{}, err
 	}
 	client := mgr.GetClient()

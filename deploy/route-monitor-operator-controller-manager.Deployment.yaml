@@ -39,7 +39,6 @@ spec:
             - --zap-log-level=debug
             - --blackbox-image=$(BLACKBOX_IMAGE)
             - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
-            - --config=controller_manager_config.yaml
           command:
             - /manager
           env:
@@ -74,10 +73,6 @@ spec:
               memory: 20Mi
           securityContext:
             allowPrivilegeEscalation: false
-          volumeMounts:
-            - mountPath: /controller_manager_config.yaml
-              name: manager-config
-              subPath: controller_manager_config.yaml
       securityContext:
         runAsNonRoot: true
       serviceAccountName: route-monitor-operator-system
@@ -86,7 +81,3 @@ spec:
         - effect: NoSchedule
           key: node-role.kubernetes.io/infra
           operator: Exists
-      volumes:
-        - configMap:
-            name: route-monitor-operator-manager-config
-          name: manager-config

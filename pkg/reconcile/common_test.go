@@ -2,14 +2,12 @@ package reconcileCommon_test
 
 import (
 	"context"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -28,7 +26,6 @@ type ResourceComparerMockHelper struct {
 
 var _ = Describe("CR Deployment Handling", func() {
 	var (
-		ctx                  context.Context
 		mockClient           *clientmocks.MockClient
 		mockCtrl             *gomock.Controller
 		mockResourceComparer *utilmock.MockResourceComparerInterface
@@ -42,7 +39,6 @@ var _ = Describe("CR Deployment Handling", func() {
 		rc reconcilecommon.MonitorResourceCommon
 	)
 	BeforeEach(func() {
-		ctx = constinit.Context
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 		mockResourceComparer = utilmock.NewMockResourceComparerInterface(mockCtrl)
@@ -55,7 +51,7 @@ var _ = Describe("CR Deployment Handling", func() {
 
 		rc = reconcilecommon.MonitorResourceCommon{
 			Client:   mockClient,
-			Ctx:      ctx,
+			Ctx:      context.Background(),
 			Comparer: mockResourceComparer,
 		}
 	})

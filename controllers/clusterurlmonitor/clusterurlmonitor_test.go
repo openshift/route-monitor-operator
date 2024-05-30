@@ -3,6 +3,7 @@ package clusterurlmonitor_test
 import (
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
@@ -60,7 +61,7 @@ var _ = Describe("Clusterurlmonitor", func() {
 		clusterUrlMonitor.Spec.Suffix = suffix
 		clusterUrlMonitor.Spec.Port = port
 		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
-			Log:              constinit.Logger,
+			Log:              logr.Discard(),
 			Client:           mockClient,
 			Scheme:           constinit.Scheme,
 			BlackBoxExporter: mockBlackBoxExporter,
