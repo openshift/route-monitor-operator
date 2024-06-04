@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // RouteMonitorReconciler reconciles a RouteMonitor object
@@ -174,11 +173,8 @@ func (r *RouteMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&monitoringv1alpha1.RouteMonitor{}).
 		Watches(
-			&source.Kind{Type: &monitoringv1.ServiceMonitor{}},
-			&handler.EnqueueRequestForOwner{
-				OwnerType:    &monitoringv1alpha1.RouteMonitor{},
-				IsController: true,
-			},
+			&monitoringv1.ServiceMonitor{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &monitoringv1alpha1.RouteMonitor{}, handler.OnlyControllerOwner()),
 		).
 		Complete(r)
 }

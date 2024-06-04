@@ -21,7 +21,6 @@ import (
 	"flag"
 	"os"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,15 +31,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/config"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/hostedcontrolplane"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
@@ -72,7 +74,6 @@ func main() {
 	var enableLeaderElection bool
 	var enablehypershift bool
 	var probeAddr string
-	var managerConfigPath string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -80,19 +81,12 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&enablehypershift, "enable-hypershift", false,
 		"Enabling this for HyperShift")
-	flag.StringVar(&managerConfigPath,
-		"config",
-		"",
-		"The controller will load its initial configuration from this file. "+
-			"Omit this flag to use the default configuration values. "+
-			"Command-line flags override configuration from this file.",
-	)
 
 	var blackboxExporterImage string
 	var blackboxExporterNamespace string
 
 	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter:master", "The image that will be used for the blackbox-exporter deployment")
-	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", "openshift-route-monitor-operator", "Blackbox-exporter deployment will reside on this Namespace")
+	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -101,22 +95,13 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	options := ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "2793210b.openshift.io",
-	}
-
-	var err error
-
-	if managerConfigPath != "" {
-		cfgLoader := ctrl.ConfigFile().AtPath(managerConfigPath)
-		if options, err = options.AndFrom(cfgLoader); err != nil {
-			setupLog.Error(err, "Unable to load the manager config file")
-			os.Exit(1)
-		}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
@@ -126,15 +111,13 @@ func main() {
 	}
 
 	routeMonitorReconciler := routemonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
-
-	if err = routeMonitorReconciler.SetupWithManager(mgr); err != nil {
+	if err := routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
 
 	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
-
-	if err = clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
+	if err := clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "clusterUrlMonitorReconciler")
 		os.Exit(1)
 	}

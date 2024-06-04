@@ -12,7 +12,7 @@ package controllers
 import (
 	reflect "reflect"
 
-	v1beta1 "github.com/openshift/hypershift/api/v1beta1"
+	v1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"

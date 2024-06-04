@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
