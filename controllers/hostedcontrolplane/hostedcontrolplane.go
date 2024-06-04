@@ -30,7 +30,6 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	"github.com/openshift/hypershift/api/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -501,7 +500,7 @@ func (r *HostedControlPlaneReconciler) getSecret(ctx context.Context) (string, s
 	return valueDynatraceApiToken, valueDynatraceTenant, nil
 }
 
-func (APIClient *APIClient) getDynatraceHTTPMonitorID(ctx context.Context, log logr.Logger, hostedcontrolplane *v1beta1.HostedControlPlane) (string, error) {
+func (APIClient *APIClient) getDynatraceHTTPMonitorID(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	labels := hostedcontrolplane.GetLabels()
 	dynatraceHttpMonitorId, exists := labels[httpMonitorLabel]
 	if exists {
@@ -510,7 +509,7 @@ func (APIClient *APIClient) getDynatraceHTTPMonitorID(ctx context.Context, log l
 	return "", fmt.Errorf("key '%s' not found in labels", httpMonitorLabel)
 }
 
-func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *v1beta1.HostedControlPlane, key, value string) error {
+func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, key, value string) error {
 	labels := hostedcontrolplane.GetLabels()
 	labels[key] = value
 	hostedcontrolplane.SetLabels(labels)
@@ -522,7 +521,7 @@ func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx contex
 	return nil
 }
 
-func (r *HostedControlPlaneReconciler) GetAPIServerHostname(hostedcontrolplane *v1beta1.HostedControlPlane, log logr.Logger) (string, error) {
+func (r *HostedControlPlaneReconciler) GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, log logr.Logger) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
 		if service.Service == "APIServer" {
 			return service.ServicePublishingStrategy.Route.Hostname, nil
@@ -531,7 +530,7 @@ func (r *HostedControlPlaneReconciler) GetAPIServerHostname(hostedcontrolplane *
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
 }
 
-func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolplane *v1beta1.HostedControlPlane) (string, error) {
+func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	openShiftToAwsRegions := map[string]string{
 		"us": "N. Virginia",
 		"af": "Cape Town",
@@ -612,7 +611,7 @@ func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clus
 	return monitorID, nil
 }
 
-func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *v1beta1.HostedControlPlane, r *HostedControlPlaneReconciler) error {
+func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, r *HostedControlPlaneReconciler) error {
 	//if monitor does not exsist and hcp is not marked for deletion and hcp is ready then create http monitor
 	//get apiserver
 	APIServerHostname, err := r.GetAPIServerHostname(hostedcontrolplane, log)
@@ -664,7 +663,7 @@ func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Cont
 	return nil
 }
 
-func (APIClient *APIClient) deleteDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *v1beta1.HostedControlPlane) error {
+func (APIClient *APIClient) deleteDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	//check if http monitor exists in dynatrace, if yes, then delete
 	//if monitor exists - has label/monitor on hcp, then delete it
 	// key := "dynatrace.http.monitor/id"
