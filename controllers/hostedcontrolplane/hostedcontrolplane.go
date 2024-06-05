@@ -58,7 +58,7 @@ const (
 	//httpMonitorLabel is added to hcp object to keep track of when to create and delete of dynatrace http monitor
 	httpMonitorLabel = "dynatrace.http.monitor/id"
 
-	//for dynatrace http monitor
+	//fetch dynatrace secret to get dynatrace api token and tennant url
 	secretNamespace    = "openshift-route-monitor-operator"
 	secretName         = "dynatrace-token-two"
 	dynatraceApiKey    = "apiToken"
@@ -452,7 +452,7 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 // ------------------------------synthetic-monitoring--------------------------
-// helper function to make api requests
+// helper function to make Dynatrace api requests
 func (APIClient *APIClient) makeRequest(method, path string, renderedJSON string) (*http.Response, error) {
 	url := APIClient.baseURL + path
 	var reqBody io.Reader
@@ -545,7 +545,7 @@ func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolp
 	// Look up the location name based on the region code in map
 	locationName, ok := openShiftToAwsRegions[regionCode]
 	if !ok {
-		return "", fmt.Errorf("location not found for region code: %s and region: %s", regionCode, clusterRegion)
+		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
 	}
 
 	resp, err := APIClient.makeRequest("GET", "/synthetic/locations", "")
