@@ -1,9 +1,9 @@
 package routemonitor_test
 
 import (
-	"net/http"
+  "net/http"
 	"net/http/httptest"
-
+	"github.com/go-logr/logr"
 	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -66,7 +66,7 @@ var _ = Describe("Routemonitor", func() {
 		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
 
 		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
-			Log:              constinit.Logger,
+			Log:              logr.Discard(),
 			Client:           mockClient,
 			Scheme:           constinit.Scheme,
 			BlackBoxExporter: mockBlackboxExporter,

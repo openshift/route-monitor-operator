@@ -2,12 +2,12 @@ package blackboxexporter_test
 
 import (
 	"context"
+	"github.com/go-logr/logr"
 	"time"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,8 +26,6 @@ var _ = Describe("Blackboxexporter", func() {
 
 		blackboxExporter BlackBoxExporter
 
-		ctx context.Context
-
 		get    helper.MockHelper
 		delete helper.MockHelper
 		create helper.MockHelper
@@ -37,8 +35,6 @@ var _ = Describe("Blackboxexporter", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockClient = clientmocks.NewMockClient(mockCtrl)
 
-		ctx = constinit.Context
-
 		get = helper.MockHelper{}
 		delete = helper.MockHelper{}
 		create = helper.MockHelper{}
@@ -46,9 +42,9 @@ var _ = Describe("Blackboxexporter", func() {
 	})
 	JustBeforeEach(func() {
 		blackboxExporter = BlackBoxExporter{
-			Log:    constinit.Logger,
+			Log:    logr.Discard(),
 			Client: mockClient,
-			Ctx:    ctx,
+			Ctx:    context.Background(),
 		}
 
 		mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -189,7 +185,7 @@ var _ = Describe("Blackboxexporter", func() {
 	Describe("CreateBlackBoxExporterDeployment", func() {
 		BeforeEach(func() {
 			// Arrange
-			get.CalledTimes = 1
+			get.CalledTimes = 2
 		})
 
 		When("the resource(deployment) is Not Found", func() {

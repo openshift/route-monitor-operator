@@ -52,26 +52,18 @@ run-verbose: generate fmt vet
 
 # Install CRDs into a cluster
 install:
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	$(KUBECTL) apply -f deploy/crds
 
 # Uninstall CRDs from a cluster
 uninstall:
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete -f -
+	$(KUBECTL) delete -f deploy/crds
 
 pre-deploy:
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: pre-deploy
+deploy: pre-deploy install
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-
-# Install CRDs into a cluster
-sample-install:
-	$(KUSTOMIZE) build config/samples | $(KUBECTL) apply -f -
-#
-# Uninstall CRDs into a cluster
-sample-uninstall:
-	$(KUSTOMIZE) build config/samples | $(KUBECTL) delete -f -
 
 # Run go fmt against code
 fmt:

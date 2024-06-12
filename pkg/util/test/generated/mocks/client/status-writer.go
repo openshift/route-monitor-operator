@@ -40,8 +40,27 @@ func (m *MockStatusWriter) EXPECT() *MockStatusWriterMockRecorder {
 	return m.recorder
 }
 
+// Create mocks base method.
+func (m *MockStatusWriter) Create(arg0 context.Context, arg1, arg2 client.Object, arg3 ...client.SubResourceCreateOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1, arg2}
+	for _, a := range arg3 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Create", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockStatusWriterMockRecorder) Create(arg0, arg1, arg2 any, arg3 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1, arg2}, arg3...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockStatusWriter)(nil).Create), varargs...)
+}
+
 // Patch mocks base method.
-func (m *MockStatusWriter) Patch(arg0 context.Context, arg1 client.Object, arg2 client.Patch, arg3 ...client.PatchOption) error {
+func (m *MockStatusWriter) Patch(arg0 context.Context, arg1 client.Object, arg2 client.Patch, arg3 ...client.SubResourcePatchOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{arg0, arg1, arg2}
 	for _, a := range arg3 {
@@ -60,7 +79,7 @@ func (mr *MockStatusWriterMockRecorder) Patch(arg0, arg1, arg2 any, arg3 ...any)
 }
 
 // Update mocks base method.
-func (m *MockStatusWriter) Update(arg0 context.Context, arg1 client.Object, arg2 ...client.UpdateOption) error {
+func (m *MockStatusWriter) Update(arg0 context.Context, arg1 client.Object, arg2 ...client.SubResourceUpdateOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{arg0, arg1}
 	for _, a := range arg2 {

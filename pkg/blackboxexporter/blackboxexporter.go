@@ -5,6 +5,7 @@ import (
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 
 	"context"
@@ -141,7 +142,10 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterConfigMapExists() error {
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
 func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
-	nodeLabel := "node-role.kubernetes.io/master"
+	nodeLabel := "node-role.kubernetes.io/infra"
+	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.13") && util.ClusterHasPrivateNLB(b.Client) {
+		nodeLabel = "node-role.kubernetes.io/master"
+	}
 
 	labels := blackboxexporter.GenerateBlackBoxExporterLables()
 	labelSelectors := metav1.LabelSelector{

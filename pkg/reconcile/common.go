@@ -9,7 +9,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/v1beta1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"

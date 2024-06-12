@@ -16,6 +16,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -101,17 +102,52 @@ func (mr *MockClientMockRecorder) DeleteAllOf(arg0, arg1 any, arg2 ...any) *gomo
 }
 
 // Get mocks base method.
-func (m *MockClient) Get(arg0 context.Context, arg1 types.NamespacedName, arg2 client.Object) error {
+func (m *MockClient) Get(arg0 context.Context, arg1 types.NamespacedName, arg2 client.Object, arg3 ...client.GetOption) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2)
+	varargs := []any{arg0, arg1, arg2}
+	for _, a := range arg3 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "Get", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockClientMockRecorder) Get(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockClientMockRecorder) Get(arg0, arg1, arg2 any, arg3 ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClient)(nil).Get), arg0, arg1, arg2)
+	varargs := append([]any{arg0, arg1, arg2}, arg3...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClient)(nil).Get), varargs...)
+}
+
+// GroupVersionKindFor mocks base method.
+func (m *MockClient) GroupVersionKindFor(arg0 runtime.Object) (schema.GroupVersionKind, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GroupVersionKindFor", arg0)
+	ret0, _ := ret[0].(schema.GroupVersionKind)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GroupVersionKindFor indicates an expected call of GroupVersionKindFor.
+func (mr *MockClientMockRecorder) GroupVersionKindFor(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GroupVersionKindFor", reflect.TypeOf((*MockClient)(nil).GroupVersionKindFor), arg0)
+}
+
+// IsObjectNamespaced mocks base method.
+func (m *MockClient) IsObjectNamespaced(arg0 runtime.Object) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsObjectNamespaced", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsObjectNamespaced indicates an expected call of IsObjectNamespaced.
+func (mr *MockClientMockRecorder) IsObjectNamespaced(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsObjectNamespaced", reflect.TypeOf((*MockClient)(nil).IsObjectNamespaced), arg0)
 }
 
 // List mocks base method.
@@ -181,10 +217,10 @@ func (mr *MockClientMockRecorder) Scheme() *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockClient) Status() client.StatusWriter {
+func (m *MockClient) Status() client.SubResourceWriter {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(client.StatusWriter)
+	ret0, _ := ret[0].(client.SubResourceWriter)
 	return ret0
 }
 
@@ -192,6 +228,20 @@ func (m *MockClient) Status() client.StatusWriter {
 func (mr *MockClientMockRecorder) Status() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockClient)(nil).Status))
+}
+
+// SubResource mocks base method.
+func (m *MockClient) SubResource(arg0 string) client.SubResourceClient {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubResource", arg0)
+	ret0, _ := ret[0].(client.SubResourceClient)
+	return ret0
+}
+
+// SubResource indicates an expected call of SubResource.
+func (mr *MockClientMockRecorder) SubResource(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubResource", reflect.TypeOf((*MockClient)(nil).SubResource), arg0)
 }
 
 // Update mocks base method.
