@@ -18,7 +18,6 @@ package routemonitor
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/go-logr/logr"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
@@ -47,7 +46,7 @@ type RouteMonitorReconciler struct {
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
-	HttpClient       *http.Client
+	HTTPClient       HTTPClient
 }
 
 func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"reflect"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -266,12 +265,7 @@ func (r *RouteMonitorReconciler) getHostedControlPlane(namespace string) (hypers
 // If a redirection status code (300-399) is received, it updates the routeMonitor object's InsecureSkipTLSVerify field to true
 // and sets the extractedRouteURL to the redirection location.
 func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMonitor v1alpha1.RouteMonitor) error {
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
+	client := r.HTTPClient
 	resp, err := client.Head(extractedRouteURL)
 	if err != nil {
 		r.Log.V(3).Error(err, "Failed to make HEAD request to the URL")
