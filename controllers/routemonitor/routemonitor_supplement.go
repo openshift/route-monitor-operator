@@ -233,8 +233,9 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 		return utilreconcile.ContinueReconcile()
 	}
 
+	var err error
 	if currentRouteURL != "" && extractedRouteURL != currentRouteURL {
-		err := r.checkRedirect(extractedRouteURL, routeMonitor)
+		extractedRouteURL, err = r.checkRedirect(extractedRouteURL, routeMonitor)
 		if err != nil {
 			r.Log.V(3).Error(err, "RouteURL mismatch: failed to check redirects")
 			return utilreconcile.RequeueReconcileWith(err)
@@ -264,12 +265,12 @@ func (r *RouteMonitorReconciler) getHostedControlPlane(namespace string) (hypers
 // checkRedirect makes a HEAD request to the provided URL and handles any redirection responses.
 // If a redirection status code (300-399) is received, it updates the routeMonitor object's InsecureSkipTLSVerify field to true
 // and sets the extractedRouteURL to the redirection location.
-func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMonitor v1alpha1.RouteMonitor) error {
+func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMonitor v1alpha1.RouteMonitor) (string, error) {
 	client := r.HTTPClient
 	resp, err := client.Head(extractedRouteURL)
 	if err != nil {
 		r.Log.V(3).Error(err, "Failed to make HEAD request to the URL")
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
@@ -279,5 +280,5 @@ func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMo
 		routeMonitor.Spec.InsecureSkipTLSVerify = true
 	}
 
-	return nil
+	return extractedRouteURL, nil
 }
