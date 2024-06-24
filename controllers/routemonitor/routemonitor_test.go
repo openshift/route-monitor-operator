@@ -1,6 +1,10 @@
 package routemonitor_test
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+
 	"github.com/go-logr/logr"
 	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/ginkgo"
@@ -22,11 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	httpclientmocks "github.com/openshift/route-monitor-operator/controllers/routemonitor/mock"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
+	"github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
 	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
@@ -42,6 +48,7 @@ var _ = Describe("Routemonitor", func() {
 		mockUtils            *controllermocks.MockMonitorResourceHandler
 		mockPrometheusRule   *controllermocks.MockPrometheusRuleHandler
 		mockServiceMonitor   *controllermocks.MockServiceMonitorHandler
+		mockHTTPClient       *httpclientmocks.MockHTTPClient
 
 		update helper.MockHelper
 		delete helper.MockHelper
@@ -61,6 +68,7 @@ var _ = Describe("Routemonitor", func() {
 		mockUtils = controllermocks.NewMockMonitorResourceHandler(mockCtrl)
 		mockServiceMonitor = controllermocks.NewMockServiceMonitorHandler(mockCtrl)
 		mockPrometheusRule = controllermocks.NewMockPrometheusRuleHandler(mockCtrl)
+		mockHTTPClient = httpclientmocks.NewMockHTTPClient(mockCtrl)
 
 		routeMonitorReconciler = routemonitor.RouteMonitorReconciler{
 			Log:              logr.Discard(),
@@ -70,6 +78,7 @@ var _ = Describe("Routemonitor", func() {
 			Common:           mockUtils,
 			ServiceMonitor:   mockServiceMonitor,
 			Prom:             mockPrometheusRule,
+			HTTPClient:       mockHTTPClient,
 		}
 
 		update = helper.MockHelper{}
@@ -558,7 +567,14 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 					"eddie",
 				}
-				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+
+				mockResp := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte{})), // No-op Body
+				}
+
+				mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1).Return(utilreconcile.RequeueOperation(), consterror.CustomError)
+				mockHTTPClient.EXPECT().Head(firstRouteURL).Return(mockResp, nil)
 				routeMonitorReconciler.Client = mockClient
 			})
 			JustBeforeEach(func() {
@@ -578,7 +594,14 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 					"eddie",
 				}
-				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+
+				mockResp := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte{})), // No-op Body
+				}
+
+				mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockHTTPClient.EXPECT().Head(firstRouteURL).Return(mockResp, nil)
 			})
 			JustBeforeEach(func() {
 				expectedRouteMonitor.Status.RouteURL = firstRouteURL
@@ -598,7 +621,14 @@ var _ = Describe("Routemonitor", func() {
 					firstRouteURL,
 				}
 
-				mockUtils.EXPECT().UpdateMonitorResourceStatus(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockResp := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte{})), // No-op Body
+				}
+
+				mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1).Return(utilreconcile.StopOperation(), nil)
+				mockHTTPClient.EXPECT().Head(firstRouteURL).Return(mockResp, nil)
+
 			})
 			JustBeforeEach(func() {
 				routeMonitor.Status.RouteURL = firstRouteURL + "but-different"
@@ -609,6 +639,35 @@ var _ = Describe("Routemonitor", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(res).NotTo(BeNil())
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+
+		When("the RouteURL doesn't match the extracted Route and RouteURL doesn't match the Header Location and redirect response is received", func() {
+			var (
+				customRouteURL  = "http://example.com"
+				defaultRouteURL = "http://example.com/origin"
+			)
+
+			BeforeEach(func() {
+				routeMonitor.Status.RouteURL = defaultRouteURL
+				ingresses = []string{
+					customRouteURL,
+				}
+
+				mockResp := &http.Response{
+					StatusCode: http.StatusMovedPermanently,
+					Header:     http.Header{"Location": []string{defaultRouteURL}},
+					Body:       io.NopCloser(bytes.NewReader([]byte{})), // No-op Body
+				}
+
+				mockHTTPClient.EXPECT().Head(customRouteURL).Return(mockResp, nil)
+				mockUtils.EXPECT().UpdateMonitorResource(gomock.Any()).Times(1).Return(reconcile.StopOperation(), nil)
+			})
+
+			It("should update the RouteURL with the defaultRouteURL", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+				Expect(routeMonitor.Status.RouteURL).To(Equal(defaultRouteURL))
 			})
 		})
 

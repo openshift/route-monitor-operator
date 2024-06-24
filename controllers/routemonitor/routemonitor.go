@@ -46,6 +46,7 @@ type RouteMonitorReconciler struct {
 	ServiceMonitor   controllers.ServiceMonitorHandler
 	Prom             controllers.PrometheusRuleHandler
 	Common           controllers.MonitorResourceHandler
+	HTTPClient       HTTPClient
 }
 
 func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
