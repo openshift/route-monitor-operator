@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -239,8 +240,6 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 		if err != nil {
 			r.Log.V(3).Error(err, "RouteURL mismatch: failed to check redirects")
 			return utilreconcile.RequeueReconcileWith(err)
-		} else {
-			r.Log.V(3).Info("RouteURL mismatch: currentRouteURL and extractedRouteURL are not equal, taking extractedRouteURL as source of truth")
 		}
 	}
 
@@ -274,10 +273,12 @@ func (r *RouteMonitorReconciler) checkRedirect(extractedRouteURL string, routeMo
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+	if resp != nil && resp.StatusCode == http.StatusMovedPermanently || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusSeeOther || resp.StatusCode == http.StatusTemporaryRedirect || resp.StatusCode == http.StatusPermanentRedirect {
 		r.Log.V(3).Info("RouteURL mismatch: redirection status code received, taking defaultRouteURL as source of truth")
 		extractedRouteURL = resp.Header.Get("Location")
 		routeMonitor.Spec.InsecureSkipTLSVerify = true
+	} else {
+		r.Log.V(3).Info("RouteURL mismatch: no redirection status code received, taking extractedRouteURL as source of truth")
 	}
 
 	return extractedRouteURL, nil
