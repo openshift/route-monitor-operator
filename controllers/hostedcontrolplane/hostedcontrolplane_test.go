@@ -757,12 +757,6 @@ func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc
 	})
 }
 func TestNewAPIClient(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Mock response"))
-	}))
-	defer server.Close()
-
 	baseURL := "https://example.com/api"
 	apiToken := "mockToken"
 	apiClient := NewAPIClient(baseURL, apiToken)
@@ -823,7 +817,7 @@ func TestHostedControlPlaneReconciler_GetSecret(t *testing.T) {
 		"apiUrl":   []byte("https://sampletenant.dynatrace.com"),
 	}
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "dynatrace-token-two", Namespace: "openshift-route-monitor-operator"},
+		ObjectMeta: metav1.ObjectMeta{Name: "dynatrace-token", Namespace: "openshift-route-monitor-operator"},
 		Data:       secretData,
 	}
 	if err := r.Client.Create(ctx, secret); err != nil {
@@ -995,7 +989,7 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 					},
 				},
 			},
-			mockResponse:     `{"locations": [{"name": "N. Virginia", "type": "PUBLIC", "cloudPlatform": "AMAZON_EC2", "entityId": "123"}]}`,
+			mockResponse:     `{"locations": [{"name": "Oregon", "type": "PUBLIC", "cloudPlatform": "AMAZON_EC2", "entityId": "123"}]}`,
 			mockStatusCode:   http.StatusOK,
 			expectedRegionID: "123",
 			expectedError:    "",
@@ -1053,17 +1047,10 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	mockResponse := `{"entityId": "56789"}`
 
 	// Mock the HTTP server to return the desired response
-	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(mockResponse))
-	}
-
-	// Create the mock server using the setupMockServer function
-	mockServer := httptest.NewServer(http.HandlerFunc(handlerFunc))
-	defer mockServer.Close()
+	mockServer := setupMockServer(createMockHandlerFunc(mockResponse, http.StatusOK))
 
 	// Create an instance of the APIClient using the mock server
-	mockClient := NewAPIClient(mockServer.URL, "mockedToken")
+	mockClient := NewAPIClient(mockServer, "mockedToken")
 
 	t.Run("SuccessfulMonitorCreation", func(t *testing.T) {
 		monitorID, err := mockClient.createDynatraceHTTPMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
@@ -1079,15 +1066,9 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 
 	t.Run("ErrorResponseFromServer", func(t *testing.T) {
 		// Mock the HTTP server to return an error response
-		handlerFuncError := func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusBadRequest) // Simulate an error response
-			w.Write([]byte("Bad request"))
-		}
+		mockServerBadRequest := setupMockServer(createMockHandlerFunc("Bad request", http.StatusBadRequest))
 
-		mockServerError := httptest.NewServer(http.HandlerFunc(handlerFuncError))
-		defer mockServerError.Close()
-
-		mockClientError := NewAPIClient(mockServerError.URL, "mockedToken")
+		mockClientError := NewAPIClient(mockServerBadRequest, "mockedToken")
 
 		_, err := mockClientError.createDynatraceHTTPMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
 
@@ -1135,11 +1116,8 @@ func TestAPIClient_deployDynatraceHTTPMonitorResources(t *testing.T) {
 
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	t.Run("HTTP Monitor ID not found", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
-		apiClient := NewAPIClient(server.URL, "mockedToken")
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
+		apiClient := NewAPIClient(mockServer, "mockedToken")
 
 		ctx := context.Background()
 		log := log.Log
@@ -1152,11 +1130,8 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	})
 
 	t.Run("Successful deletion of HTTP Monitor", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
-		apiClient := NewAPIClient(server.URL, "mockedToken")
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
+		apiClient := NewAPIClient(mockServer, "mockedToken")
 
 		ctx := context.Background()
 		log := log.Log
@@ -1171,11 +1146,8 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 
 func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	t.Run("Successful DELETE request", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusNoContent)
-		}))
-		defer server.Close()
-		apiClient := NewAPIClient(server.URL, "mockedToken")
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusNoContent))
+		apiClient := NewAPIClient(mockServer, "mockedToken")
 
 		err := apiClient.deleteDynatraceHTTPMonitor("123")
 		if err != nil {
@@ -1184,11 +1156,8 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	})
 
 	t.Run("Failed DELETE request", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-		}))
-		defer server.Close()
-		apiClient := NewAPIClient(server.URL, "mockedToken")
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusInternalServerError))
+		apiClient := NewAPIClient(mockServer, "mockedToken")
 
 		err := apiClient.deleteDynatraceHTTPMonitor("123")
 		if err == nil {

@@ -60,7 +60,7 @@ const (
 
 	//fetch dynatrace secret to get dynatrace api token and tennant url
 	secretNamespace    = "openshift-route-monitor-operator"
-	secretName         = "dynatrace-token-two"
+	secretName         = "dynatrace-token"
 	dynatraceApiKey    = "apiToken"
 	dynatraceTenantKey = "apiUrl"
 )
@@ -133,8 +133,12 @@ var publicMonitorTemplate = `
     },
     "tags": [
         {
-            "key": "clusterId",
-            "value": "{{.ClusterId}}"
+            "key": "cluster-id",
+            "value": "{{.ClusterId}}",
+			"key": "route-monitor-operator-managed",
+            "value": "true",
+			"key": "hcp-cluster",
+            "value": "true"
         }
     ]
 }
@@ -531,19 +535,40 @@ func (r *HostedControlPlaneReconciler) GetAPIServerHostname(hostedcontrolplane *
 }
 
 func (APIClient *APIClient) getDynatraceEquivalentClusterRegionId(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
-	openShiftToAwsRegions := map[string]string{
-		"us": "N. Virginia",
-		"af": "Cape Town",
-		"ap": "Seoul",
-		"ca": "Montreal",
-		"eu": "Frankfurt",
-		"me": "Bahrain",
-		"sa": "São Paulo",
+	// Adapted from spreadsheet in https://issues.redhat.com//browse/SDE-3754
+	// Coming soon regions - il-central-1, ca-west-1
+	awsRegionToDyntraceLocationMapping := map[string]string{
+		"us-east-1":      "N. Virginia",
+		"us-east-2":      "N. Virginia",
+		"us-west-1":      "Oregon",
+		"us-west-2":      "Oregon",
+		"af-south-1":     "São Paulo",
+		"ap-southeast-1": "Singapore",
+		"ap-southeast-2": "Sydney",
+		"ap-southeast-3": "Singapore",
+		"ap-southeast-4": "Sydney",
+		"ap-northeast-1": "Singapore",
+		"ap-northeast-2": "Sydney",
+		"ap-northeast-3": "Singapore",
+		"ap-south-1":     "Mumbai",
+		"ap-south-2":     "Mumbai",
+		"ap-east-1":      "Singapore",
+		"ca-central-1":   "Montreal",
+		"eu-west-1":      "Dublin",
+		"eu-west-2":      "London",
+		"eu-west-3":      "Frankfurt",
+		"eu-central-1":   "Frankfurt",
+		"eu-central-2":   "Frankfurt",
+		"eu-south-1":     "Frankfurt",
+		"eu-south-2":     "Frankfurt",
+		"eu-north-1":     "London",
+		"me-south-1":     "Mumbai",
+		"me-central-1":   "Mumbai",
+		"sa-east-1":      "São Paulo",
 	}
 	clusterRegion := hostedcontrolplane.Spec.Platform.AWS.Region
-	regionCode := strings.Split(clusterRegion, "-")[0]
-	// Look up the location name based on the region code in map
-	locationName, ok := openShiftToAwsRegions[regionCode]
+	// Look up the dynatrace location name based on the aws region in map
+	locationName, ok := awsRegionToDyntraceLocationMapping[clusterRegion]
 	if !ok {
 		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
 	}
