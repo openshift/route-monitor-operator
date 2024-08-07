@@ -131,13 +131,17 @@ var publicMonitorTemplate = `
             ]
         }
     },
-    "tags": [
+	"tags": [
         {
             "key": "cluster-id",
-            "value": "{{.ClusterId}}",
-			"key": "route-monitor-operator-managed",
-            "value": "true",
-			"key": "hcp-cluster",
+            "value": "{{.ClusterId}}"
+        },
+        {
+            "key": "route-monitor-operator-managed",
+            "value": "true"
+        },
+        {
+            "key": "hcp-cluster",
             "value": "true"
         }
     ]
@@ -637,7 +641,7 @@ func (APIClient *APIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clus
 }
 
 func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, r *HostedControlPlaneReconciler) error {
-	//if monitor does not exsist and hcp is not marked for deletion and hcp is ready then create http monitor
+	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
 	//get apiserver
 	APIServerHostname, err := r.GetAPIServerHostname(hostedcontrolplane, log)
 	if err != nil {
@@ -647,7 +651,7 @@ func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Cont
 	// APIServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
 	monitorLocation := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
 
-	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname gives api.cewong-rs1.dgcj.i3.devshift.org
+	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org
 	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
 
 	apiUrl := fmt.Sprintf("https://%s/livez", APIServerHostname)
@@ -689,8 +693,7 @@ func (APIClient *APIClient) deployDynatraceHTTPMonitorResources(ctx context.Cont
 }
 
 func (APIClient *APIClient) deleteDynatraceHTTPMonitorResources(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	//check if http monitor exists in dynatrace, if yes, then delete
-	//if monitor exists - has label/monitor on hcp, then delete it
+	//check if monitor exists - has label/monitor on hcp, then delete it
 	// key := "dynatrace.http.monitor/id"
 	dynatraceHttpMonitorId, err := APIClient.getDynatraceHTTPMonitorID(ctx, log, hostedcontrolplane)
 	if err != nil {
@@ -718,6 +721,11 @@ func (APIClient *APIClient) deleteDynatraceHTTPMonitor(monitorID string) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	//monitor already deleted
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
