@@ -759,7 +759,7 @@ func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc
 func TestNewAPIClient(t *testing.T) {
 	baseURL := "https://example.com/api"
 	apiToken := "mockToken"
-	apiClient := NewAPIClient(baseURL, apiToken)
+	apiClient := NewDynatraceAPIClient(baseURL, apiToken)
 
 	if apiClient.baseURL != baseURL {
 		t.Errorf("Expected baseURL to be %s, got %s", baseURL, apiClient.baseURL)
@@ -781,7 +781,7 @@ func TestAPIClient_makeRequest(t *testing.T) {
 	// Create the mock server using the setupMockServer function
 	mockServerURL := setupMockServer(handlerFunc)
 	// Create an instance of the APIClient
-	APIClient := NewAPIClient(mockServerURL, "mockedToken")
+	APIClient := NewDynatraceAPIClient(mockServerURL, "mockedToken")
 	response, err := APIClient.makeRequest("GET", "/test", "")
 	if err != nil {
 		t.Errorf("Error making GET request: %v", err)
@@ -794,7 +794,7 @@ func TestAPIClient_makeRequest(t *testing.T) {
 
 	// Test case: Make a POST request
 	mockServerURL = setupMockServer(handlerFunc)
-	APIClient = NewAPIClient(mockServerURL, "mockedToken")
+	APIClient = NewDynatraceAPIClient(mockServerURL, "mockedToken")
 	response, err = APIClient.makeRequest("POST", "/test", `{"key": "value"}`)
 	if err != nil {
 		t.Errorf("Error making POST request: %v", err)
@@ -824,10 +824,10 @@ func TestHostedControlPlaneReconciler_GetSecret(t *testing.T) {
 		t.Fatalf("Failed to create test Secret: %v", err)
 	}
 
-	// Test the getSecret function
-	apiToken, tenantUrl, err := r.getSecret(ctx)
+	// Test the getDynatraceSecrets function
+	apiToken, tenantUrl, err := r.getDynatraceSecrets(ctx)
 	if err != nil {
-		t.Fatalf("getSecret returned an error: %v", err)
+		t.Fatalf("getDynatraceSecrets returned an error: %v", err)
 	}
 
 	expectedApiToken := "sampleApiToken123"
@@ -843,10 +843,6 @@ func TestHostedControlPlaneReconciler_GetSecret(t *testing.T) {
 }
 
 func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
-	apiClient := &APIClient{}
-
-	ctx := context.Background()
-	logger := log.Log.WithName("Test")
 
 	// Test case: Key exists in labels
 	hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
@@ -857,7 +853,7 @@ func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
 		},
 	}
 
-	monitorID, err := apiClient.getDynatraceHTTPMonitorID(ctx, logger, hostedControlPlane)
+	monitorID, err := getDynatraceHTTPMonitorID(hostedControlPlane)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -874,7 +870,7 @@ func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
 		},
 	}
 
-	monitorID, err = apiClient.getDynatraceHTTPMonitorID(ctx, logger, hostedControlPlaneWithoutLabel)
+	monitorID, err = getDynatraceHTTPMonitorID(hostedControlPlaneWithoutLabel)
 	if err == nil {
 		t.Errorf("Expected error for key not found, but got nil %s", monitorID)
 	}
@@ -918,8 +914,6 @@ func TestHostedControlPlaneReconciler_UpdateHostedControlPlaneLabels(t *testing.
 }
 
 func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
-	r := &HostedControlPlaneReconciler{}
-	logger := log.Log.WithName("Test")
 	t.Run("APIServer Service Found", func(t *testing.T) {
 		hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
 			Spec: hypershiftv1beta1.HostedControlPlaneSpec{
@@ -936,7 +930,7 @@ func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 			},
 		}
 
-		hostname, err := r.GetAPIServerHostname(hostedcontrolplane, logger)
+		hostname, err := GetAPIServerHostname(hostedcontrolplane)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -959,7 +953,7 @@ func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 			},
 		}
 
-		hostname, err := r.GetAPIServerHostname(hostedcontrolplane, logger)
+		hostname, err := GetAPIServerHostname(hostedcontrolplane)
 		if err == nil {
 			t.Error("Expected error but got nil")
 		}
@@ -972,6 +966,7 @@ func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 	tests := []struct {
 		name               string
+		region             string
 		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
 		mockResponse       string
 		mockStatusCode     int
@@ -979,32 +974,16 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 		expectedError      string
 	}{
 		{
-			name: "Valid region code and location found",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
-					Platform: hypershiftv1beta1.PlatformSpec{
-						AWS: &hypershiftv1beta1.AWSPlatformSpec{
-							Region: "us-west-2",
-						},
-					},
-				},
-			},
+			name:             "Valid region code and location found",
+			region:           "us-west-2",
 			mockResponse:     `{"locations": [{"name": "Oregon", "type": "PUBLIC", "cloudPlatform": "AMAZON_EC2", "entityId": "123"}]}`,
 			mockStatusCode:   http.StatusOK,
 			expectedRegionID: "123",
 			expectedError:    "",
 		},
 		{
-			name: "Invalid region code (no matching location)",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
-					Platform: hypershiftv1beta1.PlatformSpec{
-						AWS: &hypershiftv1beta1.AWSPlatformSpec{
-							Region: "invalid-region-code",
-						},
-					},
-				},
-			},
+			name:             "Invalid region code (no matching location)",
+			region:           "invalid-region-code",
 			mockResponse:     `{"locations": []}`,
 			mockStatusCode:   http.StatusBadRequest,
 			expectedRegionID: "",
@@ -1019,10 +998,10 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 			// Create the mock server using the setupMockServer function
 			mockServer := setupMockServer(handlerFunc)
 			// Create an instance of the APIClient using the reusable setup
-			mockClient := NewAPIClient(mockServer, "mockedToken")
+			mockClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
 			// Call the function being tested
-			regionID, err := mockClient.getDynatraceEquivalentClusterRegionId(tt.hostedControlPlane)
+			regionID, err := mockClient.getDynatraceEquivalentClusterRegionId(tt.region)
 
 			// Check the returned values against the expected results
 			if regionID != tt.expectedRegionID {
@@ -1050,7 +1029,7 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	mockServer := setupMockServer(createMockHandlerFunc(mockResponse, http.StatusOK))
 
 	// Create an instance of the APIClient using the mock server
-	mockClient := NewAPIClient(mockServer, "mockedToken")
+	mockClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
 	t.Run("SuccessfulMonitorCreation", func(t *testing.T) {
 		monitorID, err := mockClient.createDynatraceHTTPMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
@@ -1068,7 +1047,7 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 		// Mock the HTTP server to return an error response
 		mockServerBadRequest := setupMockServer(createMockHandlerFunc("Bad request", http.StatusBadRequest))
 
-		mockClientError := NewAPIClient(mockServerBadRequest, "mockedToken")
+		mockClientError := NewDynatraceAPIClient(mockServerBadRequest, "mockedToken")
 
 		_, err := mockClientError.createDynatraceHTTPMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
 
@@ -1102,7 +1081,7 @@ func TestAPIClient_deployDynatraceHTTPMonitorResources(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			APIClient := &APIClient{
+			APIClient := &DynatraceAPIClient{
 				baseURL:    tt.fields.baseURL,
 				apiToken:   tt.fields.apiToken,
 				httpClient: tt.fields.httpClient,
@@ -1117,13 +1096,12 @@ func TestAPIClient_deployDynatraceHTTPMonitorResources(t *testing.T) {
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	t.Run("HTTP Monitor ID not found", func(t *testing.T) {
 		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
-		apiClient := NewAPIClient(mockServer, "mockedToken")
+		apiClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
-		ctx := context.Background()
 		log := log.Log
 		hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
 
-		err := apiClient.deleteDynatraceHTTPMonitorResources(ctx, log, hostedControlPlane)
+		err := apiClient.deleteDynatraceHTTPMonitorResources(log, hostedControlPlane)
 		if err != nil {
 			t.Errorf("Expected no error when HTTP monitor ID is not found, got: %v", err)
 		}
@@ -1131,13 +1109,12 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 
 	t.Run("Successful deletion of HTTP Monitor", func(t *testing.T) {
 		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
-		apiClient := NewAPIClient(mockServer, "mockedToken")
+		apiClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
-		ctx := context.Background()
 		log := log.Log
 		hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
 
-		err := apiClient.deleteDynatraceHTTPMonitorResources(ctx, log, hostedControlPlane)
+		err := apiClient.deleteDynatraceHTTPMonitorResources(log, hostedControlPlane)
 		if err != nil {
 			t.Errorf("Expected no error when deleting HTTP monitor, got: %v", err)
 		}
@@ -1147,7 +1124,7 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	t.Run("Successful DELETE request", func(t *testing.T) {
 		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusNoContent))
-		apiClient := NewAPIClient(mockServer, "mockedToken")
+		apiClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
 		err := apiClient.deleteDynatraceHTTPMonitor("123")
 		if err != nil {
@@ -1157,7 +1134,7 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 
 	t.Run("Failed DELETE request", func(t *testing.T) {
 		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusInternalServerError))
-		apiClient := NewAPIClient(mockServer, "mockedToken")
+		apiClient := NewDynatraceAPIClient(mockServer, "mockedToken")
 
 		err := apiClient.deleteDynatraceHTTPMonitor("123")
 		if err == nil {
