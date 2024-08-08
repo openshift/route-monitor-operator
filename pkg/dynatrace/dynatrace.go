@@ -122,7 +122,7 @@ type DynatraceLocation struct {
 
 // ------------------------------synthetic-monitoring--------------------------
 // helper function to make Dynatrace api requests
-func (DynatraceAPIClient *DynatraceAPIClient) makeRequest(method, path string, renderedJSON string) (*http.Response, error) {
+func (DynatraceAPIClient *DynatraceAPIClient) MakeRequest(method, path string, renderedJSON string) (*http.Response, error) {
 	url := DynatraceAPIClient.baseURL + path
 	var reqBody io.Reader
 	if renderedJSON != "" {
@@ -140,7 +140,7 @@ func (DynatraceAPIClient *DynatraceAPIClient) makeRequest(method, path string, r
 	return DynatraceAPIClient.httpClient.Do(req)
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) getDynatraceEquivalentClusterRegionId(clusterRegion string) (string, error) {
+func (DynatraceAPIClient *DynatraceAPIClient) GetDynatraceEquivalentClusterRegionId(clusterRegion string) (string, error) {
 	// Adapted from spreadsheet in https://issues.redhat.com//browse/SDE-3754
 	// Coming soon regions - il-central-1, ca-west-1
 	awsRegionToDyntraceLocationMapping := map[string]string{
@@ -179,7 +179,7 @@ func (DynatraceAPIClient *DynatraceAPIClient) getDynatraceEquivalentClusterRegio
 		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
 	}
 
-	resp, err := DynatraceAPIClient.makeRequest("GET", "/synthetic/locations", "")
+	resp, err := DynatraceAPIClient.MakeRequest("GET", "/synthetic/locations", "")
 	if err != nil {
 		return "", err
 	}
@@ -204,7 +204,7 @@ func (DynatraceAPIClient *DynatraceAPIClient) getDynatraceEquivalentClusterRegio
 	return "", fmt.Errorf("location '%s' not found", locationName)
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) createDynatraceHTTPMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
+func (DynatraceAPIClient *DynatraceAPIClient) CreateDynatraceHTTPMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
 
 	tmpl := template.Must(template.New("jsonTemplate").Parse(publicMonitorTemplate))
 
@@ -222,7 +222,7 @@ func (DynatraceAPIClient *DynatraceAPIClient) createDynatraceHTTPMonitor(monitor
 	}
 	renderedJSON := tplBuffer.String()
 
-	resp, err := DynatraceAPIClient.makeRequest("POST", "/synthetic/monitors", renderedJSON)
+	resp, err := DynatraceAPIClient.MakeRequest("POST", "/synthetic/monitors", renderedJSON)
 	if err != nil {
 		return "", err
 	}
@@ -242,10 +242,10 @@ func (DynatraceAPIClient *DynatraceAPIClient) createDynatraceHTTPMonitor(monitor
 	return monitorID, nil
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) deleteDynatraceHTTPMonitor(monitorID string) error {
+func (DynatraceAPIClient *DynatraceAPIClient) DeleteDynatraceHTTPMonitor(monitorID string) error {
 	path := fmt.Sprintf("/synthetic/monitors/%s", monitorID)
 
-	resp, err := DynatraceAPIClient.makeRequest("DELETE", path, "")
+	resp, err := DynatraceAPIClient.MakeRequest("DELETE", path, "")
 	if err != nil {
 		return err
 	}
