@@ -3,6 +3,8 @@ package hostedcontrolplane
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -11,6 +13,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -742,4 +745,266 @@ func newTestReconciler(t *testing.T, objs ...client.Object) *HostedControlPlaneR
 		Scheme: s,
 	}
 	return r
+}
+
+func setupMockServer(handlerFunc http.HandlerFunc) string {
+	mockServer := httptest.NewServer(handlerFunc)
+	return mockServer.URL
+}
+func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(statusCode)
+		w.Write([]byte(responseBody))
+	})
+}
+
+func TestHostedControlPlaneReconciler_GetSecret(t *testing.T) {
+	r := &HostedControlPlaneReconciler{
+		Client: fake.NewFakeClient(),
+	}
+	ctx := context.Background()
+	// Create a sample Secret object
+	secretData := map[string][]byte{
+		"apiToken": []byte("sampleApiToken123"),
+		"apiUrl":   []byte("https://sampletenant.dynatrace.com"),
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "dynatrace-token", Namespace: "openshift-route-monitor-operator"},
+		Data:       secretData,
+	}
+	if err := r.Client.Create(ctx, secret); err != nil {
+		t.Fatalf("Failed to create test Secret: %v", err)
+	}
+
+	// Test the getDynatraceSecrets function
+	apiToken, tenantUrl, err := r.getDynatraceSecrets(ctx)
+	if err != nil {
+		t.Fatalf("getDynatraceSecrets returned an error: %v", err)
+	}
+
+	expectedApiToken := "sampleApiToken123"
+	expectedTenantUrl := "https://sampletenant.dynatrace.com"
+
+	if apiToken != expectedApiToken {
+		t.Errorf("Expected API Token: %s, Got: %s", expectedApiToken, apiToken)
+	}
+
+	if tenantUrl != expectedTenantUrl {
+		t.Errorf("Expected Tenant URL: %s, Got: %s", expectedTenantUrl, tenantUrl)
+	}
+}
+
+func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
+
+	// Test case: Key exists in labels
+	hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				httpMonitorLabel: "sampleMonitorID",
+			},
+		},
+	}
+
+	monitorID, err := getDynatraceHTTPMonitorID(hostedControlPlane)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectedMonitorID := "sampleMonitorID"
+	if monitorID != expectedMonitorID {
+		t.Errorf("Expected Monitor ID: %s, Got: %s", expectedMonitorID, monitorID)
+	}
+
+	// Test case: Key does not exist in labels
+	hostedControlPlaneWithoutLabel := &hypershiftv1beta1.HostedControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{},
+		},
+	}
+
+	monitorID, err = getDynatraceHTTPMonitorID(hostedControlPlaneWithoutLabel)
+	if err == nil {
+		t.Errorf("Expected error for key not found, but got nil %s", monitorID)
+	}
+}
+
+func TestHostedControlPlaneReconciler_UpdateHostedControlPlaneLabels(t *testing.T) {
+	r := newTestReconciler(t)
+
+	ctx := context.Background()
+
+	// Initialize the HostedControlPlane object with labels and metadata.name
+	hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hostedcontrolplane",
+			Namespace: "default",
+			Labels: map[string]string{
+				"existingKey": "existingValue",
+			},
+		},
+	}
+
+	key := "testKey"
+	value := "testValue"
+
+	err := r.Client.Create(ctx, hostedcontrolplane)
+	if err != nil {
+		t.Fatalf("Failed to create mock HostedControlPlane resource: %v", err)
+	}
+
+	// Call the method being tested
+	err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, key, value)
+	if err != nil {
+		t.Errorf("UpdateHostedControlPlaneLabels failed: %v", err)
+	}
+
+	// Verify that the labels are updated correctly
+	updatedLabels := hostedcontrolplane.GetLabels()
+	if updatedLabels[key] != value {
+		t.Errorf("Expected value: %s, Actual value: %s", value, updatedLabels[key])
+	}
+}
+
+func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
+	t.Run("APIServer Service Found", func(t *testing.T) {
+		hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
+			Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+				Services: []hypershiftv1beta1.ServicePublishingStrategyMapping{
+					{
+						Service: "APIServer",
+						ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+							Route: &hypershiftv1beta1.RoutePublishingStrategy{
+								Hostname: "api.example.com",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		hostname, err := GetAPIServerHostname(hostedcontrolplane)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if hostname != "api.example.com" {
+			t.Errorf("Expected hostname: api.example.com, got: %s", hostname)
+		}
+	})
+
+	t.Run("APIServer Service Not Found", func(t *testing.T) {
+		hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
+			Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+				Services: []hypershiftv1beta1.ServicePublishingStrategyMapping{
+					{
+						Service: "ControllerManager",
+					},
+					{
+						Service: "Scheduler",
+					},
+				},
+			},
+		}
+
+		hostname, err := GetAPIServerHostname(hostedcontrolplane)
+		if err == nil {
+			t.Error("Expected error but got nil")
+		}
+		if hostname != "" {
+			t.Errorf("Expected empty hostname, got: %s", hostname)
+		}
+	})
+}
+
+// Left as a placeholder for future testing.
+// Currently, this function simply calls other methods and wraps any error returned,
+func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
+	tests := []struct {
+		name                 string
+		dynatraceMonitorID   string
+		mockServerResponse   string
+		mockServerStatusCode int
+		expectedError        error
+	}{
+		{
+			name:                 "Create Monitor Successfully",
+			dynatraceMonitorID:   "",
+			mockServerResponse:   `{"id":"new-monitor-id"}`,
+			mockServerStatusCode: http.StatusOK,
+			expectedError:        nil,
+		},
+		{
+			name:                 "Error Creating Monitor",
+			dynatraceMonitorID:   "",
+			mockServerResponse:   `{"error":"creation error"}`,
+			mockServerStatusCode: http.StatusInternalServerError,
+			expectedError:        fmt.Errorf("error creating HTTP monitor: creation error"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup mocks
+			mockServer := setupMockServer(createMockHandlerFunc(tt.mockServerResponse, tt.mockServerStatusCode))
+			apiClient := dynatrace.NewDynatraceAPIClient(mockServer, "mockedToken")
+
+			r := newTestReconciler(t)
+
+			ctx := context.Background()
+
+			// Initialize the HostedControlPlane object
+			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					Services: []hypershiftv1beta1.ServicePublishingStrategyMapping{
+						{
+							Service: "APIServer",
+							ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+								Route: &hypershiftv1beta1.RoutePublishingStrategy{
+									Hostname: "api.example.com",
+								},
+							},
+						},
+					},
+					Platform: hypershiftv1beta1.PlatformSpec{
+						AWS: &hypershiftv1beta1.AWSPlatformSpec{
+							EndpointAccess: "PublicAndPrivate",
+							Region:         "us-west-1",
+						},
+					},
+				},
+			}
+			log := log.FromContext(ctx) // Replace with a proper logger if needed
+
+			// Call the function under test
+			deployDynatraceHTTPMonitorResources(apiClient, ctx, log, hostedControlPlane, r)
+
+		})
+	}
+}
+
+func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
+	t.Run("HTTP Monitor ID not found", func(t *testing.T) {
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
+		apiClient := dynatrace.NewDynatraceAPIClient(mockServer, "mockedToken")
+
+		log := log.Log
+		hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
+
+		err := deleteDynatraceHTTPMonitorResources(apiClient, log, hostedControlPlane)
+		if err != nil {
+			t.Errorf("Expected no error when HTTP monitor ID is not found, got: %v", err)
+		}
+	})
+
+	t.Run("Successful deletion of HTTP Monitor", func(t *testing.T) {
+		mockServer := setupMockServer(createMockHandlerFunc("", http.StatusOK))
+		apiClient := dynatrace.NewDynatraceAPIClient(mockServer, "mockedToken")
+
+		log := log.Log
+		hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
+
+		err := deleteDynatraceHTTPMonitorResources(apiClient, log, hostedControlPlane)
+		if err != nil {
+			t.Errorf("Expected no error when deleting HTTP monitor, got: %v", err)
+		}
+	})
 }
