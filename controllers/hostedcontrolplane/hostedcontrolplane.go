@@ -153,7 +153,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	log.Info("Deploying HTTP Monitor Resources")
-	err = deployDynatraceHTTPMonitorResources(DynatraceAPIClient, ctx, log, hostedcontrolplane, r)
+	err = r.deployDynatraceHTTPMonitorResources(DynatraceAPIClient, ctx, log, hostedcontrolplane)
 	if err != nil {
 		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
 		return utilreconcile.RequeueWith(err)
@@ -420,12 +420,12 @@ func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPla
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
 }
 
-func deployDynatraceHTTPMonitorResources(DynatraceAPIClient *dynatrace.DynatraceAPIClient, ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, r *HostedControlPlaneReconciler) error {
+func (r *HostedControlPlaneReconciler) deployDynatraceHTTPMonitorResources(DynatraceAPIClient *dynatrace.DynatraceAPIClient, ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
 	//get apiserver
 	APIServerHostname, err := GetAPIServerHostname(hostedcontrolplane)
 	if err != nil {
-		log.Error(err, "Failed to get APIServer hostname")
+		return fmt.Errorf("failed to get APIServer hostname %v", err)
 	}
 	monitorName := strings.Replace(APIServerHostname, "api.", "", 1)
 	// APIServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
@@ -468,6 +468,12 @@ func deployDynatraceHTTPMonitorResources(DynatraceAPIClient *dynatrace.Dynatrace
 		}
 
 		log.Info("Created HTTP monitor ", monitorID, clusterID)
+	}
+
+	//private not supported yet
+	if monitorLocation == "Private" {
+		log.Info("Private API - Not supported yet.")
+		return nil
 	}
 
 	return nil
