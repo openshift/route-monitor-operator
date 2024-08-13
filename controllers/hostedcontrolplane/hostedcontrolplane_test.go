@@ -857,24 +857,24 @@ func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
 	}
 }
 
-func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
+func TestGetDynatraceHTTPMonitorId(t *testing.T) {
 	tests := []struct {
 		name               string
 		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
-		expectedMonitorID  string
-		expectError        bool
+		expectedMonitorId  string
+		expectedFound      bool
 	}{
 		{
 			name: "Key exists in labels",
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorID",
+						httpMonitorLabel: "sampleMonitorId",
 					},
 				},
 			},
-			expectedMonitorID: "sampleMonitorID",
-			expectError:       false,
+			expectedMonitorId: "sampleMonitorId",
+			expectedFound:     true,
 		},
 		{
 			name: "Key does not exist in labels",
@@ -883,26 +883,32 @@ func TestAPIClient_GetDynatraceHTTPMonitorID(t *testing.T) {
 					Labels: map[string]string{},
 				},
 			},
-			expectedMonitorID: "",
-			expectError:       true,
+			expectedMonitorId: "",
+			expectedFound:     false,
+		},
+		{
+			name: "Multiple keys but target key absent",
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"otherLabel": "someValue",
+					},
+				},
+			},
+			expectedMonitorId: "",
+			expectedFound:     false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			monitorID, err := getDynatraceHTTPMonitorID(tt.hostedControlPlane)
+			monitorId, found := getDynatraceHttpMonitorId(tt.hostedControlPlane)
 
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error for case '%s', but got nil", tt.name)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("Unexpected error for case '%s': %v", tt.name, err)
-				}
-				if monitorID != tt.expectedMonitorID {
-					t.Errorf("Expected Monitor ID for case '%s': %s, Got: %s", tt.name, tt.expectedMonitorID, monitorID)
-				}
+			if monitorId != tt.expectedMonitorId {
+				t.Errorf("Expected Monitor Id for case '%s': %s, Got: %s", tt.name, tt.expectedMonitorId, monitorId)
+			}
+			if found != tt.expectedFound {
+				t.Errorf("Expected found status for case '%s': %v, Got: %v", tt.name, tt.expectedFound, found)
 			}
 		})
 	}
@@ -1029,21 +1035,21 @@ func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 	tests := []struct {
 		name                 string
-		dynatraceMonitorID   string
+		dynatraceMonitorId   string
 		mockServerResponse   string
 		mockServerStatusCode int
 		expectedError        error
 	}{
 		{
 			name:                 "Create Monitor Successfully",
-			dynatraceMonitorID:   "",
+			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"id":"new-monitor-id"}`,
 			mockServerStatusCode: http.StatusOK,
 			expectedError:        nil,
 		},
 		{
 			name:                 "Error Creating Monitor",
-			dynatraceMonitorID:   "",
+			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"error":"creation error"}`,
 			mockServerStatusCode: http.StatusInternalServerError,
 			expectedError:        fmt.Errorf("error creating HTTP monitor: creation error"),
@@ -1054,7 +1060,7 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mocks
 			mockServer := setupMockServer(createMockHandlerFunc(tt.mockServerResponse, tt.mockServerStatusCode))
-			apiClient := dynatrace.NewDynatraceAPIClient(mockServer, "mockedToken")
+			apiClient := dynatrace.NewDynatraceApiClient(mockServer, "mockedToken")
 
 			r := newTestReconciler(t)
 
@@ -1084,7 +1090,7 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 			log := log.FromContext(ctx) // Replace with a proper logger if needed
 
 			// Call the function under test
-			r.deployDynatraceHTTPMonitorResources(apiClient, ctx, log, hostedControlPlane)
+			r.deployDynatraceHttpMonitorResources(ctx, apiClient, log, hostedControlPlane)
 
 		})
 	}
@@ -1098,7 +1104,7 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			name:         "HTTP Monitor ID not found",
+			name:         "HTTP Monitor Id not found",
 			mockResponse: "",
 			mockStatus:   http.StatusOK,
 			expectError:  false,
@@ -1114,12 +1120,12 @@ func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatus))
-			apiClient := dynatrace.NewDynatraceAPIClient(mockServer, "mockedToken")
+			apiClient := dynatrace.NewDynatraceApiClient(mockServer, "mockedToken")
 
 			log := log.Log
 			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
 
-			err := deleteDynatraceHTTPMonitorResources(apiClient, log, hostedControlPlane)
+			err := deleteDynatraceHttpMonitorResources(apiClient, log, hostedControlPlane)
 
 			if (err != nil) != tt.expectError {
 				t.Errorf("Expected error: %v, got: %v", tt.expectError, err)

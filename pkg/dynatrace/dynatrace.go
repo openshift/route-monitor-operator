@@ -26,14 +26,14 @@ import (
 )
 
 // ------------------------------synthetic-monitoring--------------------------
-type DynatraceAPIClient struct {
+type DynatraceApiClient struct {
 	baseURL    string
 	apiToken   string
 	httpClient *http.Client
 }
 
-func NewDynatraceAPIClient(baseURL, apiToken string) *DynatraceAPIClient {
-	return &DynatraceAPIClient{
+func NewDynatraceApiClient(baseURL, apiToken string) *DynatraceApiClient {
+	return &DynatraceApiClient{
 		baseURL:    baseURL,
 		apiToken:   apiToken,
 		httpClient: &http.Client{},
@@ -116,14 +116,14 @@ type DynatraceLocation struct {
 		Name          string `json:"name"`
 		Type          string `json:"type"`
 		CloudPlatform string `json:"cloudPlatform"`
-		EntityID      string `json:"entityId"`
+		EntityId      string `json:"entityId"`
 	} `json:"locations"`
 }
 
 // ------------------------------synthetic-monitoring--------------------------
 // helper function to make Dynatrace api requests
-func (DynatraceAPIClient *DynatraceAPIClient) MakeRequest(method, path string, renderedJSON string) (*http.Response, error) {
-	url := DynatraceAPIClient.baseURL + path
+func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, renderedJSON string) (*http.Response, error) {
+	url := dynatraceApiClient.baseURL + path
 	var reqBody io.Reader
 	if renderedJSON != "" {
 		reqBody = bytes.NewBufferString(renderedJSON)
@@ -134,16 +134,16 @@ func (DynatraceAPIClient *DynatraceAPIClient) MakeRequest(method, path string, r
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Api-Token "+DynatraceAPIClient.apiToken)
+	req.Header.Set("Authorization", "Api-Token "+dynatraceApiClient.apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	return DynatraceAPIClient.httpClient.Do(req)
+	return dynatraceApiClient.httpClient.Do(req)
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) GetDynatraceEquivalentClusterRegionId(clusterRegion string) (string, error) {
+func (dynatraceApiClient *DynatraceApiClient) GetDynatraceEquivalentClusterRegionId(clusterRegion string) (string, error) {
 	// Adapted from spreadsheet in https://issues.redhat.com//browse/SDE-3754
 	// Coming soon regions - il-central-1, ca-west-1
-	awsRegionToDyntraceLocationMapping := map[string]string{
+	awsRegionToDyntraceRegionMapping := map[string]string{
 		"us-east-1":      "N. Virginia",
 		"us-east-2":      "N. Virginia",
 		"us-west-1":      "Oregon",
@@ -173,13 +173,15 @@ func (DynatraceAPIClient *DynatraceAPIClient) GetDynatraceEquivalentClusterRegio
 		"sa-east-1":      "São Paulo",
 	}
 
-	// Look up the dynatrace location name based on the aws region in map
-	locationName, ok := awsRegionToDyntraceLocationMapping[clusterRegion]
+	// Look up the equivalent dynatrace location name based on the aws region in map
+	//e.g. "us-east-2" in aws has equivalent "N. Virginia" in Dynatrace Locations
+	dynatraceLocationName, ok := awsRegionToDyntraceRegionMapping[clusterRegion]
 	if !ok {
 		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
 	}
 
-	resp, err := DynatraceAPIClient.MakeRequest("GET", "/synthetic/locations", "")
+	//fetch dynatrace locations using dynatrace api
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, "/synthetic/locations", "")
 	if err != nil {
 		return "", err
 	}
@@ -189,22 +191,30 @@ func (DynatraceAPIClient *DynatraceAPIClient) GetDynatraceEquivalentClusterRegio
 		return "", fmt.Errorf("failed to fetch locations. Status code: %d", resp.StatusCode)
 	}
 
-	//return location id from response body
+	//return location id from response body in which dynatrace location is public && CloudPlatform is AWS/AMAZON_EC2
+	//e.g. returns exampleLocationId for N. Virginia location in dynatrace in which CloudPlatform is AWS and location is public
+	//e.g. response body
+	// {
+	// 	"name": "N. Virginia",
+	// 	"entityId": "exampleLocationId",
+	// 	"type": "PUBLIC",
+	// 	"cloudPlatform": "AMAZON_EC2",
+	// }
 	var locationResponse DynatraceLocation
 	err = json.NewDecoder(resp.Body).Decode(&locationResponse)
 	if err != nil {
 		return "", err
 	}
 	for _, loc := range locationResponse.Locations {
-		if loc.Name == locationName && loc.Type == "PUBLIC" && loc.CloudPlatform == "AMAZON_EC2" {
-			return loc.EntityID, nil
+		if loc.Name == dynatraceLocationName && loc.Type == "PUBLIC" && loc.CloudPlatform == "AMAZON_EC2" {
+			return loc.EntityId, nil
 		}
 	}
 
-	return "", fmt.Errorf("location '%s' not found", locationName)
+	return "", fmt.Errorf("location '%s' not found", dynatraceLocationName)
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) CreateDynatraceHTTPMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
+func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
 
 	tmpl := template.Must(template.New("jsonTemplate").Parse(publicMonitorTemplate))
 
@@ -222,7 +232,7 @@ func (DynatraceAPIClient *DynatraceAPIClient) CreateDynatraceHTTPMonitor(monitor
 	}
 	renderedJSON := tplBuffer.String()
 
-	resp, err := DynatraceAPIClient.MakeRequest("POST", "/synthetic/monitors", renderedJSON)
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodPost, "/synthetic/monitors", renderedJSON)
 	if err != nil {
 		return "", err
 	}
@@ -238,14 +248,14 @@ func (DynatraceAPIClient *DynatraceAPIClient) CreateDynatraceHTTPMonitor(monitor
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch monitor id - %v", err)
 	}
-	monitorID := createdMonitor.EntityId
-	return monitorID, nil
+	monitorId := createdMonitor.EntityId
+	return monitorId, nil
 }
 
-func (DynatraceAPIClient *DynatraceAPIClient) DeleteDynatraceHTTPMonitor(monitorID string) error {
-	path := fmt.Sprintf("/synthetic/monitors/%s", monitorID)
+func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(monitorId string) error {
+	path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
 
-	resp, err := DynatraceAPIClient.MakeRequest("DELETE", path, "")
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
 	if err != nil {
 		return err
 	}

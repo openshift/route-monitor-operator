@@ -33,7 +33,7 @@ func TestNewAPIClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			apiClient := NewDynatraceAPIClient(tt.baseURL, tt.apiToken)
+			apiClient := NewDynatraceApiClient(tt.baseURL, tt.apiToken)
 
 			if apiClient.baseURL != tt.baseURL {
 				t.Errorf("Expected baseURL to be %s, got %s", tt.baseURL, apiClient.baseURL)
@@ -60,13 +60,13 @@ func TestAPIClient_makeRequest(t *testing.T) {
 	}{
 		{
 			name:           "Make a GET request",
-			method:         "GET",
+			method:         http.MethodGet,
 			body:           "",
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "Make a POST request",
-			method:         "POST",
+			method:         http.MethodPost,
 			body:           `{"key": "value"}`,
 			expectedStatus: http.StatusOK,
 		},
@@ -80,7 +80,7 @@ func TestAPIClient_makeRequest(t *testing.T) {
 			// Create the mock server
 			mockServerURL := setupMockServer(handlerFunc)
 			// Create an instance of the APIClient
-			apiClient := NewDynatraceAPIClient(mockServerURL, "mockedToken")
+			apiClient := NewDynatraceApiClient(mockServerURL, "mockedToken")
 
 			// Make the request
 			response, err := apiClient.MakeRequest(tt.method, "/test", tt.body)
@@ -104,7 +104,7 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
 		mockResponse       string
 		mockStatusCode     int
-		expectedRegionID   string
+		expectedRegionId   string
 		expectedError      string
 	}{
 		{
@@ -112,7 +112,7 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 			region:           "us-west-2",
 			mockResponse:     `{"locations": [{"name": "Oregon", "type": "PUBLIC", "cloudPlatform": "AMAZON_EC2", "entityId": "123"}]}`,
 			mockStatusCode:   http.StatusOK,
-			expectedRegionID: "123",
+			expectedRegionId: "123",
 			expectedError:    "",
 		},
 		{
@@ -120,7 +120,7 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 			region:           "invalid-region-code",
 			mockResponse:     `{"locations": []}`,
 			mockStatusCode:   http.StatusBadRequest,
-			expectedRegionID: "",
+			expectedRegionId: "",
 			expectedError:    "location not found for region: invalid-region-code",
 		},
 	}
@@ -132,14 +132,14 @@ func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
 			// Create the mock server using the setupMockServer function
 			mockServer := setupMockServer(handlerFunc)
 			// Create an instance of the APIClient using the reusable setup
-			mockClient := NewDynatraceAPIClient(mockServer, "mockedToken")
+			mockClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the function being tested
-			regionID, err := mockClient.GetDynatraceEquivalentClusterRegionId(tt.region)
+			regionId, err := mockClient.GetDynatraceEquivalentClusterRegionId(tt.region)
 
 			// Check the returned values against the expected results
-			if regionID != tt.expectedRegionID {
-				t.Errorf("Got: %s, Expected: %s", regionID, tt.expectedRegionID)
+			if regionId != tt.expectedRegionId {
+				t.Errorf("Got: %s, Expected: %s", regionId, tt.expectedRegionId)
 			}
 
 			if err != nil && err.Error() != tt.expectedError {
@@ -161,21 +161,21 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 		name           string
 		mockResponse   string
 		mockStatusCode int
-		expectedID     string
+		expectedId     string
 		expectError    bool
 	}{
 		{
 			name:           "SuccessfulMonitorCreation",
 			mockResponse:   `{"entityId": "56789"}`,
 			mockStatusCode: http.StatusOK,
-			expectedID:     "56789",
+			expectedId:     "56789",
 			expectError:    false,
 		},
 		{
 			name:           "ErrorResponseFromServer",
 			mockResponse:   "Bad request",
 			mockStatusCode: http.StatusBadRequest,
-			expectedID:     "",
+			expectedId:     "",
 			expectError:    true,
 		},
 	}
@@ -186,18 +186,18 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode))
 
 			// Create an instance of the APIClient using the mock server
-			mockClient := NewDynatraceAPIClient(mockServer, "mockedToken")
+			mockClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			monitorID, err := mockClient.CreateDynatraceHTTPMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
+			monitorId, err := mockClient.CreateDynatraceHttpMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
 
 			// Check for errors or expected values based on the test case
 			if (err != nil) != tt.expectError {
 				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
 			}
 
-			if !tt.expectError && monitorID != tt.expectedID {
-				t.Errorf("Incorrect monitor ID. Expected: %s, Got: %s", tt.expectedID, monitorID)
+			if !tt.expectError && monitorId != tt.expectedId {
+				t.Errorf("Incorrect monitor Id. Expected: %s, Got: %s", tt.expectedId, monitorId)
 			}
 		})
 	}
@@ -226,10 +226,10 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock the HTTP server to return the desired response
 			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
-			apiClient := NewDynatraceAPIClient(mockServer, "mockedToken")
+			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			err := apiClient.DeleteDynatraceHTTPMonitor("123")
+			err := apiClient.DeleteDynatraceHttpMonitor("123")
 
 			// Check for errors based on the expected outcome
 			if (err != nil) != tt.expectError {
