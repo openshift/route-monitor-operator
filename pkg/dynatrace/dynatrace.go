@@ -120,6 +120,12 @@ type DynatraceLocation struct {
 	} `json:"locations"`
 }
 
+type ExistsHttpMonitorInDynatraceResponse struct {
+	Monitors []struct {
+		EntityId string `json:"entityId"`
+	} `json:"monitors"`
+}
+
 // ------------------------------synthetic-monitoring--------------------------
 // helper function to make Dynatrace api requests
 func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, renderedJSON string) (*http.Response, error) {
@@ -191,15 +197,15 @@ func (dynatraceApiClient *DynatraceApiClient) GetDynatraceEquivalentClusterRegio
 		return "", fmt.Errorf("failed to fetch locations. Status code: %d", resp.StatusCode)
 	}
 
-	//return location id from response body in which dynatrace location is public && CloudPlatform is AWS/AMAZON_EC2
-	//e.g. returns exampleLocationId for N. Virginia location in dynatrace in which CloudPlatform is AWS and location is public
-	//e.g. response body
-	// {
-	// 	"name": "N. Virginia",
-	// 	"entityId": "exampleLocationId",
-	// 	"type": "PUBLIC",
-	// 	"cloudPlatform": "AMAZON_EC2",
-	// }
+	/*return location id from response body in which dynatrace location is public && CloudPlatform is AWS/AMAZON_EC2
+	e.g. returns exampleLocationId for N. Virginia location in dynatrace in which CloudPlatform is AWS and location is public
+	e.g. response body
+	{
+		"name": "N. Virginia",
+		"entityId": "exampleLocationId",
+		"type": "PUBLIC",
+		"cloudPlatform": "AMAZON_EC2",
+	}*/
 	var locationResponse DynatraceLocation
 	err = json.NewDecoder(resp.Body).Decode(&locationResponse)
 	if err != nil {
@@ -246,10 +252,36 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	var createdMonitor DynatraceCreatedMonitor
 	err = json.NewDecoder(resp.Body).Decode(&createdMonitor)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch monitor id - %v", err)
+		return "", fmt.Errorf("failed to fetch monitor id: %v", err)
 	}
 	monitorId := createdMonitor.EntityId
 	return monitorId, nil
+}
+
+func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(monitorId string) (bool, error) {
+	path := ("/synthetic/monitors/")
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	// Check if the response status code is OK
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
+	}
+
+	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&existsHttpMonitorResponse); err != nil {
+		return false, fmt.Errorf("error parsing JSON: %w", err)
+	}
+
+	for _, monitor := range existsHttpMonitorResponse.Monitors {
+		if monitor.EntityId == monitorId {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(monitorId string) error {

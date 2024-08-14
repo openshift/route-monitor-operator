@@ -203,6 +203,69 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	}
 }
 
+func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
+	tests := []struct {
+		name           string
+		monitorId      string
+		mockResponse   string
+		mockStatusCode int
+		expectExists   bool
+		expectError    bool
+	}{
+		{
+			name:           "Monitor exists",
+			monitorId:      "monitor-1",
+			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectExists:   true,
+			expectError:    false,
+		},
+		{
+			name:           "Monitor does not exist",
+			monitorId:      "monitor-2",
+			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectExists:   false,
+			expectError:    false,
+		},
+		{
+			name:           "HTTP error",
+			monitorId:      "monitor-1",
+			mockResponse:   "",
+			mockStatusCode: http.StatusInternalServerError,
+			expectExists:   false,
+			expectError:    true,
+		},
+		{
+			name:           "JSON parse error",
+			monitorId:      "monitor-1",
+			mockResponse:   "{invalid json", // Invalid JSON to simulate a parsing error
+			mockStatusCode: http.StatusOK,
+			expectExists:   false,
+			expectError:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the mock server using the new setup function
+			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode))
+			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
+
+			// Call the function to test
+			exists, err := apiClient.ExistsHttpMonitorInDynatrace(tt.monitorId)
+
+			// Verify the results
+			// Check for errors based on the expected outcome
+			if exists != tt.expectExists {
+				t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+			}
+			if (err != nil) != tt.expectError {
+				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
+			}
+		})
+	}
+}
+
 func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	// Create a list of test cases
 	tests := []struct {

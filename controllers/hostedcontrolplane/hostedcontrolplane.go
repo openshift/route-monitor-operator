@@ -435,8 +435,14 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 
 	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
 	if ok {
-		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor. Monitor id is %s", dynatraceHttpMonitorId))
-		return nil
+		exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(dynatraceHttpMonitorId)
+		if err != nil {
+			return fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace: %v", err)
+		}
+		if exists {
+			log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor. Monitor id is %s", dynatraceHttpMonitorId))
+			return nil
+		}
 	}
 
 	// determine location and create monitor
@@ -457,7 +463,12 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 		}
 
 		err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
+		//if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
 		if err != nil {
+			deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
+			if deleteErr != nil {
+				log.Error(deleteErr, "error deleting HTTP monitor")
+			}
 			return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
 		}
 
