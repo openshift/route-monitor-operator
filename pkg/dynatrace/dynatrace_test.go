@@ -1,4 +1,4 @@
-package hostedcontrolplane
+package dynatrace
 
 import (
 	"net/http"
