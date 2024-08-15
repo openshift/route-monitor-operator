@@ -1096,6 +1096,88 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 	}
 }
 
+func TestCheckHttpMonitorExists(t *testing.T) {
+	tests := []struct {
+		name               string
+		mockExistsResponse string
+		mockApiError       bool
+		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
+		expectedExists     bool
+		expectedError      bool
+	}{
+		{
+			name: "Monitor exists",
+			// Updated response to use the correct format with entityId
+			mockExistsResponse: `{"monitors": [{"entityId": "sampleMonitorId"}]}`,
+			mockApiError:       false,
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						httpMonitorLabel: "sampleMonitorId",
+					},
+				},
+			},
+			expectedExists: true,
+			expectedError:  false,
+		},
+		{
+			name: "Monitor does not exist",
+			// Updated response to indicate no monitors found
+			mockExistsResponse: `{"monitors": []}`,
+			mockApiError:       false,
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						httpMonitorLabel: "sampleMonitorId",
+					},
+				},
+			},
+			expectedExists: false,
+			expectedError:  false,
+		},
+		{
+			name: "API error when checking monitor existence",
+			// Simulating an error response
+			mockExistsResponse: `{"error": "mock error"}`,
+			mockApiError:       true,
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						httpMonitorLabel: "sampleMonitorId",
+					},
+				},
+			},
+			expectedExists: false,
+			expectedError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Prepare the mock response
+			statusCode := http.StatusOK
+			if tt.mockApiError {
+				statusCode = http.StatusInternalServerError
+			}
+
+			// Set up the mock server
+			mockServerURL := setupMockServer(createMockHandlerFunc(tt.mockExistsResponse, statusCode))
+			apiClient := dynatrace.NewDynatraceApiClient(mockServerURL, "mockedToken")
+
+			// Call the function to test
+			exists, err := checkHttpMonitorExists(apiClient, tt.hostedControlPlane)
+
+			// Validate the expected values
+			if exists != tt.expectedExists {
+				t.Errorf("Expected exists: %v, got: %v", tt.expectedExists, exists)
+			}
+			if (err != nil) != tt.expectedError {
+				t.Errorf("Expected error: %v, got: %v", tt.expectedError, err)
+			}
+		})
+	}
+}
+
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	tests := []struct {
 		name         string

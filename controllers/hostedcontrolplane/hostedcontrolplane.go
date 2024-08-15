@@ -56,10 +56,10 @@ const (
 	httpMonitorLabel = "dynatrace.http.monitor/id"
 
 	//fetch dynatrace secret to get dynatrace api token and tennant url
-	secretNamespace    = "openshift-route-monitor-operator"
-	secretName         = "dynatrace-token"
-	dynatraceApiKey    = "apiToken"
-	dynatraceTenantKey = "apiUrl"
+	dynatraceSecretNamespace = "openshift-route-monitor-operator"
+	dynatraceSecretName      = "dynatrace-token"
+	dynatraceApiKey          = "apiToken"
+	dynatraceTenantKey       = "apiUrl"
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -364,7 +364,7 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) (string, string, error) {
 
 	secret := &v1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
 	if err != nil {
 		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)
 	}
@@ -417,6 +417,20 @@ func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPla
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
 }
 
+func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
+	if ok {
+		exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(dynatraceHttpMonitorId)
+		if err != nil {
+			return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [monitorId:%s]: %v", dynatraceHttpMonitorId, err)
+		}
+		if exists {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
 	//get apiserver
@@ -433,16 +447,13 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 
 	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
 
-	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
-	if ok {
-		exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(dynatraceHttpMonitorId)
-		if err != nil {
-			return fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace: %v", err)
-		}
-		if exists {
-			log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor. Monitor id is %s", dynatraceHttpMonitorId))
-			return nil
-		}
+	exists, err := checkHttpMonitorExists(dynatraceApiClient, hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to check http monitor exists %v", err)
+	}
+	if exists {
+		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor for %s", monitorName))
+		return nil
 	}
 
 	// determine location and create monitor
