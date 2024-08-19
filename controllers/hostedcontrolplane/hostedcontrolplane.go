@@ -19,6 +19,8 @@ package hostedcontrolplane
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/go-logr/logr"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -39,6 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
 )
 
 const (
@@ -47,6 +51,15 @@ const (
 
 	// watchResourceLabel is a label key indicating which objects this controller should reconcile against
 	watchResourceLabel = "hostedcontrolplane.routemonitoroperator.monitoring.openshift.io/managed"
+
+	//httpMonitorLabel is added to hcp object to keep track of when to create and delete of dynatrace http monitor
+	httpMonitorLabel = "dynatrace.http.monitor/id"
+
+	//fetch dynatrace secret to get dynatrace api token and tennant url
+	dynatraceSecretNamespace = "openshift-route-monitor-operator"
+	dynatraceSecretName      = "dynatrace-token"
+	dynatraceApiKey          = "apiToken"
+	dynatraceTenantKey       = "apiUrl"
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -87,9 +100,24 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
+	//Create Dynatrace API client
+	valueDynatraceApiToken, valueDynatraceTenant, err := r.getDynatraceSecrets(ctx)
+	if err != nil {
+		log.Error(err, "failed to get secret for Dynatrace API client")
+		return utilreconcile.RequeueWith(err)
+	}
+	baseURL := fmt.Sprintf("%s/v1", valueDynatraceTenant)
+	dynatraceApiClient := dynatrace.NewDynatraceApiClient(baseURL, valueDynatraceApiToken)
+
 	// If the HostedControlPlane is marked for deletion, clean up
 	shouldDelete := finalizer.WasDeleteRequested(hostedcontrolplane)
 	if shouldDelete {
+		err = deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
+		if err != nil {
+			log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
+			return utilreconcile.RequeueWith(err)
+		}
+
 		err := r.finalizeHostedControlPlane(ctx, log, hostedcontrolplane)
 		if err != nil {
 			log.Error(err, "failed to finalize HostedControlPlane")
@@ -121,6 +149,13 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	err = r.deployInternalMonitoringObjects(ctx, log, hostedcontrolplane)
 	if err != nil {
 		log.Error(err, "failed to deploy internal monitoring components")
+		return utilreconcile.RequeueWith(err)
+	}
+
+	log.Info("Deploying HTTP Monitor Resources")
+	err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
+	if err != nil {
+		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
 		return utilreconcile.RequeueWith(err)
 	}
 
@@ -322,4 +357,157 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			builder.WithPredicates(selectorPredicate),
 		).
 		Complete(r)
+}
+
+// ------------------------------synthetic-monitoring--------------------------
+
+func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) (string, string, error) {
+
+	secret := &v1.Secret{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
+	if err != nil {
+		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)
+	}
+
+	valueBytesDynatraceApiToken, ok := secret.Data[dynatraceApiKey]
+	if !ok {
+		return "", "", fmt.Errorf("secret did not contain key %s", dynatraceApiKey)
+	}
+	if len(valueBytesDynatraceApiToken) == 0 {
+		return "", "", fmt.Errorf("%s is empty", dynatraceApiKey)
+	}
+	valueDynatraceApiToken := string(valueBytesDynatraceApiToken)
+
+	valueBytesDynatraceTenant, ok := secret.Data[dynatraceTenantKey]
+	if !ok {
+		return "", "", fmt.Errorf("secret did not contain key %s", dynatraceTenantKey)
+	}
+	if len(valueBytesDynatraceTenant) == 0 {
+		return "", "", fmt.Errorf("%s is empty", dynatraceTenantKey)
+	}
+	valueDynatraceTenant := string(valueBytesDynatraceTenant)
+
+	return valueDynatraceApiToken, valueDynatraceTenant, nil
+}
+
+func getDynatraceHttpMonitorId(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, bool) {
+	labels := hostedcontrolplane.GetLabels()
+	dynatraceHttpMonitorId, ok := labels[httpMonitorLabel]
+	return dynatraceHttpMonitorId, ok
+}
+
+func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, key, value string) error {
+	labels := hostedcontrolplane.GetLabels()
+	labels[key] = value
+	hostedcontrolplane.SetLabels(labels)
+
+	err := r.Client.Update(ctx, hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("error updating hostedcontrolplane monitor: %v", err)
+	}
+	return nil
+}
+
+func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
+	for _, service := range hostedcontrolplane.Spec.Services {
+		if service.Service == "APIServer" {
+			return service.ServicePublishingStrategy.Route.Hostname, nil
+		}
+	}
+	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
+}
+
+func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
+	if ok {
+		exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(dynatraceHttpMonitorId)
+		if err != nil {
+			return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [monitorId:%s]: %v", dynatraceHttpMonitorId, err)
+		}
+		if exists {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
+	//get apiserver
+	apiServerHostname, err := GetAPIServerHostname(hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to get APIServer hostname %v", err)
+	}
+	monitorName := strings.Replace(apiServerHostname, "api.", "", 1)
+	// apiServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
+	monitorLocation := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
+
+	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org
+	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
+
+	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
+
+	exists, err := checkHttpMonitorExists(dynatraceApiClient, hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to check http monitor exists %v", err)
+	}
+	if exists {
+		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor for %s", monitorName))
+		return nil
+	}
+
+	// determine location and create monitor
+	//public
+	if monitorLocation == "PublicAndPrivate" {
+
+		clusterId := hostedcontrolplane.Spec.ClusterID
+		clusterRegion := hostedcontrolplane.Spec.Platform.AWS.Region
+
+		dynatraceEquivalentClusterRegionId, err := dynatraceApiClient.GetDynatraceEquivalentClusterRegionId(clusterRegion)
+		if err != nil {
+			return fmt.Errorf("error getting DynatraceEquivalentClusterRegionId: %v", err)
+		}
+
+		monitorId, err := dynatraceApiClient.CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId)
+		if err != nil {
+			return fmt.Errorf("error creating HTTP monitor: %v", err)
+		}
+
+		err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
+		//if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
+		if err != nil {
+			deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
+			if deleteErr != nil {
+				log.Error(deleteErr, "error deleting HTTP monitor")
+			}
+			return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
+		}
+
+		log.Info("Created HTTP monitor ", monitorId, clusterId)
+	}
+
+	//private not supported yet
+	if monitorLocation == "Private" {
+		log.Info("Private API - Not supported yet.")
+		return nil
+	}
+
+	return nil
+}
+
+func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	//check if monitor exists - has label/monitor on hcp, then delete it
+	// key := "dynatrace.http.monitor/id"
+	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
+	if !ok {
+		log.Info("HTTP monitor label not found. Skipping deleting HTTP monitor")
+		return nil
+	}
+
+	err := dynatraceApiClient.DeleteDynatraceHttpMonitor(dynatraceHttpMonitorId)
+	if err != nil {
+		return fmt.Errorf("error deleting HTTP monitor. Status Code: %v", err)
+	}
+	log.Info("Successfully deleted HTTP monitor")
+	return nil
 }
