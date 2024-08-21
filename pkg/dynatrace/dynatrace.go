@@ -54,10 +54,6 @@ var publicMonitorTemplate = `
                 "url": "{{.ApiUrl}}",
                 "method": "GET",
                 "requestBody": "",
-                "configuration": {
-                    "acceptAnyCertificate": true,
-                    "followRedirects": true
-                },
                 "preProcessingScript": "",
                 "postProcessingScript": ""
             }
