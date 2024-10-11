@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	corev1 "k8s.io/api/core/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -136,21 +135,6 @@ func main() {
                     },
                 },
                 &operatorv1.IngressController{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &corev1.Service{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &hypershiftv1beta1.HostedCluster{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &hypershiftv1beta1.HostedControlPlane{}: {
                     Namespaces: map[string]cache.Config{
                         cache.AllNamespaces: {},
                     },
