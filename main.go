@@ -28,7 +28,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -41,7 +40,6 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/config"
@@ -104,43 +102,6 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "2793210b.openshift.io",
-        Cache: cache.Options{
-            DefaultNamespaces: map[string]cache.Config{
-                config.OperatorNamespace: {},
-            },
-            ByObject: map[client.Object]cache.ByObject{
-                &v1alpha1.RouteMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &v1alpha1.ClusterUrlMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &routev1.Route{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &monitoringv1.ServiceMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &monitoringv1.PrometheusRule{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &operatorv1.IngressController{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-            },
-        },
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
