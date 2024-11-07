@@ -28,11 +28,13 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+    "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+    corev1 "k8s.io/api/core/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -40,6 +42,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+    "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/config"
@@ -94,6 +97,59 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	enableHCP, err := shouldEnableHCP()
+	if err != nil {
+		setupLog.Error(err, "failed to determine whether HCP controller should be enabled", "controller", "HostedControlPlane")
+	}
+
+    cacheOptions := cache.Options{}
+
+    // If HCP is not enabled (RMO is not running on an MC cluster) then limit caching
+    if !enableHCP {
+        cacheOptions = cache.Options{
+            DefaultNamespaces: map[string]cache.Config{
+                config.OperatorNamespace: {},
+            },
+            ByObject: map[client.Object]cache.ByObject{
+                &v1alpha1.RouteMonitor{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &v1alpha1.ClusterUrlMonitor{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &routev1.Route{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &monitoringv1.ServiceMonitor{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &monitoringv1.PrometheusRule{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &operatorv1.IngressController{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+                &corev1.Service{}: {
+                    Namespaces: map[string]cache.Config{
+                        cache.AllNamespaces: {},
+                    },
+                },
+            },
+        }
+    }
+
 	options := ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
@@ -102,7 +158,8 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "2793210b.openshift.io",
-	}
+        Cache: cacheOptions,
+    }
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
@@ -122,10 +179,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	enableHCP, err := shouldEnableHCP(mgr)
-	if err != nil {
-		setupLog.Error(err, "failed to determine whether HCP controller should be enabled", "controller", "HostedControlPlane")
-	}
 	if enableHCP {
 		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr)
 		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
@@ -159,8 +212,8 @@ func main() {
 //   - if it exists, enable the HCP controller
 //   - if we get an error unrelated to it's existence (ie - kubeapiserver is down) return the error
 //   - if we get an error due to it not existing, disable the HCP controller
-func shouldEnableHCP(mgr ctrl.Manager) (bool, error) {
-	c, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+func shouldEnableHCP() (bool, error) {
+	c, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
 	if err != nil {
 		return false, err
 	}
