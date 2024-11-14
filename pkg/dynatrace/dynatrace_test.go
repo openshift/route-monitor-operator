@@ -97,64 +97,13 @@ func TestAPIClient_makeRequest(t *testing.T) {
 	}
 }
 
-func TestAPIClient_GetDynatraceEquivalentClusterRegionId(t *testing.T) {
-	tests := []struct {
-		name               string
-		region             string
-		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
-		mockResponse       string
-		mockStatusCode     int
-		expectedRegionId   string
-		expectedError      string
-	}{
-		{
-			name:             "Valid region code and location found",
-			region:           "us-west-2",
-			mockResponse:     `{"locations": [{"name": "Oregon", "type": "PUBLIC", "cloudPlatform": "AMAZON_EC2", "entityId": "123"}]}`,
-			mockStatusCode:   http.StatusOK,
-			expectedRegionId: "123",
-			expectedError:    "",
-		},
-		{
-			name:             "Invalid region code (no matching location)",
-			region:           "invalid-region-code",
-			mockResponse:     `{"locations": []}`,
-			mockStatusCode:   http.StatusBadRequest,
-			expectedRegionId: "",
-			expectedError:    "location not found for region: invalid-region-code",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Mocking the HTTP server to return the desired response
-			handlerFunc := createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode)
-			// Create the mock server using the setupMockServer function
-			mockServer := setupMockServer(handlerFunc)
-			// Create an instance of the APIClient using the reusable setup
-			mockClient := NewDynatraceApiClient(mockServer, "mockedToken")
-
-			// Call the function being tested
-			regionId, err := mockClient.GetDynatraceEquivalentClusterRegionId(tt.region)
-
-			// Check the returned values against the expected results
-			if regionId != tt.expectedRegionId {
-				t.Errorf("Got: %s, Expected: %s", regionId, tt.expectedRegionId)
-			}
-
-			if err != nil && err.Error() != tt.expectedError {
-				t.Errorf("Got error: %v, Expected error: %s", err, tt.expectedError)
-			}
-		})
-	}
-}
-
 func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	// Mocked response data for testing
 	mockMonitorName := "TestMonitor"
 	mockApiUrl := "https://example.com"
 	mockClusterId := "12345"
 	mockDynatraceEquivalentClusterRegionId := "us-east-1"
+	mockClusterRegion := "us-east-1"
 
 	// Create a list of test cases
 	tests := []struct {
@@ -189,7 +138,7 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 			mockClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			monitorId, err := mockClient.CreateDynatraceHttpMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId)
+			monitorId, err := mockClient.CreateDynatraceHttpMonitor(mockMonitorName, mockApiUrl, mockClusterId, mockDynatraceEquivalentClusterRegionId, mockClusterRegion)
 
 			// Check for errors or expected values based on the test case
 			if (err != nil) != tt.expectError {
@@ -295,6 +244,92 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 			err := apiClient.DeleteDynatraceHttpMonitor("123")
 
 			// Check for errors based on the expected outcome
+			if (err != nil) != tt.expectError {
+				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
+			}
+		})
+	}
+}
+
+func TestAPIClient_GetLocationEntityIdFromDynatrace(t *testing.T) {
+	tests := []struct {
+		name           string
+		locationName   string
+		locationType   hypershiftv1beta1.AWSEndpointAccessType
+		mockResponse   string
+		mockStatusCode int
+		expectId       string
+		expectError    bool
+	}{
+		{
+			name:           "Public location found",
+			locationName:   "N. Virginia",
+			locationType:   hypershiftv1beta1.PublicAndPrivate,
+			mockResponse:   `{"locations":[{"name":"N. Virginia","entityId":"exampleLocationId","type":"PUBLIC","cloudPlatform":"AMAZON_EC2","status":"ENABLED"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectId:       "exampleLocationId",
+			expectError:    false,
+		},
+		{
+			name:           "Private location found",
+			locationName:   "backplane",
+			locationType:   hypershiftv1beta1.Private,
+			mockResponse:   `{"locations":[{"name":"backplanei03xyz","entityId":"privateLocationId","type":"PRIVATE","status":"ENABLED"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectId:       "privateLocationId",
+			expectError:    false,
+		},
+		{
+			name:           "Public location not found",
+			locationName:   "Test",
+			locationType:   hypershiftv1beta1.PublicAndPrivate,
+			mockResponse:   `{"locations":[{"name":"Some Other Location","entityId":"someOtherId","type":"PUBLIC","cloudPlatform":"AMAZON_EC2","status":"ENABLED"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectId:       "",
+			expectError:    true,
+		},
+		{
+			name:           "Private location not found",
+			locationName:   "Test",
+			locationType:   hypershiftv1beta1.Private,
+			mockResponse:   `{"locations":[{"name":"Some Other Location","entityId":"someOtherId","type":"PRIVATE","status":"ENABLED"}]}`,
+			mockStatusCode: http.StatusOK,
+			expectId:       "",
+			expectError:    true,
+		},
+		{
+			name:           "HTTP error from API",
+			locationName:   "N. Virginia",
+			locationType:   hypershiftv1beta1.PublicAndPrivate,
+			mockResponse:   "",
+			mockStatusCode: http.StatusInternalServerError,
+			expectId:       "",
+			expectError:    true,
+		},
+		{
+			name:           "JSON parse error",
+			locationName:   "N. Virginia",
+			locationType:   hypershiftv1beta1.PublicAndPrivate,
+			mockResponse:   "{invalid json",
+			mockStatusCode: http.StatusOK,
+			expectId:       "",
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create the mock server
+			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode))
+			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
+
+			// Call the function to test
+			id, err := apiClient.GetLocationEntityIdFromDynatrace(tt.locationName, tt.locationType)
+
+			// Verify the results
+			if id != tt.expectId {
+				t.Errorf("Unexpected ID. Expected: %v, got: %v", tt.expectId, id)
+			}
 			if (err != nil) != tt.expectError {
 				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
 			}
