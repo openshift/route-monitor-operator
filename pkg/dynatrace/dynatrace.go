@@ -23,9 +23,6 @@ import (
 	"html/template"
 	"io"
 	"net/http"
-	"strings"
-
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 )
 
 // ------------------------------synthetic-monitoring--------------------------
@@ -87,10 +84,6 @@ var publicMonitorTemplate = `
             "key": "cluster-id",
             "value": "{{.ClusterId}}"
         },
-		{
-            "key": "cluster-region",
-            "value": "{{.ClusterRegion}}"
-        },
         {
             "key": "route-monitor-operator-managed",
             "value": "true"
@@ -108,7 +101,6 @@ type DynatraceMonitorConfig struct {
 	ApiUrl                             string
 	DynatraceEquivalentClusterRegionId string
 	ClusterId                          string
-	ClusterRegion                      string
 }
 
 type DynatraceCreatedMonitor struct {
@@ -121,7 +113,6 @@ type DynatraceLocation struct {
 		Type          string `json:"type"`
 		CloudPlatform string `json:"cloudPlatform"`
 		EntityId      string `json:"entityId"`
-		Status        string `json:"status"`
 	} `json:"locations"`
 }
 
@@ -151,8 +142,47 @@ func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, r
 	return dynatraceApiClient.httpClient.Do(req)
 }
 
-func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(locationName string, locationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
-	// Fetch Dynatrace locations using Dynatrace API
+func (dynatraceApiClient *DynatraceApiClient) GetDynatraceEquivalentClusterRegionId(clusterRegion string) (string, error) {
+	// Adapted from spreadsheet in https://issues.redhat.com//browse/SDE-3754
+	// Coming soon regions - il-central-1, ca-west-1
+	awsRegionToDyntraceRegionMapping := map[string]string{
+		"us-east-1":      "N. Virginia",
+		"us-east-2":      "N. Virginia",
+		"us-west-1":      "Oregon",
+		"us-west-2":      "Oregon",
+		"af-south-1":     "São Paulo",
+		"ap-southeast-1": "Singapore",
+		"ap-southeast-2": "Sydney",
+		"ap-southeast-3": "Singapore",
+		"ap-southeast-4": "Sydney",
+		"ap-northeast-1": "Singapore",
+		"ap-northeast-2": "Sydney",
+		"ap-northeast-3": "Singapore",
+		"ap-south-1":     "Mumbai",
+		"ap-south-2":     "Mumbai",
+		"ap-east-1":      "Singapore",
+		"ca-central-1":   "Montreal",
+		"eu-west-1":      "Dublin",
+		"eu-west-2":      "London",
+		"eu-west-3":      "Frankfurt",
+		"eu-central-1":   "Frankfurt",
+		"eu-central-2":   "Frankfurt",
+		"eu-south-1":     "Frankfurt",
+		"eu-south-2":     "Frankfurt",
+		"eu-north-1":     "London",
+		"me-south-1":     "Mumbai",
+		"me-central-1":   "Mumbai",
+		"sa-east-1":      "São Paulo",
+	}
+
+	// Look up the equivalent dynatrace location name based on the aws region in map
+	//e.g. "us-east-2" in aws has equivalent "N. Virginia" in Dynatrace Locations
+	dynatraceLocationName, ok := awsRegionToDyntraceRegionMapping[clusterRegion]
+	if !ok {
+		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
+	}
+
+	//fetch dynatrace locations using dynatrace api
 	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, "/synthetic/locations", "")
 	if err != nil {
 		return "", err
@@ -165,50 +195,28 @@ func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(l
 
 	/*return location id from response body in which dynatrace location is public && CloudPlatform is AWS/AMAZON_EC2
 	e.g. returns exampleLocationId for N. Virginia location in dynatrace in which CloudPlatform is AWS and location is public
-	e.g. PublicAndPrivate response body
+	e.g. response body
 	{
 		"name": "N. Virginia",
 		"entityId": "exampleLocationId",
 		"type": "PUBLIC",
 		"cloudPlatform": "AMAZON_EC2",
-		"status": "ENABLED"
 	}*/
-
-	/*
-		e.g. Private Response body
-		{
-			"name": "backplanei03xyz",
-			"entityId": "privateLocationId",
-			"type": "PRIVATE",
-			"status": "ENABLED"
-		},
-	*/
-	// Decode the response body
 	var locationResponse DynatraceLocation
 	err = json.NewDecoder(resp.Body).Decode(&locationResponse)
 	if err != nil {
 		return "", err
 	}
-
-	if locationType == hypershiftv1beta1.PublicAndPrivate {
-		for _, loc := range locationResponse.Locations {
-			if loc.Name == locationName && loc.Type == "PUBLIC" && loc.CloudPlatform == "AMAZON_EC2" && loc.Status == "ENABLED" {
-				return loc.EntityId, nil
-			}
-		}
-	}
-	if locationType == hypershiftv1beta1.Private {
-		for _, loc := range locationResponse.Locations {
-			if strings.Contains(loc.Name, locationName) && loc.Type == "PRIVATE" && loc.Status == "ENABLED" {
-				return loc.EntityId, nil
-			}
+	for _, loc := range locationResponse.Locations {
+		if loc.Name == dynatraceLocationName && loc.Type == "PUBLIC" && loc.CloudPlatform == "AMAZON_EC2" {
+			return loc.EntityId, nil
 		}
 	}
 
-	return "", fmt.Errorf("location '%s' not found for location type '%s'", locationName, locationType)
+	return "", fmt.Errorf("location '%s' not found", dynatraceLocationName)
 }
 
-func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId, clusterRegion string) (string, error) {
+func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId string) (string, error) {
 
 	tmpl := template.Must(template.New("jsonTemplate").Parse(publicMonitorTemplate))
 
@@ -217,7 +225,6 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 		ApiUrl:                             apiUrl,
 		DynatraceEquivalentClusterRegionId: dynatraceEquivalentClusterRegionId,
 		ClusterId:                          clusterId,
-		ClusterRegion:                      clusterRegion,
 	}
 
 	var tplBuffer bytes.Buffer
