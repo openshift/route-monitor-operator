@@ -390,48 +390,6 @@ func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) 
 	return valueDynatraceApiToken, valueDynatraceTenant, nil
 }
 
-func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, error) {
-	// Adapted from spreadsheet in https://issues.redhat.com/browse/SDE-3754
-	// Coming soon regions - il-central-1, ca-west-1
-	awsRegionToDyntraceRegionMapping := map[string]string{
-		"us-east-1":      "N. Virginia",
-		"us-east-2":      "N. Virginia",
-		"us-west-1":      "Oregon",
-		"us-west-2":      "Oregon",
-		"af-south-1":     "São Paulo",
-		"ap-southeast-1": "Singapore",
-		"ap-southeast-2": "Sydney",
-		"ap-southeast-3": "Singapore",
-		"ap-southeast-4": "Sydney",
-		"ap-northeast-1": "Singapore",
-		"ap-northeast-2": "Sydney",
-		"ap-northeast-3": "Singapore",
-		"ap-south-1":     "Mumbai",
-		"ap-south-2":     "Mumbai",
-		"ap-east-1":      "Singapore",
-		"ca-central-1":   "Montreal",
-		"eu-west-1":      "Dublin",
-		"eu-west-2":      "London",
-		"eu-west-3":      "Frankfurt",
-		"eu-central-1":   "Frankfurt",
-		"eu-central-2":   "Frankfurt",
-		"eu-south-1":     "Frankfurt",
-		"eu-south-2":     "Frankfurt",
-		"eu-north-1":     "London",
-		"me-south-1":     "Mumbai",
-		"me-central-1":   "Mumbai",
-		"sa-east-1":      "São Paulo",
-	}
-
-	// Look up the equivalent dynatrace location name based on the aws region in map
-	//e.g. "us-east-2" in aws has equivalent "N. Virginia" in Dynatrace Locations
-	dynatraceLocationName, ok := awsRegionToDyntraceRegionMapping[clusterRegion]
-	if !ok {
-		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
-	}
-	return dynatraceLocationName, nil
-}
-
 func getDynatraceHttpMonitorId(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, bool) {
 	labels := hostedcontrolplane.GetLabels()
 	dynatraceHttpMonitorId, ok := labels[httpMonitorLabel]
@@ -473,35 +431,6 @@ func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, ho
 	return false, nil
 }
 
-func getClusterRegion(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
-	if hostedcontrolplane == nil {
-		return "", fmt.Errorf("hostedcontrolplane is nil %v", hostedcontrolplane)
-	}
-
-	clusterRegion := hostedcontrolplane.Spec.Platform.AWS.Region
-	if clusterRegion == "" {
-		return "", fmt.Errorf("aws region is not set in hcp %v", hostedcontrolplane)
-	}
-
-	return clusterRegion, nil
-}
-
-func determineDynatraceClusterRegionName(clusterRegion string, monitorLocationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
-	//public
-	if monitorLocationType == hypershiftv1beta1.PublicAndPrivate {
-		return getDynatraceEquivalentClusterRegionName(clusterRegion)
-	} else if monitorLocationType == hypershiftv1beta1.Private {
-		/*
-			For "Private" HCPs, we have one backplane location deployed per dynatrace tenant. E.g. "name": "backplanei03xyz"
-			"backplane" is returned from this function and passed to GetLocationEntityIdFromDynatrace function and this location is
-			searched for in dynatrace - if strings.Contains(loc.Name, locationName) && loc.Type == "PRIVATE" && loc.Status == "ENABLED".
-			Ref: https://issues.redhat.com/browse/OSD-25167
-		*/
-		return "backplane", nil
-	}
-	return "", fmt.Errorf("monitorLocationType '%s' not supported", monitorLocationType)
-}
-
 func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
 	//get apiserver
@@ -511,7 +440,7 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	}
 	monitorName := strings.Replace(apiServerHostname, "api.", "", 1)
 	// apiServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
-	monitorLocationType := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
+	monitorLocation := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
 
 	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org
 	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
@@ -527,40 +456,41 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 		return nil
 	}
 
-	clusterId := hostedcontrolplane.Spec.ClusterID
-	/* determine cluster region, find cluster region equivalent name in dynatrace, fetch locationId/entityId
-	of the cluster region equivalent name in dynatrace, create http monitor and then update hcp labels.
-	*/
-	clusterRegion, err := getClusterRegion(hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("error calling getClusterRegion: %v", err)
-	}
-	dynatraceClusterRegionName, err := determineDynatraceClusterRegionName(clusterRegion, monitorLocationType)
-	if err != nil {
-		return fmt.Errorf("error calling determineDynatraceClusterRegionId: %v", err)
-	}
+	// determine location and create monitor
+	//public
+	if monitorLocation == "PublicAndPrivate" {
 
-	locationId, err := dynatraceApiClient.GetLocationEntityIdFromDynatrace(dynatraceClusterRegionName, monitorLocationType)
-	if err != nil {
-		return fmt.Errorf("error calling GetLocationEntityIdFromDynatrace: %v", err)
-	}
+		clusterId := hostedcontrolplane.Spec.ClusterID
+		clusterRegion := hostedcontrolplane.Spec.Platform.AWS.Region
 
-	monitorId, err := dynatraceApiClient.CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, locationId, clusterRegion)
-	if err != nil {
-		return fmt.Errorf("error creating HTTP monitor: %v", err)
-	}
-
-	err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
-	//if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
-	if err != nil {
-		deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
-		if deleteErr != nil {
-			log.Error(deleteErr, "error deleting HTTP monitor")
+		dynatraceEquivalentClusterRegionId, err := dynatraceApiClient.GetDynatraceEquivalentClusterRegionId(clusterRegion)
+		if err != nil {
+			return fmt.Errorf("error getting DynatraceEquivalentClusterRegionId: %v", err)
 		}
-		return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
+
+		monitorId, err := dynatraceApiClient.CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId)
+		if err != nil {
+			return fmt.Errorf("error creating HTTP monitor: %v", err)
+		}
+
+		err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
+		//if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
+		if err != nil {
+			deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
+			if deleteErr != nil {
+				log.Error(deleteErr, "error deleting HTTP monitor")
+			}
+			return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
+		}
+
+		log.Info("Created HTTP monitor ", monitorId, clusterId)
 	}
 
-	log.Info("Created HTTP monitor ", monitorId, clusterId)
+	//private not supported yet
+	if monitorLocation == "Private" {
+		log.Info("Private API - Not supported yet.")
+		return nil
+	}
 
 	return nil
 }
