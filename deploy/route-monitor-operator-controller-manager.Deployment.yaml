@@ -45,7 +45,7 @@ spec:
             - name: LOG_LEVEL
               value: "1"
             - name: BLACKBOX_IMAGE
-              value: quay.io/prometheus/blackbox-exporter:master
+              value: quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e
             - name: BLACKBOX_NAMESPACE
               valueFrom:
                 fieldRef:
