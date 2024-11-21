@@ -1,0 +1,1 @@
+LABEL com.redhat.component="openshift-route-monitor-operator"       io.k8s.description="..."       description="..."       distribution-scope="public"       name="openshift/route-monitor-operator"       url="https://github.com/openshift/route-monitor-operator"       vendor="Red Hat, Inc."       release="v0.0.0"       version="v0.0.0"
