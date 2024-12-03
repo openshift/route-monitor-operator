@@ -80,3 +80,5 @@ objects:
         namespace: ${NAMESPACE}
         annotations:
           olm.operatorframework.io/exclude-global-namespace-resolution: 'true'
+      spec:
+        upgradeStrategy: TechPreviewUnsafeFailForward
