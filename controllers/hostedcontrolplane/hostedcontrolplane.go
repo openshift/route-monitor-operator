@@ -152,12 +152,13 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.Info("Deploying HTTP Monitor Resources")
-	err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
-	if err != nil {
-		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
-		return utilreconcile.RequeueWith(err)
-	}
+	log.Info("Skipping deployment of HTTP Monitor Resources - To be re-enabled at a future date")
+	// log.Info("Deploying HTTP Monitor Resources")
+	// err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
+	// if err != nil {
+	// 	log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
+	// 	return utilreconcile.RequeueWith(err)
+	// }
 
 	return ctrl.Result{}, err
 }
