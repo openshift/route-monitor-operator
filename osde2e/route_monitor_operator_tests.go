@@ -97,6 +97,16 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 					{
 						Name:  "test",
 						Image: "quay.io/jitesoft/nginx:mainline",
+						SecurityContext: &corev1.SecurityContext{
+                    					AllowPrivilegeEscalation: pointer.BoolPtr(false),
+                    					Capabilities: &corev1.Capabilities{
+                        					Drop: []corev1.Capability{"ALL"},
+                   				 	},
+                    					RunAsNonRoot: pointer.BoolPtr(true),
+                    					SeccompProfile: &corev1.SeccompProfile{
+                        					Type: corev1.SeccompProfileTypeRuntimeDefault,
+							},
+						},
 					},
 				},
 			},
