@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
+	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
@@ -30,6 +31,26 @@ func Test_buildMetadataForUpdate(t *testing.T) {
 		hcp = hypershiftv1beta1.HostedControlPlane{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
+			},
+		}
+
+		vpcEndpointAvailable = avov1alpha2.VpcEndpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "private-hcp",
+				Namespace: hcp.Namespace,
+			},
+			Status: avov1alpha2.VpcEndpointStatus{
+				Status: "available",
+			},
+		}
+
+		vpcEndpointPending = avov1alpha2.VpcEndpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "private-hcp",
+				Namespace: hcp.Namespace,
+			},
+			Status: avov1alpha2.VpcEndpointStatus{
+				Status: "pending",
 			},
 		}
 
