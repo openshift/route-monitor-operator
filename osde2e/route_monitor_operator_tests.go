@@ -87,6 +87,10 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 	It("required dependent resources are created", func(ctx context.Context) {
 		By("Creating a pod, service and route to monitor with a ServiceMonitor and PrometheusRule")
 		By("Creating the test pod")
+		var allowPrivilegeEscalation *bool = new(bool)
+		*allowPrivilegeEscalation = false
+		var runAsNonRoot *bool = new(bool)
+		*runAsNonRoot = true
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      routeMonitorName,
@@ -98,13 +102,13 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 						Name:  "test",
 						Image: "quay.io/jitesoft/nginx:mainline",
 						SecurityContext: &corev1.SecurityContext{
-                    					AllowPrivilegeEscalation: pointer.BoolPtr(false),
-                    					Capabilities: &corev1.Capabilities{
-                        					Drop: []corev1.Capability{"ALL"},
-                   				 	},
-                    					RunAsNonRoot: pointer.BoolPtr(true),
-                    					SeccompProfile: &corev1.SeccompProfile{
-                        					Type: corev1.SeccompProfileTypeRuntimeDefault,
+							AllowPrivilegeEscalation: allowPrivilegeEscalation,
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"ALL"},
+							},
+							RunAsNonRoot: runAsNonRoot,
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeRuntimeDefault,
 							},
 						},
 					},
