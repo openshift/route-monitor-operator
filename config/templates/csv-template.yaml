@@ -50,5 +50,4 @@ spec:
   provider:
     name: Red Hat
     url: https://www.redhat.com
-  replaces: route-monitor-operator.v0.1.183-e9011b0
   version: 0.0.1
