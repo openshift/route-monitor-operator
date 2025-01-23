@@ -1132,6 +1132,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
 			// client := fake.NewClientBuilder().Build()
 
 			// Create a mock HostedControlPlane instance
@@ -1141,6 +1142,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 					Namespace: "default",
 				},
 			}
+
 
 			r := newTestReconciler(t)
 			ctx := context.Background()
