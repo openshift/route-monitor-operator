@@ -34,26 +34,6 @@ func Test_buildMetadataForUpdate(t *testing.T) {
 			},
 		}
 
-		vpcEndpointAvailable = avov1alpha2.VpcEndpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "private-hcp",
-				Namespace: hcp.Namespace,
-			},
-			Status: avov1alpha2.VpcEndpointStatus{
-				Status: "available",
-			},
-		}
-
-		vpcEndpointPending = avov1alpha2.VpcEndpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "private-hcp",
-				Namespace: hcp.Namespace,
-			},
-			Status: avov1alpha2.VpcEndpointStatus{
-				Status: "pending",
-			},
-		}
-
 		dgps = int64(0)
 		meta = metav1.ObjectMeta{
 			Name:                       "actual",
@@ -1060,20 +1040,37 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 		mockServerResponse   string
 		mockServerStatusCode int
 		expectedError        error
+		vpcEndpointStatus    avov1alpha2.VpcEndpointStatus
 	}{
 		{
 			name:                 "Create Monitor Successfully",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"id":"new-monitor-id"}`,
 			mockServerStatusCode: http.StatusOK,
-			expectedError:        nil,
+			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
+				Status: "available",
+			},
+			expectedError: nil,
 		},
 		{
 			name:                 "Error Creating Monitor",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"error":"creation error"}`,
 			mockServerStatusCode: http.StatusInternalServerError,
-			expectedError:        fmt.Errorf("error creating HTTP monitor: creation error"),
+			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
+				Status: "available",
+			},
+			expectedError: fmt.Errorf("error creating HTTP monitor: creation error"),
+		},
+		{
+			name:                 "Create Monitor Unsuccessful",
+			dynatraceMonitorId:   "",
+			mockServerResponse:   `{"error":"creation error"}`,
+			mockServerStatusCode: http.StatusOK,
+			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
+				Status: "pending",
+			},
+			expectedError: fmt.Errorf("failed to check VPC Endpoint readiness"),
 		},
 	}
 
@@ -1113,6 +1110,72 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 			// Call the function under test
 			r.deployDynatraceHttpMonitorResources(ctx, apiClient, log, hostedControlPlane)
 
+		})
+	}
+}
+
+func TestCheckVPCendpointReady(t *testing.T) {
+	tests := []struct {
+		name               string
+		vpcEndpointStatus  avov1alpha2.VpcEndpointStatus
+		vpcEndpointName    string
+		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
+		expectedError      error
+		isVpcEndpointReady bool
+	}{
+		{
+			name: "VPCendpoint exists",
+			// Updated response to use the correct format with entityId
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test",
+				},
+			},
+			vpcEndpointName: "private-hcp",
+			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
+				Status: "available",
+			},
+
+			expectedError:      nil,
+			isVpcEndpointReady: true,
+		},
+		{
+			name: "VPCendpoint does not exist",
+			// Updated response to indicate no monitors found
+			vpcEndpointName: "private-hcp",
+			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
+				Status: "pending",
+			},
+
+			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						httpMonitorLabel: "sampleVPCendpointId",
+					},
+				},
+			},
+			expectedError:      fmt.Errorf("VPC Endpoint test/private-hcp is not ready, status:pending"),
+			isVpcEndpointReady: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			r := newTestReconciler(t)
+			ctx := context.Background()
+
+			// Call the function to test
+			ready, err := r.isVpcEndpointReady(ctx, tt.hostedControlPlane)
+
+			// Validate the expected values
+			if ready != tt.isVpcEndpointReady {
+				t.Errorf("Expected exists: %v, got: %v", tt.isVpcEndpointReady, ready)
+			}
+			if err != tt.expectedError {
+				t.Errorf("Expected exists: %v, got: %v", tt.expectedError, err)
+			}
 		})
 	}
 }
