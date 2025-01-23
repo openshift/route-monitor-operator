@@ -1040,37 +1040,20 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 		mockServerResponse   string
 		mockServerStatusCode int
 		expectedError        error
-		vpcEndpointStatus    avov1alpha2.VpcEndpointStatus
 	}{
 		{
 			name:                 "Create Monitor Successfully",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"id":"new-monitor-id"}`,
 			mockServerStatusCode: http.StatusOK,
-			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
-				Status: "available",
-			},
-			expectedError: nil,
+			expectedError:        nil,
 		},
 		{
 			name:                 "Error Creating Monitor",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"error":"creation error"}`,
 			mockServerStatusCode: http.StatusInternalServerError,
-			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
-				Status: "available",
-			},
-			expectedError: fmt.Errorf("error creating HTTP monitor: creation error"),
-		},
-		{
-			name:                 "Create Monitor Unsuccessful",
-			dynatraceMonitorId:   "",
-			mockServerResponse:   `{"error":"creation error"}`,
-			mockServerStatusCode: http.StatusOK,
-			vpcEndpointStatus: avov1alpha2.VpcEndpointStatus{
-				Status: "pending",
-			},
-			expectedError: fmt.Errorf("failed to check VPC Endpoint readiness"),
+			expectedError:        fmt.Errorf("error creating HTTP monitor: creation error"),
 		},
 	}
 
@@ -1113,8 +1096,7 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 		})
 	}
 }
-
-func TestCheckVPCendpointReady(t *testing.T) {
+func TestIsVpcEndpointReady(t *testing.T) {
 	tests := []struct {
 		name               string
 		vpcEndpointStatus  avov1alpha2.VpcEndpointStatus
@@ -1162,7 +1144,6 @@ func TestCheckVPCendpointReady(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			r := newTestReconciler(t)
 			ctx := context.Background()
 

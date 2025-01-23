@@ -10,6 +10,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240524162738-d899f8877d22
+	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364
 	github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c
 	github.com/openshift/osde2e-common v0.0.0-20240604133256-b7200cad0cca
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
@@ -56,7 +57,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
