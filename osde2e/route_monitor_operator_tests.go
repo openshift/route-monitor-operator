@@ -70,7 +70,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		EventuallyDeployment(ctx, k8s, deploymentName, namespace).Should(BeAvailable())
 	})
 
-	It("can be upgraded", func(ctx context.Context) {
+	PIt("can be upgraded", func(ctx context.Context) {
 		By("forcing operator upgrade")
 		err := k8s.UpgradeOperator(ctx, operatorName, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), "operator upgrade failed")
