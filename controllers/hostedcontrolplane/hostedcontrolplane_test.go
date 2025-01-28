@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
+	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
@@ -738,6 +739,11 @@ func newTestReconciler(t *testing.T, objs ...client.Object) *HostedControlPlaneR
 		t.Errorf("failed to add routev1 to scheme: %v", err)
 	}
 
+	err = avov1alpha2.AddToScheme(s)
+	if err != nil {
+		t.Errorf("unable to add avov1alpha2 scheme to test: %v", err)
+	}
+
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 
 	r := &HostedControlPlaneReconciler{
@@ -1092,6 +1098,82 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 			// Call the function under test
 			r.deployDynatraceHttpMonitorResources(ctx, apiClient, log, hostedControlPlane)
 
+		})
+	}
+}
+
+func TestIsVpcEndpointReady(t *testing.T) {
+	tests := []struct {
+		name              string
+		vpcEndpointName   string
+		vpcEndpointStatus string
+		expectedResult    bool
+		expectedError     bool
+	}{
+		{
+			name:              "VpcEndpoint is available",
+			vpcEndpointStatus: "available",
+			expectedResult:    true,
+			expectedError:     false,
+		},
+		{
+			name:              "VpcEndpoint is not available",
+			vpcEndpointStatus: "pending",
+			expectedResult:    false,
+			expectedError:     true,
+		},
+		{
+			name:              "VpcEndpoint not found",
+			vpcEndpointStatus: "",
+			expectedResult:    false,
+			expectedError:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			// client := fake.NewClientBuilder().Build()
+
+			// Create a mock HostedControlPlane instance
+			hcp := &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hostedcontrolplane",
+					Namespace: "default",
+				},
+			}
+
+
+			r := newTestReconciler(t)
+			ctx := context.Background()
+			// r.Client.Create(ctx, hcp)
+
+			// Mocking the VpcEndpoint
+			if tt.vpcEndpointStatus != "" {
+				vpcEndpointTest := &avov1alpha2.VpcEndpoint{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "private-hcp",
+						Namespace: "default",
+					},
+					Status: avov1alpha2.VpcEndpointStatus{
+						Status: tt.vpcEndpointStatus,
+					},
+				}
+				r.Client.Create(ctx, vpcEndpointTest)
+			}
+
+			// Test the function
+			result, err := r.isVpcEndpointReady(context.Background(), hcp)
+
+			// Validate the results
+			if result != tt.expectedResult {
+				t.Errorf("expected result %v, but got %v", tt.expectedResult, result)
+			}
+
+			// Check if error status matches expectedError
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, but got error: %v", tt.expectedError, err != nil)
+			}
 		})
 	}
 }

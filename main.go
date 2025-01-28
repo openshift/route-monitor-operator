@@ -28,21 +28,22 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-    "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-    corev1 "k8s.io/api/core/v1"
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
-    "github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringopenshiftiov1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	monitoringv1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/config"
@@ -69,6 +70,7 @@ func init() {
 	utilruntime.Must(hypershiftv1beta1.AddToScheme(scheme))
 	utilruntime.Must(rhobsv1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(avov1alpha2.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -102,53 +104,53 @@ func main() {
 		setupLog.Error(err, "failed to determine whether HCP controller should be enabled", "controller", "HostedControlPlane")
 	}
 
-    cacheOptions := cache.Options{}
+	cacheOptions := cache.Options{}
 
-    // If HCP is not enabled (RMO is not running on an MC cluster) then limit caching
-    if !enableHCP {
-        cacheOptions = cache.Options{
-            DefaultNamespaces: map[string]cache.Config{
-                config.OperatorNamespace: {},
-            },
-            ByObject: map[client.Object]cache.ByObject{
-                &v1alpha1.RouteMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &v1alpha1.ClusterUrlMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &routev1.Route{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &monitoringv1.ServiceMonitor{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &monitoringv1.PrometheusRule{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &operatorv1.IngressController{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-                &corev1.Service{}: {
-                    Namespaces: map[string]cache.Config{
-                        cache.AllNamespaces: {},
-                    },
-                },
-            },
-        }
-    }
+	// If HCP is not enabled (RMO is not running on an MC cluster) then limit caching
+	if !enableHCP {
+		cacheOptions = cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				config.OperatorNamespace: {},
+			},
+			ByObject: map[client.Object]cache.ByObject{
+				&v1alpha1.RouteMonitor{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&v1alpha1.ClusterUrlMonitor{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&routev1.Route{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&monitoringv1.ServiceMonitor{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&monitoringv1.PrometheusRule{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&operatorv1.IngressController{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+				&corev1.Service{}: {
+					Namespaces: map[string]cache.Config{
+						cache.AllNamespaces: {},
+					},
+				},
+			},
+		}
+	}
 
 	options := ctrl.Options{
 		Scheme: scheme,
@@ -158,8 +160,8 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "2793210b.openshift.io",
-        Cache: cacheOptions,
-    }
+		Cache:                  cacheOptions,
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {

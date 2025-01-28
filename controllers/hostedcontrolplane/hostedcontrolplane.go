@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
+
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -152,6 +154,16 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
+	isVpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
+	if err != nil {
+		log.Error(err, "failed to check VPC Endpoint readiness")
+		return utilreconcile.RequeueWith(err)
+	}
+	if !isVpcEndpointReady {
+		log.Info("VPC Endpoint is not ready, skipping HTTP Monitor deployment")
+		return utilreconcile.Stop()
+	}
+
 	log.Info("Deploying HTTP Monitor Resources")
 	err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
 	if err != nil {
@@ -160,6 +172,29 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	return ctrl.Result{}, err
+}
+
+// isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
+func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	// Create an instance of the VpcEndpoint
+	vpcEndpoint := &avov1alpha2.VpcEndpoint{}
+
+	// Construct the name and namespace of the VpcEndpoint
+	vpcEndpointName := "private-hcp"
+	vpcEndpointNamespace := hostedcontrolplane.Namespace
+
+	// Fetch the VpcEndpoint resource
+	err := r.Client.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
+	if err != nil {
+		return false, err
+	}
+
+	// Check readiness using the Status field
+	if vpcEndpoint.Status.Status == "available" {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("VPC Endpoint %s/%s is not ready, status: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
