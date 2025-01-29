@@ -1105,7 +1105,6 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 func TestIsVpcEndpointReady(t *testing.T) {
 	tests := []struct {
 		name              string
-		vpcEndpointName   string
 		vpcEndpointStatus string
 		expectedResult    bool
 		expectedError     bool
@@ -1117,8 +1116,20 @@ func TestIsVpcEndpointReady(t *testing.T) {
 			expectedError:     false,
 		},
 		{
-			name:              "VpcEndpoint is not available",
+			name:              "VpcEndpoint is pending",
 			vpcEndpointStatus: "pending",
+			expectedResult:    false,
+			expectedError:     false, // Pending is not an error, just not ready
+		},
+		{
+			name:              "VpcEndpoint is rejected",
+			vpcEndpointStatus: "rejected",
+			expectedResult:    false,
+			expectedError:     true,
+		},
+		{
+			name:              "VpcEndpoint is failed",
+			vpcEndpointStatus: "failed",
 			expectedResult:    false,
 			expectedError:     true,
 		},
@@ -1142,7 +1153,6 @@ func TestIsVpcEndpointReady(t *testing.T) {
 					Namespace: "default",
 				},
 			}
-
 
 			r := newTestReconciler(t)
 			ctx := context.Background()
