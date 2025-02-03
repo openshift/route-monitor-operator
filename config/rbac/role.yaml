@@ -233,3 +233,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - avo.openshift.io
+  resources:
+  - vpcendpoints
+  verbs:
+  - get
+  - list
+  - watch
+

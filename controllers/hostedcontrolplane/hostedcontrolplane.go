@@ -156,7 +156,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	isVpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
 	if err != nil {
-		log.Error(err, "failed to check VPC Endpoint readiness")
+		log.Error(err, "VPC Endpoint check failed")
 		return utilreconcile.RequeueWith(err)
 	}
 	if !isVpcEndpointReady {
@@ -190,11 +190,21 @@ func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, h
 	}
 
 	// Check readiness using the Status field
-	if vpcEndpoint.Status.Status == "available" {
+	// Cases can be found here: https://github.com/openshift/aws-vpce-operator/blob/main/controllers/vpcendpoint/validation.go#L148
+	switch vpcEndpoint.Status.Status {
+	case "available":
+		// VPC Endpoint is ready
 		return true, nil
+	case "pendingAcceptance", "pending", "deleting":
+		// These states mean the VPC Endpoint is transitioning, so we return false (without an error)
+		return false, nil
+	case "rejected", "failed", "deleted":
+		// Bad states, return an error
+		return false, fmt.Errorf("VPC Endpoint %s/%s is in a bad state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
+	default:
+		// Unknown state, return an error
+		return false, fmt.Errorf("VPC Endpoint %s/%s is in an unknown state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
 	}
-
-	return false, fmt.Errorf("VPC Endpoint %s/%s is not ready, status: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
