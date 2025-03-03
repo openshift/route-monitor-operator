@@ -69,14 +69,16 @@ var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedContro
 // HostedControlPlaneReconciler reconciles a HostedControlPlane object
 type HostedControlPlaneReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	ApiReader client.Reader
+	Scheme    *runtime.Scheme
 }
 
 // NewHostedControlPlaneReconciler creates a HostedControlPlaneReconciler
 func NewHostedControlPlaneReconciler(mgr manager.Manager) *HostedControlPlaneReconciler {
 	return &HostedControlPlaneReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		ApiReader: mgr.GetAPIReader(),
+		Scheme:    mgr.GetScheme(),
 	}
 }
 
@@ -184,7 +186,7 @@ func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, h
 	vpcEndpointNamespace := hostedcontrolplane.Namespace
 
 	// Fetch the VpcEndpoint resource
-	err := r.Client.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
+	err := r.ApiReader.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
 	if err != nil {
 		return false, err
 	}
