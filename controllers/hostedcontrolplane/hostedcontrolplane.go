@@ -156,21 +156,29 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
-	isVpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
+	httpExists, err := checkHttpMonitorExists(dynatraceApiClient, hostedcontrolplane)
 	if err != nil {
-		log.Error(err, "VPC Endpoint check failed")
+		log.Error(err, "Failed to lookup if Dynatrace monitor exists")
 		return utilreconcile.RequeueWith(err)
 	}
-	if !isVpcEndpointReady {
-		log.Info("VPC Endpoint is not ready, skipping HTTP Monitor deployment")
-		return utilreconcile.Stop()
-	}
+	// If the monitor isn't created, create as long as VPC Endpoint is ready
+	if !httpExists {
+		isVpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
+		if err != nil {
+			log.Error(err, "VPC Endpoint check failed")
+			return utilreconcile.RequeueWith(err)
+		}
+		if !isVpcEndpointReady {
+			log.Info("VPC Endpoint is not ready, skipping HTTP Monitor deployment")
+			return utilreconcile.Stop()
+		}
 
-	log.Info("Deploying HTTP Monitor Resources")
-	err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
-	if err != nil {
-		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
-		return utilreconcile.RequeueWith(err)
+		log.Info("Deploying HTTP Monitor Resources")
+		err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
+		if err != nil {
+			log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
+			return utilreconcile.RequeueWith(err)
+		}
 	}
 
 	return ctrl.Result{}, err
