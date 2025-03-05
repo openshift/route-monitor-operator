@@ -128,7 +128,7 @@ bundle:
 
 # Build the bundle image.
 bundle-build:
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	docker buildx build --platform linux/amd64 -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 packagemanifests: pre-deploy
 	$(OPERATOR_SDK) generate kustomize manifests -q
@@ -140,7 +140,7 @@ packagemanifests: pre-deploy
 		--output-dir $(BUNDLE_DIR) \
 
 packagemanifests-build:
-	docker build -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
+	docker buildx build --platform linux/amd64 -f packagemanifests.Dockerfile -t $(BUNDLE_IMG) --build-arg BUNDLE_DIR=$(BUNDLE_DIR) .
 
 syncset-install:
 	oc process --local -f $(SELECTOR_SYNC_SET_DESTINATION) \
