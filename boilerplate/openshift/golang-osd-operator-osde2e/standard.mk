@@ -49,7 +49,7 @@ OSDE2E_CONVENTION_DIR := boilerplate/openshift/golang-osd-operator-osde2e
 container-build-push-one: container-engine-login
 	@(if [[ -z "${IMAGE_URI}" ]]; then echo "Must specify IMAGE_URI"; exit 1; fi)
 	@(if [[ -z "${DOCKERFILE_PATH}" ]]; then echo "Must specify DOCKERFILE_PATH"; exit 1; fi)
-	${CONTAINER_ENGINE} build --pull -f $(DOCKERFILE_PATH) -t $(IMAGE_URI) .
+	${CONTAINER_ENGINE} buildx build --platform linux/amd64 --pull -f $(DOCKERFILE_PATH) -t $(IMAGE_URI) .
 	${CONTAINER_ENGINE} push ${IMAGE_URI}
 
 # log into quay.io

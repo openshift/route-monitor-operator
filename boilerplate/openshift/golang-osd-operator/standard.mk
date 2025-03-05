@@ -155,13 +155,13 @@ isclean:
 docker-build-push-one: isclean docker-login
 	@(if [[ -z "${IMAGE_URI}" ]]; then echo "Must specify IMAGE_URI"; exit 1; fi)
 	@(if [[ -z "${DOCKERFILE_PATH}" ]]; then echo "Must specify DOCKERFILE_PATH"; exit 1; fi)
-	${CONTAINER_ENGINE} build --pull -f $(DOCKERFILE_PATH) -t $(IMAGE_URI) .
+	${CONTAINER_ENGINE} buildx build --platform linux/amd64 --pull -f $(DOCKERFILE_PATH) -t $(IMAGE_URI) .
 	${CONTAINER_ENGINE} push ${IMAGE_URI}
 
 # TODO: Get rid of docker-build. It's only used by opm-build-push
 .PHONY: docker-build
 docker-build: isclean
-	${CONTAINER_ENGINE} build --pull -f $(OPERATOR_DOCKERFILE) -t $(OPERATOR_IMAGE_URI) .
+	${CONTAINER_ENGINE} buildx build --platform linux/amd64 --pull -f $(OPERATOR_DOCKERFILE) -t $(OPERATOR_IMAGE_URI) .
 	${CONTAINER_ENGINE} tag $(OPERATOR_IMAGE_URI) $(OPERATOR_IMAGE_URI_LATEST)
 
 # TODO: Get rid of docker-push. It's only used by opm-build-push
