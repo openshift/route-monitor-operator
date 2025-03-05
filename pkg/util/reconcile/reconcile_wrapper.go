@@ -3,6 +3,7 @@ package reconcile
 import (
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"time"
 )
 
 var Log logr.Logger = ctrl.Log.WithName("ReconcileOperation")
@@ -32,4 +33,8 @@ func RequeueWith(err error) (ctrl.Result, error) {
 
 func Requeue() (ctrl.Result, error) {
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func RequeueAfter(requeueAfter time.Duration) ctrl.Result {
+	return ctrl.Result{RequeueAfter: requeueAfter}
 }

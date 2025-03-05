@@ -65,7 +65,7 @@ const (
 	dynatraceTenantKey       = "apiUrl"
 
 	// requeueAfter can be used with RequeueAfter()
-	requeueAfter = 5 * time.Minute
+	requeueAfterValue = 5 * time.Minute
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -165,7 +165,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 	if !isVpcEndpointReady {
 		log.Info("VPC Endpoint is not ready, delaying HTTP Monitor deployment")
-		return ctrl.Result{RequeueAfter: requeueAfter}, err
+		return utilreconcile.RequeueAfter(requeueAfterValue), err
 	}
 
 	log.Info("Deploying HTTP Monitor Resources")
