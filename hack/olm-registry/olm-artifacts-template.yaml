@@ -32,6 +32,7 @@ objects:
       matchLabels:
         api.openshift.com/managed: 'true'
     resourceApplyMode: Sync
+    applyBehavior: CreateOrUpdate
     resources:
     - apiVersion: v1
       kind: Namespace
