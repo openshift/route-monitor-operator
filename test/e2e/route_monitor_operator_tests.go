@@ -38,7 +38,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		deploymentName   = "route-monitor-operator-controller-manager"
 		operatorName     = "route-monitor-operator"
 		consoleName      = "console"
-		pollingDuration  = 10 * time.Minute
+		pollingDuration  = 2 * time.Minute
 		routeMonitorName = "routemonitor-e2e-test"
 	)
 	BeforeAll(func(ctx context.Context) {
@@ -120,7 +120,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 
 		By("Checking the pod state")
 		var phase kubev1.PodPhase
-		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			err := k8s.Get(ctx, pod.Name, pod.Namespace, pod)
 			Expect(err).ShouldNot(HaveOccurred(), "Unable to get the testing pod")
 			if pod != nil {
@@ -221,7 +221,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		Expect(err).ShouldNot(HaveOccurred(), "Failed to delete RouteMonitor")
 
 		// wait for the routemonitor to delete before returning.
-		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			err = k8s.Get(ctx, rmo.Name, rmo.Namespace, rmo)
 			if k8serrors.IsNotFound(err) {
 				return true, nil // RouteMonitor is deleted
