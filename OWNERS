@@ -1,16 +1,11 @@
 maintainers:
-- NautiluX
+- chcollin
+- srep-functional-leads
+- srep-team-leads
 approvers:
 - Tessg22
-- rafael-azevedo
-- sam-nguyen7
-- dustman9000
-- tnierman
 - srep-functional-leads
 - srep-team-leads
 reviewers:
+- srep-functional-team-rocket
 - Tessg22
-- rafael-azevedo
-- sam-nguyen7
-- dustman9000
-- tnierman
