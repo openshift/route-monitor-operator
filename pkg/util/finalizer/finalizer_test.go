@@ -1,5 +1,7 @@
 package finalizer_test
 
+// cspell: ignore routemonitorconst
+
 import (
 	"time"
 
@@ -7,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/pkg/consts"
 	routemonitorconst "github.com/openshift/route-monitor-operator/pkg/consts"
 	. "github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,7 +47,7 @@ var _ = Describe("Finalizer", func() {
 
 			It("should return false", func() {
 				// Act
-				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				res := HasFinalizer(&routeMonitor, routemonitorconst.FinalizerKey)
 				// Assert
 				Expect(res).To(BeFalse())
 			})
@@ -54,7 +55,7 @@ var _ = Describe("Finalizer", func() {
 		When("'FinalizerKey' is in the 'Finalizers' list", func() {
 			It("should return true", func() {
 				// Act
-				res := HasFinalizer(&routeMonitor, consts.FinalizerKey)
+				res := HasFinalizer(&routeMonitor, routemonitorconst.FinalizerKey)
 				// Assert
 				Expect(res).To(BeTrue())
 			})
@@ -122,7 +123,7 @@ var _ = Describe("Finalizer", func() {
 		})
 	})
 	Describe("Remove", func() {
-		When("object doesnt have the finalizer in Finalizers", func() {
+		When("object doesn't have the finalizer in Finalizers", func() {
 			It("should return an empty list", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{
@@ -133,7 +134,7 @@ var _ = Describe("Finalizer", func() {
 				Expect(obj.Finalizers).To(Equal([]string{}))
 			})
 		})
-		When("object doesnt have the finalizer in Finalizers", func() {
+		When("object doesn't have the finalizer in Finalizers", func() {
 			It("should return the same list", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{
@@ -144,7 +145,7 @@ var _ = Describe("Finalizer", func() {
 				Expect(obj.Finalizers).To(Equal([]string{secondKey}))
 			})
 		})
-		When("key in object fianlizers", func() {
+		When("key in object Finalizers", func() {
 			It("should remove the key", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{
@@ -157,7 +158,7 @@ var _ = Describe("Finalizer", func() {
 		})
 	})
 	Describe("Add", func() {
-		When("object doesnt have Finalizers", func() {
+		When("object doesn't have Finalizers", func() {
 			It("should create a list", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{}
@@ -189,7 +190,7 @@ var _ = Describe("Finalizer", func() {
 				Expect(obj.Finalizers).To(Equal([]string{key, secondKey}))
 			})
 		})
-		When("key in object fianlizers", func() {
+		When("key in object Finalizers", func() {
 			It("do nothing", func() {
 				// Arrange
 				obj := metav1.ObjectMeta{

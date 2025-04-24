@@ -90,12 +90,12 @@ var _ = Describe("CR Deployment Handling", func() {
 		})
 		When("ErrorStatus is empty and needs to be set", func() {
 			It("should set the ErrorStatus and return true", func() {
-				res := rc.SetErrorStatus(&errorStatusString, consterror.CustomError)
+				res := rc.SetErrorStatus(&errorStatusString, consterror.ErrCustomError)
 				Expect(res).To(Equal(true))
-				Expect(errorStatusString).To(Equal(consterror.CustomError.Error()))
+				Expect(errorStatusString).To(Equal(consterror.ErrCustomError.Error()))
 			})
 		})
-		When("ErrorStatus was filled but no error has occured", func() {
+		When("ErrorStatus was filled but no error has occurred", func() {
 			BeforeEach(func() {
 				errorStatusString = "PreviousErrorState"
 			})
@@ -105,12 +105,12 @@ var _ = Describe("CR Deployment Handling", func() {
 				Expect(errorStatusString).To(Equal(""))
 			})
 		})
-		When("ErrorStatus was filled and error occured", func() {
+		When("ErrorStatus was filled and error occurred", func() {
 			BeforeEach(func() {
 				errorStatusString = "PreviousErrorState"
 			})
 			It("should flush the ErrorStatus and return true", func() {
-				res := rc.SetErrorStatus(&errorStatusString, consterror.CustomError)
+				res := rc.SetErrorStatus(&errorStatusString, consterror.ErrCustomError)
 				Expect(res).To(Equal(false))
 				Expect(errorStatusString).To(Equal("PreviousErrorState"))
 			})
@@ -146,7 +146,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should return an empty string and an error", func() {
 				Expect(res).To(Equal(""))
-				Expect(err).To(Equal(customerrors.InvalidSLO))
+				Expect(err).To(Equal(customerrors.ErrInvalidSLO))
 			})
 		})
 		When("the url is empty", func() {
@@ -155,7 +155,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should return an empty string and an error", func() {
 				Expect(res).To(Equal(""))
-				Expect(err).To(Equal(customerrors.NoHost))
+				Expect(err).To(Equal(customerrors.ErrNoHost))
 			})
 		})
 		When("the percentage is too high", func() {
@@ -164,7 +164,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should return an empty string and an error", func() {
 				Expect(res).To(Equal(""))
-				Expect(err).To(Equal(customerrors.InvalidSLO))
+				Expect(err).To(Equal(customerrors.ErrInvalidSLO))
 			})
 		})
 		When("the percentage is too low", func() {
@@ -173,7 +173,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should return an empty string and an error", func() {
 				Expect(res).To(Equal(""))
-				Expect(err).To(Equal(customerrors.InvalidSLO))
+				Expect(err).To(Equal(customerrors.ErrInvalidSLO))
 			})
 		})
 		When("all values are valid", func() {
@@ -203,11 +203,11 @@ var _ = Describe("CR Deployment Handling", func() {
 		When("when updating the monitor failed", func() {
 			BeforeEach(func() {
 				update.CalledTimes = 1
-				update.ErrorResponse = consterror.CustomError
+				update.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should try to requeue with the particular error", func() {
 				Expect(res).To(Equal(reconcile.RequeueOperation()))
-				Expect(err).To(Equal(consterror.CustomError))
+				Expect(err).To(Equal(consterror.ErrCustomError))
 			})
 		})
 		When("when updating the monitor succeeds", func() {
@@ -273,7 +273,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should indicate error", func() {
 				Expect(res).To(Equal(false))
-				Expect(err).To(Equal(customerrors.InvalidReferenceUpdate))
+				Expect(err).To(Equal(customerrors.ErrInvalidReferenceUpdate))
 			})
 		})
 	})
@@ -301,11 +301,11 @@ var _ = Describe("CR Deployment Handling", func() {
 		})
 		When("when updating the monitor failed", func() {
 			BeforeEach(func() {
-				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(consterror.CustomError)
+				mockStatusWriter.EXPECT().Update(gomock.Any(), gomock.Any()).Times(1).Return(consterror.ErrCustomError)
 			})
 			It("should try to requeue with the particular error", func() {
 				Expect(res).To(Equal(reconcile.RequeueOperation()))
-				Expect(err).To(Equal(consterror.CustomError))
+				Expect(err).To(Equal(consterror.ErrCustomError))
 			})
 		})
 		When("when updating the monitor succeeds", func() {

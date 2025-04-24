@@ -1,6 +1,9 @@
-The tests suite here starts with a standard of gomock and ginkgo
+# Testing
+
+The test suite here starts with a standard of gomock and ginkgo
 
 for a basic understanding of these refer to:
+
 - [ginkgo's website](https://onsi.github.io/ginkgo/)
 - [uber-go/mock](https://github.com/uber-go/mock)
 
@@ -11,6 +14,7 @@ but know how to use the existing ones.
 The next thing is to understand the structure of the mocks.
 Each test, which is wrapped in an `It` block.
 has usually one or more of these sections:
+
 - `BeforeEach` block: to set default values
 - `JustBeforeEach` block: to use the default values (which were set in the BeforeEach)
 

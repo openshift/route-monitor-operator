@@ -8,7 +8,6 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,10 +40,10 @@ type MonitorResourceHandler interface {
 	UpdateMonitorResourceStatus(cr client.Object) (utilreconcile.Result, error)
 
 	// SetFinalizer adds finalizerKey to an object
-	SetFinalizer(o v1.Object, finalizerKey string) bool
+	SetFinalizer(o metav1.Object, finalizerKey string) bool
 
 	// DeleteFinalizer removes Finalizer from object
-	DeleteFinalizer(o v1.Object, finalizerKey string) bool
+	DeleteFinalizer(o metav1.Object, finalizerKey string) bool
 
 	// GetClusterID fetches the Cluster ID
 	GetOSDClusterID() (string, error)

@@ -1,11 +1,12 @@
+---
 maintainers:
-- chcollin
-- srep-functional-leads
-- srep-team-leads
+  - chcollin
+  - srep-functional-leads
+  - srep-team-leads
 approvers:
-- Tessg22
-- srep-functional-leads
-- srep-team-leads
+  - Tessg22  # cspell:ignore Tessg
+  - srep-functional-leads
+  - srep-team-leads
 reviewers:
-- srep-functional-team-rocket
-- Tessg22
+  - srep-functional-team-rocket
+  - Tessg22

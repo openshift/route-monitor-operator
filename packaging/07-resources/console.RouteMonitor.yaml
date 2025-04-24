@@ -1,8 +1,9 @@
+---
 apiVersion: monitoring.openshift.io/v1alpha1
 kind: RouteMonitor
 metadata:
   annotations:
-    package-operator.run/phase: resources	
+    package-operator.run/phase: resources
   name: console
   namespace: openshift-route-monitor-operator
 spec:

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-set -x
 set -eo pipefail
+
+if [ "$BOILERPLATE_SET_X" ]; then
+  set -x
+fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 source $REPO_ROOT/boilerplate/_lib/common.sh

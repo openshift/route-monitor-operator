@@ -34,15 +34,15 @@ func Test_buildMetadataForUpdate(t *testing.T) {
 			},
 		}
 
-		dgps = int64(0)
-		meta = metav1.ObjectMeta{
+		deletionGracePeriod = int64(0)
+		meta                = metav1.ObjectMeta{
 			Name:                       "actual",
 			Namespace:                  "actualNS",
 			ResourceVersion:            "0123456789",
 			Generation:                 int64(1234),
 			CreationTimestamp:          metav1.Now(),
 			DeletionTimestamp:          &metav1.Time{Time: time.Now()},
-			DeletionGracePeriodSeconds: &dgps,
+			DeletionGracePeriodSeconds: &deletionGracePeriod,
 		}
 	)
 
@@ -175,7 +175,7 @@ func TestHostedControlPlaneReconciler_buildInternalMonitoringRoute(t *testing.T)
 			},
 			eval: func(route routev1.Route) (bool, string) {
 				if len(route.OwnerReferences) != 1 {
-					return false, fmt.Sprintf("incorrect number of ownerrefs: expected 1, got %d", len(route.OwnerReferences))
+					return false, fmt.Sprintf("incorrect number of ownerReferences: expected 1, got %d", len(route.OwnerReferences))
 				}
 				if reflect.DeepEqual(route.OwnerReferences[0], buildOwnerReferences(&hcp)) {
 					return false, "ownerref for route is incorrect"
@@ -379,6 +379,7 @@ func TestHostedControlPlaneReconciler_finalizeHostedControlPlane(t *testing.T) {
 }
 
 func TestHostedControlPlaneReconciler_deployInternalMonitoringObjects(t *testing.T) {
+	// cspell:ignore objs
 	// Test-specific definitions
 	var (
 		ctx = context.TODO()
@@ -640,12 +641,12 @@ func TestHostedControlPlaneReconciler_deleteInternalMonitoringObjects(t *testing
 				&routemonitor,
 			},
 			eval: func(_ error, r *HostedControlPlaneReconciler) (passed bool, reason string) {
-				err := r.Client.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, &routev1.Route{})
+				err := r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, &routev1.Route{})
 				if !errors.IsNotFound(err) {
 					return false, fmt.Sprintf("expected route to be deleted, instead got err: %v", err)
 				}
 
-				err = r.Client.Get(ctx, types.NamespacedName{Name: routemonitor.Name, Namespace: routemonitor.Namespace}, &v1alpha1.RouteMonitor{})
+				err = r.Get(ctx, types.NamespacedName{Name: routemonitor.Name, Namespace: routemonitor.Namespace}, &v1alpha1.RouteMonitor{})
 				if !errors.IsNotFound(err) {
 					return false, fmt.Sprintf("expected routemonitor to be deleted, instead got err: %v", err)
 				}
@@ -671,7 +672,7 @@ func TestHostedControlPlaneReconciler_deleteInternalMonitoringObjects(t *testing
 				&routemonitor,
 			},
 			eval: func(_ error, r *HostedControlPlaneReconciler) (passed bool, reason string) {
-				err := r.Client.Get(ctx, types.NamespacedName{Name: routemonitor.Name, Namespace: routemonitor.Namespace}, &v1alpha1.RouteMonitor{})
+				err := r.Get(ctx, types.NamespacedName{Name: routemonitor.Name, Namespace: routemonitor.Namespace}, &v1alpha1.RouteMonitor{})
 				if !errors.IsNotFound(err) {
 					return false, fmt.Sprintf("expected routemonitor to have been deleted, instead got err: %v", err)
 				}
@@ -697,7 +698,7 @@ func TestHostedControlPlaneReconciler_deleteInternalMonitoringObjects(t *testing
 				&route,
 			},
 			eval: func(_ error, r *HostedControlPlaneReconciler) (passed bool, reason string) {
-				err := r.Client.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, &routev1.Route{})
+				err := r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, &routev1.Route{})
 				if !errors.IsNotFound(err) {
 					return false, fmt.Sprintf("expected route to have been deleted, instead got err: %v", err)
 				}
@@ -760,7 +761,7 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		w.Write([]byte(responseBody)) // nolint:errcheck
 	})
 }
 
@@ -838,7 +839,7 @@ func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "dynatrace-token", Namespace: "openshift-route-monitor-operator"},
 				Data:       tt.secretData,
 			}
-			if err := r.Client.Create(ctx, secret); err != nil {
+			if err := r.Create(ctx, secret); err != nil {
 				t.Fatalf("Failed to create test Secret: %v", err)
 			}
 
@@ -955,7 +956,7 @@ func TestHostedControlPlaneReconciler_UpdateHostedControlPlaneLabels(t *testing.
 				},
 			}
 
-			err := r.Client.Create(ctx, hostedcontrolplane)
+			err := r.Create(ctx, hostedcontrolplane)
 			if err != nil {
 				t.Fatalf("Failed to create mock HostedControlPlane resource: %v", err)
 			}
@@ -1044,21 +1045,21 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 		dynatraceMonitorId   string
 		mockServerResponse   string
 		mockServerStatusCode int
-		expectedError        error
+		expectErr            error
 	}{
 		{
 			name:                 "Create Monitor Successfully",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"id":"new-monitor-id"}`,
 			mockServerStatusCode: http.StatusOK,
-			expectedError:        nil,
+			expectErr:            nil,
 		},
 		{
 			name:                 "Error Creating Monitor",
 			dynatraceMonitorId:   "",
 			mockServerResponse:   `{"error":"creation error"}`,
 			mockServerStatusCode: http.StatusInternalServerError,
-			expectedError:        fmt.Errorf("error creating HTTP monitor: creation error"),
+			expectErr:            fmt.Errorf("error creating HTTP monitor: creation error"),
 		},
 	}
 
@@ -1096,6 +1097,7 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 			log := log.FromContext(ctx) // Replace with a proper logger if needed
 
 			// Call the function under test
+			// nolint:errcheck // this was a placeholder test, and does not work under the covers - we need to mock multiple calls to the mocked API server
 			r.deployDynatraceHttpMonitorResources(ctx, apiClient, log, hostedControlPlane)
 
 		})
@@ -1156,7 +1158,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 
 			r := newTestReconciler(t)
 			ctx := context.Background()
-			// r.Client.Create(ctx, hcp)
+			// r.Create(ctx, hcp)
 
 			// Mocking the VpcEndpoint
 			if tt.vpcEndpointStatus != "" {
@@ -1169,7 +1171,10 @@ func TestIsVpcEndpointReady(t *testing.T) {
 						Status: tt.vpcEndpointStatus,
 					},
 				}
-				r.Client.Create(ctx, vpcEndpointTest)
+				err := r.Create(ctx, vpcEndpointTest)
+				if err != nil {
+					t.Fatalf("Failed to create mock VpcEndpoint resource: %v", err)
+				}
 			}
 
 			// Test the function

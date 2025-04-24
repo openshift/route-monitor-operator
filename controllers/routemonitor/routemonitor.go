@@ -84,7 +84,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.V(2).Info("Entering GetRouteMonitor")
 	routeMonitor, res, err := r.GetRouteMonitor(req)
 	if err != nil {
-		log.Error(err, "Failed to retreive RouteMonitor. Requeueing...")
+		log.Error(err, "Failed to retrieve RouteMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {

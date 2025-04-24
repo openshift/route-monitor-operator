@@ -122,7 +122,7 @@ var _ = Describe("Integrationtests", func() {
 				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: clusterUrlMonitorNamespace, Name: clusterUrlMonitorName}, &updatedClusterUrlMonitor)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(updatedClusterUrlMonitor.Status.ErrorStatus).To(Equal(customerrors.InvalidSLO.Error()))
+				Expect(updatedClusterUrlMonitor.Status.ErrorStatus).To(Equal(customerrors.ErrInvalidSLO.Error()))
 			})
 		})
 
@@ -305,7 +305,7 @@ var _ = Describe("Integrationtests", func() {
 				err = i.Client.Get(context.TODO(), types.NamespacedName{Namespace: routeMonitorNamespace, Name: routeMonitorName}, &updatedRouteMonitor)
 				Expect(err).NotTo(HaveOccurred())
 
-				Expect(updatedRouteMonitor.Status.ErrorStatus).To(Equal(customerrors.InvalidSLO.Error()))
+				Expect(updatedRouteMonitor.Status.ErrorStatus).To(Equal(customerrors.ErrInvalidSLO.Error()))
 			})
 		})
 		When("the RouteMonitor does not exist", func() {

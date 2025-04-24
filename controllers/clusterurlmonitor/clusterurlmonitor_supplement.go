@@ -85,7 +85,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 func isClusterVersionAvailable(hcp hypershiftv1beta1.HostedControlPlane) error {
 	condition := meta.FindStatusCondition(hcp.Status.Conditions, string(hypershiftv1beta1.ClusterVersionAvailable))
 	if condition == nil || condition.Status != metav1.ConditionTrue {
-		return fmt.Errorf("The cluster API is not yet available")
+		return fmt.Errorf("cluster API is not yet available")
 	}
 	return nil
 }
