@@ -75,7 +75,7 @@ func (r *RouteMonitorReconciler) EnsurePrometheusRuleExists(routeMonitor v1alpha
 func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	// Was the RouteURL populated by a previous step?
 	if routeMonitor.Status.RouteURL == "" {
-		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+		return utilreconcile.RequeueReconcileWith(customerrors.ErrNoHost)
 	}
 
 	var id string
@@ -191,7 +191,7 @@ func (r *RouteMonitorReconciler) GetRoute(routeMonitor v1alpha1.RouteMonitor) (r
 		Namespace: routeMonitor.Spec.Route.Namespace,
 	}
 	if nsName.Name == "" || nsName.Namespace == "" {
-		err := errors.New("Invalid CR: Cannot retrieve route if one of the fields is empty")
+		err := errors.New("invalid CR: Cannot retrieve route if one of the fields is empty")
 		return res, err
 	}
 
@@ -203,7 +203,7 @@ func (r *RouteMonitorReconciler) GetRoute(routeMonitor v1alpha1.RouteMonitor) (r
 func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, routeMonitor v1alpha1.RouteMonitor) (utilreconcile.Result, error) {
 	amountOfIngress := len(route.Status.Ingress)
 	if amountOfIngress == 0 {
-		err := errors.New("No Ingress: cannot extract route url from the Route resource")
+		err := errors.New("no Ingress: cannot extract route url from the Route resource")
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	extractedRouteURL := route.Status.Ingress[0].Host
@@ -212,7 +212,7 @@ func (r *RouteMonitorReconciler) EnsureRouteURLExists(route routev1.Route, route
 	}
 
 	if extractedRouteURL == "" {
-		return utilreconcile.RequeueReconcileWith(customerrors.NoHost)
+		return utilreconcile.RequeueReconcileWith(customerrors.ErrNoHost)
 	}
 
 	if routeMonitor.Spec.Route.Port != 0 {

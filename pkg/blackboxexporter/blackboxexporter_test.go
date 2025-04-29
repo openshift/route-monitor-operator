@@ -70,14 +70,14 @@ var _ = Describe("Blackboxexporter", func() {
 		When("'Get' return an error", func() {
 			// Arrange
 			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should bubble the error up", func() {
 				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 
@@ -104,7 +104,7 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterServiceAbsent()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 
@@ -130,14 +130,14 @@ var _ = Describe("Blackboxexporter", func() {
 		When("'Get' return an error", func() {
 			// Arrange
 			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should bubble the error up", func() {
 				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 
@@ -164,7 +164,7 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentAbsent()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 
@@ -204,14 +204,14 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should return the error and not call `Create`", func() {
 				// Act
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 		When("the resource(deployment) Create fails unexpectedly", func() {
@@ -225,7 +225,7 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 	})
@@ -267,7 +267,7 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 		When("the resource(service) Create fails unexpectedly", func() {
@@ -281,7 +281,7 @@ var _ = Describe("Blackboxexporter", func() {
 				err := blackboxExporter.EnsureBlackBoxExporterServiceExists()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 	})
@@ -314,7 +314,7 @@ var _ = Describe("Blackboxexporter", func() {
 				_, err := blackboxExporter.ShouldDeleteBlackBoxExporterResources()
 				// Assert
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(consterror.CustomError))
+				Expect(err).To(MatchError(consterror.ErrCustomError))
 			})
 		})
 

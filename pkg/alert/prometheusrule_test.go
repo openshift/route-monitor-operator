@@ -94,10 +94,10 @@ var _ = Describe("CR Deployment Handling", func() {
 		})
 		When("the Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
-				get.ErrorResponse = consterror.CustomError
+				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should return the received error", func() {
-				Expect(err).To(Equal(consterror.CustomError))
+				Expect(err).To(Equal(consterror.ErrCustomError))
 			})
 		})
 		Describe("no ServiceMonitor has been deployed yet", func() {
@@ -110,10 +110,10 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			When("an error appeared during the creation", func() {
 				BeforeEach(func() {
-					create.ErrorResponse = consterror.CustomError
+					create.ErrorResponse = consterror.ErrCustomError
 				})
 				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
+					Expect(err).To(Equal(consterror.ErrCustomError))
 				})
 			})
 		})
@@ -131,10 +131,10 @@ var _ = Describe("CR Deployment Handling", func() {
 				})
 				When("the client failed to update the existing deployments", func() {
 					BeforeEach(func() {
-						update.ErrorResponse = consterror.CustomError
+						update.ErrorResponse = consterror.ErrCustomError
 					})
 					It("should return the received error", func() {
-						Expect(err).To(Equal(consterror.CustomError))
+						Expect(err).To(Equal(consterror.ErrCustomError))
 					})
 				})
 			})
@@ -167,10 +167,10 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			When("the client failed to fetch the PrometheusRule", func() {
 				BeforeEach(func() {
-					get.ErrorResponse = consterror.CustomError
+					get.ErrorResponse = consterror.ErrCustomError
 				})
 				It("returns the received error", func() {
-					Expect(err).To(Equal(consterror.CustomError))
+					Expect(err).To(Equal(consterror.ErrCustomError))
 				})
 			})
 			When("the PrometheusRule Deployment doesnt exist", func() {
@@ -190,10 +190,10 @@ var _ = Describe("CR Deployment Handling", func() {
 				})
 				When("the client failed to delete the deployment", func() {
 					BeforeEach(func() {
-						delete.ErrorResponse = consterror.CustomError
+						delete.ErrorResponse = consterror.ErrCustomError
 					})
 					It("returns the received error", func() {
-						Expect(err).To(Equal(consterror.CustomError))
+						Expect(err).To(Equal(consterror.ErrCustomError))
 					})
 				})
 			})

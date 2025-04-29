@@ -15,7 +15,7 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody))
+		w.Write([]byte(responseBody)) // nolint:errcheck
 	})
 }
 func TestNewAPIClient(t *testing.T) {

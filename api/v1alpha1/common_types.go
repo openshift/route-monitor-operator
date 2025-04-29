@@ -19,16 +19,16 @@ func (s SloSpec) IsValid() (bool, string) {
 		return false, ""
 	}
 
-	d, sucess := new(inf.Dec).SetString(s.TargetAvailabilityPercent)
+	d, success := new(inf.Dec).SetString(s.TargetAvailabilityPercent)
 	// value is not parsable
-	if !sucess {
+	if !success {
 		return false, ""
 	}
 
 	// will be 90
-	ninty := inf.NewDec(9, -1)
+	ninety := inf.NewDec(9, -1)
 	// is lower than lower bound
-	if d.Cmp(ninty) <= 0 {
+	if d.Cmp(ninety) <= 0 {
 		return false, ""
 	}
 

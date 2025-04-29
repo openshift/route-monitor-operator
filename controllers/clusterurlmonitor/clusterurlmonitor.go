@@ -87,7 +87,7 @@ func (r *ClusterUrlMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	log.V(2).Info("Entering GetClusterUrlMonitor")
 	clusterUrlMonitor, res, err := r.GetClusterUrlMonitor(req)
 	if err != nil {
-		log.Error(err, "Failed to retreive ClusterUrlMonitor. Requeueing...")
+		log.Error(err, "Failed to retrieve ClusterUrlMonitor. Requeueing...")
 		return utilreconcile.RequeueWith(err)
 	}
 	if res.ShouldStop() {

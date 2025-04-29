@@ -27,7 +27,7 @@ import (
 //			Times(getCalledTimes)
 //	}
 //
-// this made the tests full of variables that were used seperately
+// this made the tests full of variables that were used separately
 // by joining them into one struct, a more unified way was introduced
 type MockHelper struct {
 	CalledTimes   int
@@ -43,6 +43,6 @@ func NotFoundErrorHappensOnce() MockHelper {
 func CustomErrorHappensOnce() MockHelper {
 	return MockHelper{
 		CalledTimes:   1,
-		ErrorResponse: consterror.CustomError,
+		ErrorResponse: consterror.ErrCustomError,
 	}
 }

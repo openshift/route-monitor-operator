@@ -58,9 +58,9 @@ const (
 	//httpMonitorLabel is added to hcp object to keep track of when to create and delete of dynatrace http monitor
 	httpMonitorLabel = "dynatrace.http.monitor/id"
 
-	//fetch dynatrace secret to get dynatrace api token and tennant url
+	//fetch dynatrace secret to get dynatrace api token and tenant url
 	dynatraceSecretNamespace = "openshift-route-monitor-operator"
-	dynatraceSecretName      = "dynatrace-token"
+	dynatraceSecretName      = "dynatrace-token" // nolint:gosec // Not a hardcoded credential
 	dynatraceApiKey          = "apiToken"
 	dynatraceTenantKey       = "apiUrl"
 
@@ -96,7 +96,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Fetch the HostedControlPlane instance
 	hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{}
-	err := r.Client.Get(ctx, req.NamespacedName, hostedcontrolplane)
+	err := r.Get(ctx, req.NamespacedName, hostedcontrolplane)
 	if err != nil {
 		if kerr.IsNotFound(err) {
 			log.Info("HostedControlPlane not found, assumed deleted")
@@ -130,7 +130,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 			return utilreconcile.RequeueWith(err)
 		}
 		finalizer.Remove(hostedcontrolplane, hostedcontrolplaneFinalizer)
-		err = r.Client.Update(ctx, hostedcontrolplane)
+		err = r.Update(ctx, hostedcontrolplane)
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
@@ -139,7 +139,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	if !finalizer.Contains(hostedcontrolplane.Finalizers, hostedcontrolplaneFinalizer) {
 		finalizer.Add(hostedcontrolplane, hostedcontrolplaneFinalizer)
-		err := r.Client.Update(ctx, hostedcontrolplane)
+		err := r.Update(ctx, hostedcontrolplane)
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
@@ -188,7 +188,7 @@ func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, h
 	vpcEndpointNamespace := hostedcontrolplane.Namespace
 
 	// Fetch the VpcEndpoint resource
-	err := r.Client.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
+	err := r.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
 	if err != nil {
 		return false, err
 	}
@@ -215,27 +215,30 @@ func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, h
 func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	// Create or update route object
 	expectedRoute := r.buildInternalMonitoringRoute(hostedcontrolplane)
-	err := r.Client.Create(ctx, &expectedRoute)
+	err := r.Create(ctx, &expectedRoute)
 	if err != nil {
 		if !kerr.IsAlreadyExists(err) {
+			log.Error(err, "failed to create internalMonitoringRoute")
 			return err
 		}
 		// Object already exists: update it
 		actualRoute := routev1.Route{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: expectedRoute.Name, Namespace: expectedRoute.Namespace}, &actualRoute)
+		err := r.Get(ctx, types.NamespacedName{Name: expectedRoute.Name, Namespace: expectedRoute.Namespace}, &actualRoute)
 		if err != nil {
+			log.Error(err, "failed to retrieve internalMonitoringRoute")
 			return err
 		}
 		expectedRoute.ObjectMeta = buildMetadataForUpdate(expectedRoute.ObjectMeta, actualRoute.ObjectMeta)
-		err = r.Client.Update(ctx, &expectedRoute)
+		err = r.Update(ctx, &expectedRoute)
 		if err != nil {
+			log.Error(err, "failed to update internalMonitoringRoute")
 			return err
 		}
 	}
 
 	// Quick fix to discover the API server port from the service resource
 	apiServerService := v1.Service{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
+	err = r.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
 	if err != nil {
 		return fmt.Errorf("couldn't query API server service resource: %w", err)
 	}
@@ -246,19 +249,19 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 
 	// Create or update RouteMonitor object
 	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane, apiServerPort)
-	err = r.Client.Create(ctx, &expectedRouteMonitor)
+	err = r.Create(ctx, &expectedRouteMonitor)
 	if err != nil {
 		if !kerr.IsAlreadyExists(err) {
 			return err
 		}
 		// Object already exists: update it
 		actualRouteMonitor := v1alpha1.RouteMonitor{}
-		err = r.Client.Get(ctx, types.NamespacedName{Name: expectedRouteMonitor.Name, Namespace: expectedRouteMonitor.Namespace}, &actualRouteMonitor)
+		err = r.Get(ctx, types.NamespacedName{Name: expectedRouteMonitor.Name, Namespace: expectedRouteMonitor.Namespace}, &actualRouteMonitor)
 		if err != nil {
 			return err
 		}
 		expectedRouteMonitor.ObjectMeta = buildMetadataForUpdate(expectedRouteMonitor.ObjectMeta, actualRouteMonitor.ObjectMeta)
-		err = r.Client.Update(ctx, &expectedRouteMonitor)
+		err = r.Update(ctx, &expectedRouteMonitor)
 		if err != nil {
 			return err
 		}
@@ -352,7 +355,7 @@ func (r *HostedControlPlaneReconciler) finalizeHostedControlPlane(ctx context.Co
 func (r *HostedControlPlaneReconciler) deleteInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	// Delete Route
 	expectedRoute := r.buildInternalMonitoringRoute(hostedcontrolplane)
-	err := r.Client.Delete(ctx, &expectedRoute)
+	err := r.Delete(ctx, &expectedRoute)
 	if err != nil {
 		if !kerr.IsNotFound(err) {
 			return err
@@ -362,7 +365,7 @@ func (r *HostedControlPlaneReconciler) deleteInternalMonitoringObjects(ctx conte
 
 	// Delete routemonitor, port is not relevant for deletion
 	expectedRouteMonitor := r.buildInternalMonitoringRouteMonitor(expectedRoute, hostedcontrolplane, 6443)
-	err = r.Client.Delete(ctx, &expectedRouteMonitor)
+	err = r.Delete(ctx, &expectedRouteMonitor)
 	if err != nil {
 		if !kerr.IsNotFound(err) {
 			return err
@@ -413,7 +416,7 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) (string, string, error) {
 
 	secret := &v1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
+	err := r.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
 	if err != nil {
 		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)
 	}
@@ -442,7 +445,7 @@ func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) 
 func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, error) {
 	// Adapted from spreadsheet in https://issues.redhat.com/browse/SDE-3754
 	// Coming soon regions - il-central-1, ca-west-1
-	awsRegionToDyntraceRegionMapping := map[string]string{
+	awsRegionToDynatraceRegionMapping := map[string]string{
 		"us-east-1":      "N. Virginia",
 		"us-east-2":      "N. Virginia",
 		"us-west-1":      "Oregon",
@@ -474,7 +477,7 @@ func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, erro
 
 	// Look up the equivalent dynatrace location name based on the aws region in map
 	//e.g. "us-east-2" in aws has equivalent "N. Virginia" in Dynatrace Locations
-	dynatraceLocationName, ok := awsRegionToDyntraceRegionMapping[clusterRegion]
+	dynatraceLocationName, ok := awsRegionToDynatraceRegionMapping[clusterRegion]
 	if !ok {
 		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
 	}
@@ -492,7 +495,7 @@ func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx contex
 	labels[key] = value
 	hostedcontrolplane.SetLabels(labels)
 
-	err := r.Client.Update(ctx, hostedcontrolplane)
+	err := r.Update(ctx, hostedcontrolplane)
 	if err != nil {
 		return fmt.Errorf("error updating hostedcontrolplane monitor: %v", err)
 	}
@@ -502,7 +505,7 @@ func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx contex
 func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
 		if service.Service == "APIServer" {
-			return service.ServicePublishingStrategy.Route.Hostname, nil
+			return service.Route.Hostname, nil
 		}
 	}
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
@@ -537,9 +540,11 @@ func getClusterRegion(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) 
 
 func determineDynatraceClusterRegionName(clusterRegion string, monitorLocationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
 	//public
-	if monitorLocationType == hypershiftv1beta1.PublicAndPrivate {
+	switch monitorLocationType {
+	case hypershiftv1beta1.PublicAndPrivate:
 		return getDynatraceEquivalentClusterRegionName(clusterRegion)
-	} else if monitorLocationType == hypershiftv1beta1.Private {
+	case hypershiftv1beta1.Private:
+		// cspell:ignore backplanei03xyz
 		/*
 			For "Private" HCPs, we have one backplane location deployed per dynatrace tenant. E.g. "name": "backplanei03xyz"
 			"backplane" is returned from this function and passed to GetLocationEntityIdFromDynatrace function and this location is
@@ -547,8 +552,9 @@ func determineDynatraceClusterRegionName(clusterRegion string, monitorLocationTy
 			Ref: https://issues.redhat.com/browse/OSD-25167
 		*/
 		return "backplane", nil
+	default:
+		return "", fmt.Errorf("monitorLocationType '%s' not supported", monitorLocationType)
 	}
-	return "", fmt.Errorf("monitorLocationType '%s' not supported", monitorLocationType)
 }
 
 func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
@@ -562,7 +568,7 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	// apiServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
 	monitorLocationType := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
 
-	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org
+	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org // cspell:ignore dgcj, devshift
 	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
 
 	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
@@ -573,7 +579,7 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	}
 	if exists {
 		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor for %s", monitorName))
-		return nil
+		// return nil
 	}
 
 	clusterId := hostedcontrolplane.Spec.ClusterID

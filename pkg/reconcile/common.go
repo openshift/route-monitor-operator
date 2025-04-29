@@ -26,7 +26,7 @@ type ResourceComparerInterface interface {
 
 type ResourceComparer struct{}
 
-func (_ *ResourceComparer) DeepEqual(x, y interface{}) bool {
+func (*ResourceComparer) DeepEqual(x, y any) bool {
 	return reflect.DeepEqual(x, y)
 }
 
@@ -83,7 +83,7 @@ func (u *MonitorResourceCommon) SetResourceReference(reference *v1alpha1.Namespa
 	}
 	if *reference != desiredRef {
 		// TODO Check when this is really required
-		return false, customerrors.InvalidReferenceUpdate
+		return false, customerrors.ErrInvalidReferenceUpdate
 	}
 	return false, nil
 }
@@ -91,14 +91,14 @@ func (u *MonitorResourceCommon) SetResourceReference(reference *v1alpha1.Namespa
 // remove boolean
 func (u *MonitorResourceCommon) ParseMonitorSLOSpecs(routeURL string, sloSpec v1alpha1.SloSpec) (string, error) {
 	if routeURL == "" {
-		return "", customerrors.NoHost
+		return "", customerrors.ErrNoHost
 	}
 	if sloSpec == (v1alpha1.SloSpec{}) {
 		return "", nil
 	}
 	isValid, parsedSlo := sloSpec.IsValid()
 	if !isValid {
-		return "", customerrors.InvalidSLO
+		return "", customerrors.ErrInvalidSLO
 	}
 	return parsedSlo, nil
 }

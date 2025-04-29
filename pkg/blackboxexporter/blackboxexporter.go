@@ -19,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type BlackBoxExporter struct {
@@ -40,7 +39,7 @@ func (b *BlackBoxExporter) GetBlackBoxExporterNamespace() string {
 }
 
 func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexporter.ShouldDeleteBlackBoxExporter, error) {
-	objectsDependingOnExporter := []v1.Object{}
+	objectsDependingOnExporter := []metav1.Object{}
 
 	routeMonitors := &v1alpha1.RouteMonitorList{}
 	if err := b.Client.List(b.Ctx, routeMonitors); err != nil {
@@ -89,7 +88,7 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 
 	// Update the deployment if it's different than the template
 	if !reflect.DeepEqual(resource.Spec, template.Spec) {
-		resource.ObjectMeta.ResourceVersion = ""
+		resource.ResourceVersion = ""
 		resource.Spec = template.Spec
 		err = b.Client.Update(b.Ctx, &resource)
 		if err != nil {
