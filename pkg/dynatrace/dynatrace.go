@@ -247,8 +247,8 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	return monitorId, nil
 }
 
-func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(monitorId string) (bool, error) {
-	path := ("/synthetic/monitors/")
+func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clusterId string) (bool, error) {
+	path := fmt.Sprintf("/synthetic/monitors/?tag=cluster-id:%s", clusterId)
 	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
 	if err != nil {
 		return false, err
@@ -265,10 +265,24 @@ func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(monit
 		return false, fmt.Errorf("error parsing JSON: %w", err)
 	}
 
-	for _, monitor := range existsHttpMonitorResponse.Monitors {
-		if monitor.EntityId == monitorId {
-			return true, nil
+	countMonitors := len(existsHttpMonitorResponse.Monitors)
+	if countMonitors == 1 {
+		// We have one matching monitor
+		return true, nil
+	}
+	if countMonitors == 0 {
+		// We have no matching monitors
+		return false, nil
+	}
+	if countMonitors > 1 {
+		// Keep the first monitor, delete the rest
+		for i := 1; i < countMonitors; i++ {
+			monitorId := existsHttpMonitorResponse.Monitors[i].EntityId
+			if err := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId); err != nil {
+				return false, fmt.Errorf("failed to delete monitor %s: %w", monitorId, err)
+			}
 		}
+		return true, nil
 	}
 	return false, nil
 }
