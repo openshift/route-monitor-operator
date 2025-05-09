@@ -579,7 +579,7 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	}
 	if exists {
 		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor for %s", monitorName))
-		// return nil
+		return nil
 	}
 
 	clusterId := hostedcontrolplane.Spec.ClusterID
