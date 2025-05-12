@@ -511,20 +511,6 @@ func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPla
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
 }
 
-// func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
-// 	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
-// 	if ok {
-// 		exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(dynatraceHttpMonitorId)
-// 		if err != nil {
-// 			return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [monitorId:%s]: %v", dynatraceHttpMonitorId, err)
-// 		}
-// 		if exists {
-// 			return true, nil
-// 		}
-// 	}
-// 	return false, nil
-// }
-
 func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
 	clusterId := hostedcontrolplane.Spec.ClusterID
 	exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(clusterId)
