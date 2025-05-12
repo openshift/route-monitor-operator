@@ -633,18 +633,12 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 }
 
 func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	//check if monitor exists - has label/monitor on hcp, then delete it
-	// key := "dynatrace.http.monitor/id"
-	dynatraceHttpMonitorId, ok := getDynatraceHttpMonitorId(hostedcontrolplane)
-	if !ok {
-		log.Info("HTTP monitor label not found. Skipping deleting HTTP monitor")
-		return nil
-	}
+	clusterId := hostedcontrolplane.Spec.ClusterID
 
-	err := dynatraceApiClient.DeleteDynatraceHttpMonitor(dynatraceHttpMonitorId)
+	err := dynatraceApiClient.DeleteDynatraceHttpMonitor(clusterId)
 	if err != nil {
-		return fmt.Errorf("error deleting HTTP monitor. Status Code: %v", err)
+		return fmt.Errorf("error deleting HTTP monitor(s). Status Code: %v", err)
 	}
-	log.Info("Successfully deleted HTTP monitor")
+	log.Info("Successfully deleted HTTP monitor(s)")
 	return nil
 }

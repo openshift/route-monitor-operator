@@ -277,9 +277,8 @@ func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clust
 	if countMonitors > 1 {
 		// Keep the first monitor, delete the rest
 		for i := 1; i < countMonitors; i++ {
-			monitorId := existsHttpMonitorResponse.Monitors[i].EntityId
-			if err := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId); err != nil {
-				return false, fmt.Errorf("failed to delete monitor %s: %w", monitorId, err)
+			if err := dynatraceApiClient.DeleteDynatraceHttpMonitor(clusterId); err != nil {
+				return false, fmt.Errorf("failed to delete monitors for cluster id %s: %w", clusterId, err)
 			}
 		}
 		return true, nil
@@ -287,22 +286,40 @@ func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clust
 	return false, nil
 }
 
-func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(monitorId string) error {
-	path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
-
-	resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
+func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(clusterId string) error {
+	path := fmt.Sprintf("/synthetic/monitors/?tag=cluster-id:%s", clusterId)
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	//monitor already deleted
-	if resp.StatusCode == http.StatusNotFound {
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
+	}
+
+	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&existsHttpMonitorResponse); err != nil {
+		return fmt.Errorf("error parsing JSON: %w", err)
+	}
+
+	if len(existsHttpMonitorResponse.Monitors) == 0 {
+		// No matching monitors found
 		return nil
 	}
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
+	for _, monitor := range existsHttpMonitorResponse.Monitors {
+		monitorId := monitor.EntityId
+		path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
+		del, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
+		if err != nil {
+			return err
+		}
+
+		if del.StatusCode != http.StatusNoContent {
+			return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
+		}
+		del.Body.Close()
 	}
 	return nil
 }
