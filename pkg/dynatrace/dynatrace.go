@@ -266,6 +266,9 @@ func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clust
 	}
 
 	countMonitors := len(existsHttpMonitorResponse.Monitors)
+	fmt.Println("countMonitors:", countMonitors)
+	fmt.Println(existsHttpMonitorResponse.Monitors)
+
 	if countMonitors == 1 {
 		// We have one matching monitor
 		return true, nil
