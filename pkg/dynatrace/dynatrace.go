@@ -299,16 +299,17 @@ func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(cluster
 
 	for _, monitor := range existsHttpMonitorResponse.Monitors {
 		monitorId := monitor.EntityId
+
 		path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
-		del, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
+		resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
 		if err != nil {
 			return err
 		}
 
-		if del.StatusCode != http.StatusNoContent {
+		if resp.StatusCode != http.StatusNoContent {
 			return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
 		}
-		del.Body.Close()
+		resp.Body.Close()
 	}
 	return nil
 }
