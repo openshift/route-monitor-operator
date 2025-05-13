@@ -490,18 +490,6 @@ func getDynatraceHttpMonitorId(hostedcontrolplane *hypershiftv1beta1.HostedContr
 	return dynatraceHttpMonitorId, ok
 }
 
-// func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, key, value string) error {
-// 	labels := hostedcontrolplane.GetLabels()
-// 	labels[key] = value
-// 	hostedcontrolplane.SetLabels(labels)
-
-// 	err := r.Update(ctx, hostedcontrolplane)
-// 	if err != nil {
-// 		return fmt.Errorf("error updating hostedcontrolplane monitor: %v", err)
-// 	}
-// 	return nil
-// }
-
 func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
 		if service.Service == "APIServer" {
