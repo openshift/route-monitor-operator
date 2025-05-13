@@ -921,62 +921,6 @@ func TestGetDynatraceHTTPMonitorId(t *testing.T) {
 	}
 }
 
-// func TestHostedControlPlaneReconciler_UpdateHostedControlPlaneLabels(t *testing.T) {
-// 	r := newTestReconciler(t)
-// 	ctx := context.Background()
-
-// 	tests := []struct {
-// 		name          string
-// 		initialLabels map[string]string
-// 		key           string
-// 		value         string
-// 		expectError   bool
-// 		expectedValue string
-// 	}{
-// 		{
-// 			name: "Update existing label",
-// 			initialLabels: map[string]string{
-// 				"existingKey": "existingValue",
-// 			},
-// 			key:           "testKey",
-// 			value:         "testValue",
-// 			expectError:   false,
-// 			expectedValue: "testValue",
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			// Initialize the HostedControlPlane object
-// 			hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name:      "test-hostedcontrolplane",
-// 					Namespace: "default",
-// 					Labels:    tt.initialLabels,
-// 				},
-// 			}
-
-// 			err := r.Create(ctx, hostedcontrolplane)
-// 			if err != nil {
-// 				t.Fatalf("Failed to create mock HostedControlPlane resource: %v", err)
-// 			}
-
-// 			// Call the method being tested
-// 			err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, tt.key, tt.value)
-
-// 			if (err != nil) != tt.expectError {
-// 				t.Errorf("UpdateHostedControlPlaneLabels error = %v, expectError %v", err, tt.expectError)
-// 			}
-
-// 			// Verify that the labels are updated correctly
-// 			updatedLabels := hostedcontrolplane.GetLabels()
-// 			if updatedLabels[tt.key] != tt.expectedValue {
-// 				t.Errorf("Expected value: %s, Actual value: %s", tt.expectedValue, updatedLabels[tt.key])
-// 			}
-// 		})
-// 	}
-// }
-
 func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 	tests := []struct {
 		name      string

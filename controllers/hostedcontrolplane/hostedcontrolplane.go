@@ -591,16 +591,6 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 		return fmt.Errorf("error creating HTTP monitor: %v", err)
 	}
 
-	// err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
-	// //if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
-	// if err != nil {
-	// 	deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
-	// 	if deleteErr != nil {
-	// 		log.Error(deleteErr, "error deleting HTTP monitor")
-	// 	}
-	// 	return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
-	// }
-
 	log.Info("Created HTTP monitor ", monitorId, clusterId)
 
 	return nil
