@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -759,10 +760,21 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 	return mockServer.URL
 }
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody)) // nolint:errcheck
-	})
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
+
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/synthetic/monitors/"):
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(""))
+
+		default:
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(responseBody))
+		}
+	}
 }
 
 func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
@@ -1174,7 +1186,7 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 				},
 			},
 			expectedExists: false,
-			expectedError:  false,
+			expectedError:  true,
 		},
 		{
 			name: "API error when checking monitor existence",
@@ -1221,32 +1233,36 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	tests := []struct {
-		name         string
-		mockResponse string
-		mockStatus   int
-		expectError  bool
+		name        string
+		clusterId   string
+		mockStatus  int
+		expectError bool
 	}{
 		{
-			name:         "HTTP Monitor Id not found",
-			mockResponse: "",
-			mockStatus:   http.StatusOK,
-			expectError:  false,
+			name:        "HTTP Monitor Id not found",
+			clusterId:   "fake-cluster-id",
+			mockStatus:  http.StatusNoContent,
+			expectError: true,
 		},
 		{
-			name:         "Successful deletion of HTTP Monitor",
-			mockResponse: "", // Adjust as needed for a successful response
-			mockStatus:   http.StatusOK,
-			expectError:  false,
+			name:        "Successful deletion of HTTP Monitor",
+			clusterId:   "mock-cluster-id",
+			mockStatus:  http.StatusNoContent,
+			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatus))
+			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatus))
 			apiClient := dynatrace.NewDynatraceApiClient(mockServer, "mockedToken")
 
 			log := log.Log
-			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
+			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: tt.clusterId,
+				},
+			}
 
 			err := deleteDynatraceHttpMonitorResources(apiClient, log, hostedControlPlane)
 

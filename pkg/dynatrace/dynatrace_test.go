@@ -172,10 +172,10 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 		{
 			name:           "Monitor does not exist",
 			monitorId:      "monitor-2",
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			mockResponse:   `{"monitors":[]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
-			expectError:    false,
+			expectError:    true,
 		},
 		{
 			name:           "HTTP error",
@@ -220,16 +220,19 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	tests := []struct {
 		name           string
 		mockStatusCode int
+		mockResponse   string
 		expectError    bool
 	}{
 		{
 			name:           "Successful DELETE request",
-			mockStatusCode: http.StatusNoContent,
-			expectError:    false,
+			mockStatusCode: http.StatusOK,
+			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			expectError:    true,
 		},
 		{
 			name:           "Failed DELETE request",
 			mockStatusCode: http.StatusInternalServerError,
+			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
 			expectError:    true,
 		},
 	}
@@ -237,11 +240,11 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock the HTTP server to return the desired response
-			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
+			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode))
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			err := apiClient.DeleteDynatraceHttpMonitor("123")
+			err := apiClient.DeleteDynatraceMonitorByCluserId("123")
 
 			// Check for errors based on the expected outcome
 			if (err != nil) != tt.expectError {

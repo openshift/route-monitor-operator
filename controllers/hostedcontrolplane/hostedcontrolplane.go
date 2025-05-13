@@ -599,7 +599,7 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	clusterId := hostedcontrolplane.Spec.ClusterID
 
-	err := dynatraceApiClient.DeleteDynatraceHttpMonitor(clusterId)
+	err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId)
 	if err != nil {
 		return fmt.Errorf("error deleting HTTP monitor(s). Status Code: %v", err)
 	}
