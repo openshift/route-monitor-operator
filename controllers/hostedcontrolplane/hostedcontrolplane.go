@@ -490,17 +490,17 @@ func getDynatraceHttpMonitorId(hostedcontrolplane *hypershiftv1beta1.HostedContr
 	return dynatraceHttpMonitorId, ok
 }
 
-func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, key, value string) error {
-	labels := hostedcontrolplane.GetLabels()
-	labels[key] = value
-	hostedcontrolplane.SetLabels(labels)
+// func (r *HostedControlPlaneReconciler) UpdateHostedControlPlaneLabels(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, key, value string) error {
+// 	labels := hostedcontrolplane.GetLabels()
+// 	labels[key] = value
+// 	hostedcontrolplane.SetLabels(labels)
 
-	err := r.Update(ctx, hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("error updating hostedcontrolplane monitor: %v", err)
-	}
-	return nil
-}
+// 	err := r.Update(ctx, hostedcontrolplane)
+// 	if err != nil {
+// 		return fmt.Errorf("error updating hostedcontrolplane monitor: %v", err)
+// 	}
+// 	return nil
+// }
 
 func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
@@ -603,15 +603,15 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 		return fmt.Errorf("error creating HTTP monitor: %v", err)
 	}
 
-	err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
-	//if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
-	if err != nil {
-		deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
-		if deleteErr != nil {
-			log.Error(deleteErr, "error deleting HTTP monitor")
-		}
-		return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
-	}
+	// err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, httpMonitorLabel, monitorId)
+	// //if UpdateHostedControlPlaneLabels fails, delete the http monitor, reconcile the hcp and create a new monitor
+	// if err != nil {
+	// 	deleteErr := dynatraceApiClient.DeleteDynatraceHttpMonitor(monitorId)
+	// 	if deleteErr != nil {
+	// 		log.Error(deleteErr, "error deleting HTTP monitor")
+	// 	}
+	// 	return fmt.Errorf("failed to update hostedcontrolplane monitor labels %v", err)
+	// }
 
 	log.Info("Created HTTP monitor ", monitorId, clusterId)
 
