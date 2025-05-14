@@ -19,6 +19,7 @@ package hostedcontrolplane
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -146,9 +147,17 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Check if the HostedControlPlane is ready
-	if !hostedcontrolplane.Status.Ready {
-		log.Info("skipped deploying monitoring objects: HostedControlPlane not ready")
-		return utilreconcile.Stop()
+	url := hostedcontrolplane.Status.ControlPlaneEndpoint.Host + "/livez"
+	apiHttpResponse, err := http.Get(url)
+	if err != nil {
+		return utilreconcile.RequeueWith(err)
+	}
+
+	if checkClusterOver1Hour(hostedcontrolplane.ObjectMeta.CreationTimestamp) {
+		if apiHttpResponse.StatusCode != 200 {
+			log.Info("skipped deploying monitoring objects: HostedControlPlane not ready")
+			return utilreconcile.Stop()
+		}
 	}
 
 	log.Info("Deploying internal monitoring objects")
@@ -635,4 +644,10 @@ func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.Dynatrace
 	}
 	log.Info("Successfully deleted HTTP monitor")
 	return nil
+}
+
+func checkClusterOver1Hour(creationTimestamp metav1.Time) bool {
+	now := time.Now()
+	oneHourAgo := now.Add((-1 * time.Hour))
+	return creationTimestamp.Time.Before(oneHourAgo)
 }
