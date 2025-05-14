@@ -1186,7 +1186,7 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 				},
 			},
 			expectedExists: false,
-			expectedError:  true,
+			expectedError:  false,
 		},
 		{
 			name: "API error when checking monitor existence",

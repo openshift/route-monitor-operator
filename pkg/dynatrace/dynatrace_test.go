@@ -3,6 +3,7 @@ package dynatrace
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -13,11 +14,23 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 	return mockServer.URL
 }
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody)) // nolint:errcheck
-	})
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
+
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/synthetic/monitors/"):
+			w.WriteHeader(http.StatusNoContent)
+			_, _ = w.Write([]byte(""))
+
+		default:
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(responseBody))
+		}
+	}
 }
+
 func TestNewAPIClient(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -175,7 +188,7 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 			mockResponse:   `{"monitors":[]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
-			expectError:    true,
+			expectError:    false,
 		},
 		{
 			name:           "HTTP error",
@@ -227,7 +240,7 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 			name:           "Successful DELETE request",
 			mockStatusCode: http.StatusOK,
 			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
-			expectError:    true,
+			expectError:    false,
 		},
 		{
 			name:           "Failed DELETE request",
