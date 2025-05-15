@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	// "strings"
 	"testing"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
