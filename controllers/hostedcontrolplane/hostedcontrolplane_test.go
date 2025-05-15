@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
+
+	// "strings"
 	"testing"
 	"time"
 
@@ -762,13 +763,10 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		// Mock GET synthetic monitor response
 		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
-
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/synthetic/monitors/"):
-			w.WriteHeader(statusCode)
-			_, _ = w.Write([]byte(""))
 
 		default:
 			w.WriteHeader(statusCode)
@@ -1233,34 +1231,34 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	tests := []struct {
-		name        string
-		clusterId   string
-		mockStatus  int
-		expectError bool
+		name           string
+		mockClusterId  string
+		mockStatusCode int
+		expectError    bool
 	}{
 		{
-			name:        "HTTP Monitor Id not found",
-			clusterId:   "fake-cluster-id",
-			mockStatus:  http.StatusNoContent,
-			expectError: true,
+			name:           "HTTP Monitor Id not found",
+			mockClusterId:  "fake-cluster-id",
+			mockStatusCode: http.StatusNoContent,
+			expectError:    true,
 		},
 		{
-			name:        "Successful deletion of HTTP Monitor",
-			clusterId:   "mock-cluster-id",
-			mockStatus:  http.StatusNoContent,
-			expectError: false,
+			name:           "Successful deletion of HTTP Monitor",
+			mockClusterId:  "mock-cluster-id",
+			mockStatusCode: http.StatusNoContent,
+			expectError:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatus))
+			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
 			apiClient := dynatrace.NewDynatraceApiClient(mockServer, "mockedToken")
 
 			log := log.Log
 			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
 				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
-					ClusterID: tt.clusterId,
+					ClusterID: tt.mockClusterId,
 				},
 			}
 

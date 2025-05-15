@@ -3,7 +3,8 @@ package dynatrace
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
+
+	// "strings"
 	"testing"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -16,13 +17,10 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		// Mock GET synthetic monitor response
 		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
-
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/synthetic/monitors/"):
-			w.WriteHeader(http.StatusNoContent)
-			_, _ = w.Write([]byte(""))
 
 		default:
 			w.WriteHeader(statusCode)
@@ -232,20 +230,20 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	// Create a list of test cases
 	tests := []struct {
 		name           string
+		mockClusterId  string
 		mockStatusCode int
-		mockResponse   string
 		expectError    bool
 	}{
 		{
 			name:           "Successful DELETE request",
-			mockStatusCode: http.StatusOK,
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			mockClusterId:  "mock-cluster-id",
+			mockStatusCode: http.StatusNoContent,
 			expectError:    false,
 		},
 		{
 			name:           "Failed DELETE request",
+			mockClusterId:  "mock-cluster-id",
 			mockStatusCode: http.StatusInternalServerError,
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
 			expectError:    true,
 		},
 	}
@@ -253,11 +251,11 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock the HTTP server to return the desired response
-			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatusCode))
+			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			err := apiClient.DeleteDynatraceMonitorByCluserId("123")
+			err := apiClient.DeleteDynatraceMonitorByCluserId(tt.mockClusterId)
 
 			// Check for errors based on the expected outcome
 			if (err != nil) != tt.expectError {
