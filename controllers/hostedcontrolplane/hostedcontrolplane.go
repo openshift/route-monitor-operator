@@ -55,9 +55,6 @@ const (
 	// watchResourceLabel is a label key indicating which objects this controller should reconcile against
 	watchResourceLabel = "hostedcontrolplane.routemonitoroperator.monitoring.openshift.io/managed"
 
-	//httpMonitorLabel is added to hcp object to keep track of when to create and delete of dynatrace http monitor
-	httpMonitorLabel = "dynatrace.http.monitor/id"
-
 	//fetch dynatrace secret to get dynatrace api token and tenant url
 	dynatraceSecretNamespace = "openshift-route-monitor-operator"
 	dynatraceSecretName      = "dynatrace-token" // nolint:gosec // Not a hardcoded credential
