@@ -873,63 +873,6 @@ func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
 	}
 }
 
-func TestGetDynatraceHTTPMonitorId(t *testing.T) {
-	tests := []struct {
-		name               string
-		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
-		expectedMonitorId  string
-		expectedFound      bool
-	}{
-		{
-			name: "Key exists in labels",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
-				},
-			},
-			expectedMonitorId: "sampleMonitorId",
-			expectedFound:     true,
-		},
-		{
-			name: "Key does not exist in labels",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{},
-				},
-			},
-			expectedMonitorId: "",
-			expectedFound:     false,
-		},
-		{
-			name: "Multiple keys but target key absent",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"otherLabel": "someValue",
-					},
-				},
-			},
-			expectedMonitorId: "",
-			expectedFound:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			monitorId, found := getDynatraceHttpMonitorId(tt.hostedControlPlane)
-
-			if monitorId != tt.expectedMonitorId {
-				t.Errorf("Expected Monitor Id for case '%s': %s, Got: %s", tt.name, tt.expectedMonitorId, monitorId)
-			}
-			if found != tt.expectedFound {
-				t.Errorf("Expected found status for case '%s': %v, Got: %v", tt.name, tt.expectedFound, found)
-			}
-		})
-	}
-}
-
 func TestHostedControlPlaneReconciler_GetAPIServerHostname(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1161,10 +1104,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"monitors": [{"entityId": "sampleMonitorId"}]}`,
 			mockApiError:       false,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "mock-cluster-id",
 				},
 			},
 			expectedExists: true,
@@ -1176,10 +1117,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"monitors": []}`,
 			mockApiError:       false,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "fake-cluster-id",
 				},
 			},
 			expectedExists: false,
@@ -1191,10 +1130,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"error": "mock error"}`,
 			mockApiError:       true,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "other-cluster-id",
 				},
 			},
 			expectedExists: false,

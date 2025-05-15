@@ -481,12 +481,6 @@ func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, erro
 	return dynatraceLocationName, nil
 }
 
-func getDynatraceHttpMonitorId(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, bool) {
-	labels := hostedcontrolplane.GetLabels()
-	dynatraceHttpMonitorId, ok := labels[httpMonitorLabel]
-	return dynatraceHttpMonitorId, ok
-}
-
 func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
 		if service.Service == "APIServer" {
