@@ -67,6 +67,12 @@ const (
 
 	// vpcEndpointRetryTimeout can be used with RequeueAfter()
 	vpcEndpointRetryTimeout = 5 * time.Minute
+
+	// consecutiveSuccessfulHealthchecks defines the number of healthchecks in a row that must succeed before
+	// an HCP is considered healthy and its fully reconciled
+	consecutiveSuccessfulHealthchecks = 5
+	// healthCheckIntervalSeconds defines the wait period between healthcheck attempts on the HCP
+	healthCheckIntervalSeconds = 30
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -147,17 +153,10 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Check if the HostedControlPlane is ready
-	url := hostedcontrolplane.Status.ControlPlaneEndpoint.Host + "/livez"
-	apiHttpResponse, err := http.Get(url)
+	err = hcpReady(hostedcontrolplane)
 	if err != nil {
-		return utilreconcile.RequeueWith(err)
-	}
-
-	if checkClusterOver1Hour(hostedcontrolplane.ObjectMeta.CreationTimestamp) {
-		if apiHttpResponse.StatusCode != 200 {
-			log.Info("skipped deploying monitoring objects: HostedControlPlane not ready")
-			return utilreconcile.Stop()
-		}
+		log.Error(err, "skipped deploying monitoring objects, HostedControlPlane not ready")
+		return utilreconcile.RequeueAfter(5 * time.Minute), nil
 	}
 
 	log.Info("Deploying internal monitoring objects")
@@ -646,8 +645,54 @@ func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.Dynatrace
 	return nil
 }
 
-func checkClusterOver1Hour(creationTimestamp metav1.Time) bool {
+// hcpReady attempts to determine the readiness of an HCP cluster, returning an error representing the reason why if
+// a cluster is determined to be unhealthy
+//
+// Clusters younger than 1h have their apiserver's livez endpoint polled until a consistent ready signal is received
+// or an error occurs
+//
+// Clusters older than 1h are always considered ready. This is because even in the worst cases, HCP provisioning
+// should take on the order of minutes to complete
+func hcpReady(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	if clusterOver1HourOld(hostedcontrolplane) {
+		return nil
+	}
+
+	controlplaneEndpoint := hostedcontrolplane.Status.ControlPlaneEndpoint.Host
+	if controlplaneEndpoint == "" {
+		return fmt.Errorf("missing .Status.ControlPlaneEndpoint.Host")
+	}
+
+	url := fmt.Sprintf("http://%s/livez", controlplaneEndpoint)
+	successes := 0
+	for successes < consecutiveSuccessfulHealthchecks {
+		err := endpointOK(url)
+		if err != nil {
+			return fmt.Errorf("failed to verify %q healthy: %w", url, err)
+		}
+		time.Sleep(healthCheckIntervalSeconds * time.Second)
+		successes++
+	}
+	return nil
+}
+
+// clusterOver1HourOld checks the age of the given HCP cluster and returns true if it's age is >1h old
+func clusterOver1HourOld(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) bool {
 	now := time.Now()
 	oneHourAgo := now.Add((-1 * time.Hour))
-	return creationTimestamp.Time.Before(oneHourAgo)
+	return hostedcontrolplane.CreationTimestamp.Time.Before(oneHourAgo)
+}
+
+// endpointOK checks the readiness of the given url, and returns an error if the GET fails, or a non-200
+// response is received
+func endpointOK(endpoint string) error {
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to GET endpoint: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("non 200 HTTP status returned: %s", resp.Status)
+		}
+		return nil
 }
