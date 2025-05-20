@@ -1089,7 +1089,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 	}
 }
 
-func TestCheckHttpMonitorExists(t *testing.T) {
+func TestEnsureHttpMonitor(t *testing.T) {
 	tests := []struct {
 		name               string
 		mockExistsResponse string
@@ -1152,7 +1152,7 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			apiClient := dynatrace.NewDynatraceApiClient(mockServerURL, "mockedToken")
 
 			// Call the function to test
-			exists, err := checkHttpMonitorExists(apiClient, tt.hostedControlPlane)
+			exists, err := ensureHttpMonitor(apiClient, tt.hostedControlPlane)
 
 			// Validate the expected values
 			if exists != tt.expectedExists {

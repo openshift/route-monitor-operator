@@ -268,33 +268,6 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	return monitorId, nil
 }
 
-func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clusterId string) (bool, error) {
-	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
-	if err != nil {
-		return false, err
-	}
-
-	countMonitors := len(existsHttpMonitorResponse.Monitors)
-
-	switch {
-	case countMonitors == 1:
-		return true, nil
-
-	case countMonitors == 0:
-		return false, nil
-
-	case countMonitors > 1:
-		for i := 1; i < countMonitors; i++ {
-			if err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId); err != nil {
-				return false, fmt.Errorf("failed to delete monitors for cluster id %s: %w", clusterId, err)
-			}
-		}
-		return true, nil
-	}
-
-	return false, nil
-}
-
 func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceMonitorByCluserId(clusterId string) error {
 	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
 	if err != nil {

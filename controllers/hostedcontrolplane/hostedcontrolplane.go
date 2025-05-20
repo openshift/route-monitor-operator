@@ -490,13 +490,31 @@ func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPla
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
 }
 
-func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+func ensureHttpMonitor(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
 	clusterId := hostedcontrolplane.Spec.ClusterID
-	exists, err := dynatraceApiClient.ExistsHttpMonitorInDynatrace(clusterId)
+
+	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
 	if err != nil {
 		return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [clusterId:%s]: %v", clusterId, err)
 	}
-	return exists, nil
+	countMonitors := len(existsHttpMonitorResponse.Monitors)
+	switch {
+	case countMonitors == 1:
+		return true, nil
+
+	case countMonitors == 0:
+		return false, nil
+
+	case countMonitors > 1:
+		for i := 1; i < countMonitors; i++ {
+			if err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId); err != nil {
+				return false, fmt.Errorf("failed to delete monitors for cluster id %s: %w", clusterId, err)
+			}
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func getClusterRegion(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
@@ -547,12 +565,13 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 
 	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
 
-	exists, err := checkHttpMonitorExists(dynatraceApiClient, hostedcontrolplane)
+	// Ensure the HTTP monitor has been created, and there is only a single instance of the monitor
+	isValid, err := ensureHttpMonitor(dynatraceApiClient, hostedcontrolplane)
 	if err != nil {
-		return fmt.Errorf("failed to check http monitor exists %v", err)
+		return fmt.Errorf("failed to validate the http monitor: %v", err)
 	}
-	if exists {
-		log.Info(fmt.Sprintf("HTTP monitor label found. Skipping creating a monitor for %s", monitorName))
+	if isValid {
+		log.Info(fmt.Sprintf("HTTP monitor found. Skipping any actions for monitor %s", monitorName))
 		return nil
 	}
 

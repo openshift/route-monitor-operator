@@ -162,10 +162,10 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	}
 }
 
-func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
+func TestAPIClient_GetDynatraceHttpMonitors(t *testing.T) {
 	tests := []struct {
 		name           string
-		monitorId      string
+		clusterId      string
 		mockResponse   string
 		mockStatusCode int
 		expectExists   bool
@@ -173,15 +173,15 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 	}{
 		{
 			name:           "Monitor exists",
-			monitorId:      "monitor-1",
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			clusterId:      "cluster-id",
+			mockResponse:   `{"monitors":[{"entityId":"mock-monitor-id"}]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   true,
 			expectError:    false,
 		},
 		{
 			name:           "Monitor does not exist",
-			monitorId:      "monitor-2",
+			clusterId:      "fake-cluster-id",
 			mockResponse:   `{"monitors":[]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
@@ -189,7 +189,7 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 		},
 		{
 			name:           "HTTP error",
-			monitorId:      "monitor-1",
+			clusterId:      "cluster-id",
 			mockResponse:   "",
 			mockStatusCode: http.StatusInternalServerError,
 			expectExists:   false,
@@ -197,7 +197,7 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 		},
 		{
 			name:           "JSON parse error",
-			monitorId:      "monitor-1",
+			clusterId:      "cluster-id",
 			mockResponse:   "{invalid json", // Invalid JSON to simulate a parsing error
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
@@ -211,12 +211,15 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the function to test
-			exists, err := apiClient.ExistsHttpMonitorInDynatrace(tt.monitorId)
+			exists, err := apiClient.GetDynatraceHttpMonitors(tt.clusterId)
 
 			// Verify the results
 			// Check for errors based on the expected outcome
-			if exists != tt.expectExists {
-				t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+			if err == nil {
+				monitorsExist := len(exists.Monitors) > 0
+				if monitorsExist != tt.expectExists {
+					t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+				}
 			}
 			if (err != nil) != tt.expectError {
 				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
