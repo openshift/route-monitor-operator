@@ -151,7 +151,7 @@ func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, r
 	return dynatraceApiClient.httpClient.Do(req)
 }
 
-func (dynatraceApiClient *DynatraceApiClient) GetListDynatraceHttpMonitors(clusterId string) (*ExistsHttpMonitorInDynatraceResponse, error) {
+func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitors(clusterId string) (*ExistsHttpMonitorInDynatraceResponse, error) {
 	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
 
 	path := fmt.Sprintf("/synthetic/monitors/?tag=cluster-id:%s", clusterId)
@@ -269,7 +269,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 }
 
 func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clusterId string) (bool, error) {
-	existsHttpMonitorResponse, err := dynatraceApiClient.GetListDynatraceHttpMonitors(clusterId)
+	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
 	if err != nil {
 		return false, err
 	}
@@ -296,7 +296,7 @@ func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(clust
 }
 
 func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceMonitorByCluserId(clusterId string) error {
-	existsHttpMonitorResponse, err := dynatraceApiClient.GetListDynatraceHttpMonitors(clusterId)
+	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
 	if err != nil {
 		return err
 	}
