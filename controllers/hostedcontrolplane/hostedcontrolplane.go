@@ -496,10 +496,7 @@ func checkHttpMonitorExists(dynatraceApiClient *dynatrace.DynatraceApiClient, ho
 	if err != nil {
 		return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [clusterId:%s]: %v", clusterId, err)
 	}
-	if exists {
-		return true, nil
-	}
-	return false, nil
+	return exists, nil
 }
 
 func getClusterRegion(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
