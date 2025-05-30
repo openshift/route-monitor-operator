@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 
@@ -94,6 +95,11 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 	if successes > consecutiveSuccessfulHealthchecks {
 		return nil
 	}
+
+	if checkClusterOver1Hour(hostedcontrolplane.ObjectMeta.CreationTimestamp) {
+		return nil
+	}
+
 	return fmt.Errorf("insufficient successful health check attempts")
 }
 
@@ -173,13 +179,20 @@ func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedC
 // endpointOK checks the readiness of the given url, and returns an error if the GET fails, or a non-200
 // response is received
 func endpointOK(endpoint string) error {
-		resp, err := http.Get(endpoint)
-		if err != nil {
-			return fmt.Errorf("failed to GET endpoint: %w", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("non 200 HTTP status returned: %s", resp.Status)
-		}
-		return nil
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to GET endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("non 200 HTTP status returned: %s", resp.Status)
+	}
+	return nil
+}
+
+// checkClusterOver1Hour determines if the HCP cluster is over one hour old
+func checkClusterOver1Hour(creationTimestamp metav1.Time) bool {
+	now := time.Now()
+	oneHourAgo := now.Add((-1 * time.Hour))
+	return creationTimestamp.Time.Before(oneHourAgo)
 }
