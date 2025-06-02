@@ -72,7 +72,7 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 	}
 
 	successes := healthcheckConfigMapSuccesses(healthcheckConfigMap)
-	if successes > consecutiveSuccessfulHealthchecks {
+	if successes >= consecutiveSuccessfulHealthchecks {
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 		_, resetErr := r.resetHealthCheckSuccesses(ctx, healthcheckConfigMap)
 		if resetErr != nil {
 			err = errors.Join(err, resetErr)
-			return fmt.Errorf("failed to update configmap healthcheck count following healtchecking failure. Errors: %w", err)
+			return fmt.Errorf("failed to update configmap healthcheck count following healthchecking failure. Errors: %w", err)
 		}
 		return fmt.Errorf("healthcheck failed for HCP: %w", err)
 	}
@@ -92,7 +92,7 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 	}
 
 	successes = healthcheckConfigMapSuccesses(healthcheckConfigMap)
-	if successes > consecutiveSuccessfulHealthchecks {
+	if successes >= consecutiveSuccessfulHealthchecks {
 		return nil
 	}
 
@@ -165,7 +165,7 @@ func (r *HostedControlPlaneReconciler) addHealthCheckSuccess(ctx context.Context
 }
 
 // healthcheckHostedControlPlane performs a healthcheck against the provided HCP by checking the response from its kube-apiserver's
-// /healthz endpoint
+// /livez endpoint
 func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	controlplaneEndpoint := hostedcontrolplane.Status.ControlPlaneEndpoint.Host
 	if controlplaneEndpoint == "" {
