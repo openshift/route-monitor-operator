@@ -1,6 +1,6 @@
 # to build this, use the 'make packagemanifests-build' command
 
-FROM quay.io/openshift/origin-operator-registry:4.10.0 AS builder
+FROM quay.io/openshift/origin-operator-registry:4.20.0 AS builder
 
 ARG BUNDLE_DIR=packagemanifests
 COPY $BUNDLE_DIR manifests
