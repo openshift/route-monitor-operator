@@ -12,7 +12,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240524162738-d899f8877d22
-	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364
+	github.com/openshift/aws-vpce-operator v0.0.0-20250702155035-c64cd0ff113a
 	github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c
 	github.com/openshift/osde2e-common v0.0.0-20240604133256-b7200cad0cca
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
