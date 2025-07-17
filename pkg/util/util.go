@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	compare "github.com/hashicorp/go-version"
@@ -50,28 +51,34 @@ func IsClusterVersionHigherOrEqualThan(kclient client.Client, givenVersionStr st
 
 // ClusterHasPrivateNLB checks whether the default ingress is private and an aws NLB
 // Returns false if there's an exception
-func ClusterHasPrivateNLB(kclient client.Client) (result bool) {
-	// Recovers if one of the IngressController fields are nil
-	defer func() {
-		if r := recover(); r != nil {
-			result = false
-		}
-	}()
-
+func ClusterHasPrivateNLB(kclient client.Client) (bool, error) {
 	i := &operatorv1.IngressController{}
 	err := kclient.Get(context.TODO(), client.ObjectKey{
 		Namespace: "openshift-ingress-operator",
 		Name:      "default",
 	}, i)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to GET 'openshift-ingress-operator/default' ingresscontroller: %w", err)
+	}
+
+	// Ensure that the nested pointers in the IC's .Status are all defined
+	if i.Status.EndpointPublishingStrategy == nil {
+		return false, fmt.Errorf("failed to determine if cluster has private NLB: 'openshift-ingress-operator/default' has undefined .Status.EndpointPublishingStrategy")
+	}
+	if i.Status.EndpointPublishingStrategy.LoadBalancer == nil {
+		return false, fmt.Errorf("failed to determine if cluster has private NLB: 'openshift-ingress-operator/default' has undefined .Status.EndpointPublishingStrategy.LoadBalancer")
+	}
+	if i.Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters == nil {
+		return false, fmt.Errorf("failed to determine if cluster has private NLB: 'openshift-ingress-operator/default' has undefined .Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters")
+	}
+	if i.Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters.AWS == nil {
+		return false, fmt.Errorf("failed to determine if cluster has private NLB: 'openshift-ingress-operator/default' has undefined .Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters.AWS is undefined")
 	}
 
 	if i.Status.EndpointPublishingStrategy.LoadBalancer.Scope == operatorv1.InternalLoadBalancer &&
 		i.Status.EndpointPublishingStrategy.LoadBalancer.ProviderParameters.AWS.Type == operatorv1.AWSNetworkLoadBalancer {
-		return true
-
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }

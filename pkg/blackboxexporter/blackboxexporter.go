@@ -1,6 +1,7 @@
 package blackboxexporter
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
@@ -67,10 +68,13 @@ func (b *BlackBoxExporter) ShouldDeleteBlackBoxExporterResources() (blackboxexpo
 
 func (b *BlackBoxExporter) EnsureBlackBoxExporterDeploymentExists() error {
 	resource := appsv1.Deployment{}
-	template := b.templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
+	template, err := b.templateForBlackBoxExporterDeployment(b.Image, b.NamespacedName)
+	if err != nil {
+		return fmt.Errorf("failed to create blackboxexporter template: %w", err)
+	}
 
 	// Does the resource already exist?
-	err := b.Client.Get(b.Ctx, b.NamespacedName, &resource)
+	err = b.Client.Get(b.Ctx, b.NamespacedName, &resource)
 	if err != nil {
 		// If this is an unknown error
 		if !k8serrors.IsNotFound(err) {
@@ -140,9 +144,14 @@ func (b *BlackBoxExporter) EnsureBlackBoxExporterConfigMapExists() error {
 }
 
 // deploymentForBlackBoxExporter returns a blackbox deployment
-func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) appsv1.Deployment {
+func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage string, blackBoxNamespacedName types.NamespacedName) (appsv1.Deployment, error) {
+	privateNLB, err := util.ClusterHasPrivateNLB(b.Client)
+	if err != nil {
+		return appsv1.Deployment{}, fmt.Errorf("failed to determine if cluster has private network LoadBalancer: %w", err)
+	}
+
 	nodeLabel := "node-role.kubernetes.io/infra"
-	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.13") && util.ClusterHasPrivateNLB(b.Client) {
+	if util.IsClusterVersionHigherOrEqualThan(b.Client, "4.13") && privateNLB {
 		nodeLabel = "node-role.kubernetes.io/master"
 	}
 
@@ -219,7 +228,7 @@ func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage s
 			},
 		},
 	}
-	return dep
+	return dep, nil
 }
 
 // templateForBlackBoxExporterService returns a blackbox service
