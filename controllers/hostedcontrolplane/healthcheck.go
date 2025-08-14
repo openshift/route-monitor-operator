@@ -159,6 +159,9 @@ func (r *HostedControlPlaneReconciler) addHealthCheckSuccess(ctx context.Context
 	successes := healthcheckConfigMapSuccesses(configmap)
 	successes++
 
+	if configmap.Annotations == nil {
+		configmap.Annotations = map[string]string{}
+	}
 	configmap.Annotations[healthcheckAnnotation] = fmt.Sprintf("%d", successes)
 	err := r.Update(ctx, &configmap)
 	return configmap, err
@@ -172,7 +175,7 @@ func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedC
 		return fmt.Errorf("missing .Status.ControlPlaneEndpoint.Host")
 	}
 
-	url := fmt.Sprintf("http://%s/livez", controlplaneEndpoint)
+	url := fmt.Sprintf("https://%s/livez", controlplaneEndpoint)
 	return endpointOK(url)
 }
 
