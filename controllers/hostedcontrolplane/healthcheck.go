@@ -97,7 +97,7 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 		return nil
 	}
 
-	if checkClusterOver1Hour(hostedcontrolplane.ObjectMeta.CreationTimestamp) {
+	if checkClusterOver1Hour(hostedcontrolplane.CreationTimestamp) {
 		return nil
 	}
 
@@ -198,7 +198,7 @@ func endpointOK(endpoint string, secure bool) error {
 	if !secure {
 		// Skip certificate verification when secure is false
 		client.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Required for internal cluster communication
 		}
 	}
 
