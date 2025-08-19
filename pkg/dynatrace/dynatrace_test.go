@@ -3,6 +3,7 @@ package dynatrace
 import (
 	"net/http"
 	"net/http/httptest"
+
 	"testing"
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
@@ -13,11 +14,20 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 	return mockServer.URL
 }
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody)) // nolint:errcheck
-	})
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		// Mock GET synthetic monitor response
+		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
+
+		default:
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(responseBody))
+		}
+	}
 }
+
 func TestNewAPIClient(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -152,10 +162,10 @@ func TestAPIClient_CreateDynatraceHTTPMonitor(t *testing.T) {
 	}
 }
 
-func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
+func TestAPIClient_GetDynatraceHttpMonitors(t *testing.T) {
 	tests := []struct {
 		name           string
-		monitorId      string
+		clusterId      string
 		mockResponse   string
 		mockStatusCode int
 		expectExists   bool
@@ -163,23 +173,23 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 	}{
 		{
 			name:           "Monitor exists",
-			monitorId:      "monitor-1",
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			clusterId:      "cluster-id",
+			mockResponse:   `{"monitors":[{"entityId":"mock-monitor-id"}]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   true,
 			expectError:    false,
 		},
 		{
 			name:           "Monitor does not exist",
-			monitorId:      "monitor-2",
-			mockResponse:   `{"monitors":[{"entityId":"monitor-1"}]}`,
+			clusterId:      "fake-cluster-id",
+			mockResponse:   `{"monitors":[]}`,
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
 			expectError:    false,
 		},
 		{
 			name:           "HTTP error",
-			monitorId:      "monitor-1",
+			clusterId:      "cluster-id",
 			mockResponse:   "",
 			mockStatusCode: http.StatusInternalServerError,
 			expectExists:   false,
@@ -187,7 +197,7 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 		},
 		{
 			name:           "JSON parse error",
-			monitorId:      "monitor-1",
+			clusterId:      "cluster-id",
 			mockResponse:   "{invalid json", // Invalid JSON to simulate a parsing error
 			mockStatusCode: http.StatusOK,
 			expectExists:   false,
@@ -201,12 +211,15 @@ func TestAPIClient_ExistsHttpMonitorInDynatrace(t *testing.T) {
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the function to test
-			exists, err := apiClient.ExistsHttpMonitorInDynatrace(tt.monitorId)
+			exists, err := apiClient.GetDynatraceHttpMonitors(tt.clusterId)
 
 			// Verify the results
 			// Check for errors based on the expected outcome
-			if exists != tt.expectExists {
-				t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+			if err == nil {
+				monitorsExist := len(exists.Monitors) > 0
+				if monitorsExist != tt.expectExists {
+					t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+				}
 			}
 			if (err != nil) != tt.expectError {
 				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
@@ -219,16 +232,19 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 	// Create a list of test cases
 	tests := []struct {
 		name           string
+		mockClusterId  string
 		mockStatusCode int
 		expectError    bool
 	}{
 		{
 			name:           "Successful DELETE request",
+			mockClusterId:  "mock-cluster-id",
 			mockStatusCode: http.StatusNoContent,
 			expectError:    false,
 		},
 		{
 			name:           "Failed DELETE request",
+			mockClusterId:  "mock-cluster-id",
 			mockStatusCode: http.StatusInternalServerError,
 			expectError:    true,
 		},
@@ -241,7 +257,7 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
-			err := apiClient.DeleteDynatraceHttpMonitor("123")
+			err := apiClient.DeleteDynatraceMonitorByCluserId(tt.mockClusterId)
 
 			// Check for errors based on the expected outcome
 			if (err != nil) != tt.expectError {

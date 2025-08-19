@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+
 	"testing"
 	"time"
 
@@ -759,10 +760,18 @@ func setupMockServer(handlerFunc http.HandlerFunc) string {
 	return mockServer.URL
 }
 func createMockHandlerFunc(responseBody string, statusCode int) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(statusCode)
-		w.Write([]byte(responseBody)) // nolint:errcheck
-	})
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		// Mock GET synthetic monitor response
+		case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:mock-cluster-id":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"monitors":[{"entityId":"mock-monitor-id"}]}`))
+
+		default:
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(responseBody))
+		}
+	}
 }
 
 func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
@@ -859,119 +868,6 @@ func TestHostedControlPlaneReconciler_GetDynatraceSecrets(t *testing.T) {
 
 			if tenantUrl != tt.expectedTenant {
 				t.Errorf("Expected Tenant URL: %s, Got: %s", tt.expectedTenant, tenantUrl)
-			}
-		})
-	}
-}
-
-func TestGetDynatraceHTTPMonitorId(t *testing.T) {
-	tests := []struct {
-		name               string
-		hostedControlPlane *hypershiftv1beta1.HostedControlPlane
-		expectedMonitorId  string
-		expectedFound      bool
-	}{
-		{
-			name: "Key exists in labels",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
-				},
-			},
-			expectedMonitorId: "sampleMonitorId",
-			expectedFound:     true,
-		},
-		{
-			name: "Key does not exist in labels",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{},
-				},
-			},
-			expectedMonitorId: "",
-			expectedFound:     false,
-		},
-		{
-			name: "Multiple keys but target key absent",
-			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"otherLabel": "someValue",
-					},
-				},
-			},
-			expectedMonitorId: "",
-			expectedFound:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			monitorId, found := getDynatraceHttpMonitorId(tt.hostedControlPlane)
-
-			if monitorId != tt.expectedMonitorId {
-				t.Errorf("Expected Monitor Id for case '%s': %s, Got: %s", tt.name, tt.expectedMonitorId, monitorId)
-			}
-			if found != tt.expectedFound {
-				t.Errorf("Expected found status for case '%s': %v, Got: %v", tt.name, tt.expectedFound, found)
-			}
-		})
-	}
-}
-
-func TestHostedControlPlaneReconciler_UpdateHostedControlPlaneLabels(t *testing.T) {
-	r := newTestReconciler(t)
-	ctx := context.Background()
-
-	tests := []struct {
-		name          string
-		initialLabels map[string]string
-		key           string
-		value         string
-		expectError   bool
-		expectedValue string
-	}{
-		{
-			name: "Update existing label",
-			initialLabels: map[string]string{
-				"existingKey": "existingValue",
-			},
-			key:           "testKey",
-			value:         "testValue",
-			expectError:   false,
-			expectedValue: "testValue",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Initialize the HostedControlPlane object
-			hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hostedcontrolplane",
-					Namespace: "default",
-					Labels:    tt.initialLabels,
-				},
-			}
-
-			err := r.Create(ctx, hostedcontrolplane)
-			if err != nil {
-				t.Fatalf("Failed to create mock HostedControlPlane resource: %v", err)
-			}
-
-			// Call the method being tested
-			err = r.UpdateHostedControlPlaneLabels(ctx, hostedcontrolplane, tt.key, tt.value)
-
-			if (err != nil) != tt.expectError {
-				t.Errorf("UpdateHostedControlPlaneLabels error = %v, expectError %v", err, tt.expectError)
-			}
-
-			// Verify that the labels are updated correctly
-			updatedLabels := hostedcontrolplane.GetLabels()
-			if updatedLabels[tt.key] != tt.expectedValue {
-				t.Errorf("Expected value: %s, Actual value: %s", tt.expectedValue, updatedLabels[tt.key])
 			}
 		})
 	}
@@ -1193,7 +1089,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 	}
 }
 
-func TestCheckHttpMonitorExists(t *testing.T) {
+func TestEnsureHttpMonitor(t *testing.T) {
 	tests := []struct {
 		name               string
 		mockExistsResponse string
@@ -1208,10 +1104,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"monitors": [{"entityId": "sampleMonitorId"}]}`,
 			mockApiError:       false,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "mock-cluster-id",
 				},
 			},
 			expectedExists: true,
@@ -1223,10 +1117,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"monitors": []}`,
 			mockApiError:       false,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "fake-cluster-id",
 				},
 			},
 			expectedExists: false,
@@ -1238,10 +1130,8 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			mockExistsResponse: `{"error": "mock error"}`,
 			mockApiError:       true,
 			hostedControlPlane: &hypershiftv1beta1.HostedControlPlane{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						httpMonitorLabel: "sampleMonitorId",
-					},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "other-cluster-id",
 				},
 			},
 			expectedExists: false,
@@ -1262,7 +1152,7 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 			apiClient := dynatrace.NewDynatraceApiClient(mockServerURL, "mockedToken")
 
 			// Call the function to test
-			exists, err := checkHttpMonitorExists(apiClient, tt.hostedControlPlane)
+			exists, err := ensureHttpMonitor(apiClient, tt.hostedControlPlane)
 
 			// Validate the expected values
 			if exists != tt.expectedExists {
@@ -1277,32 +1167,36 @@ func TestCheckHttpMonitorExists(t *testing.T) {
 
 func TestAPIClient_DeleteDynatraceHTTPMonitorResources(t *testing.T) {
 	tests := []struct {
-		name         string
-		mockResponse string
-		mockStatus   int
-		expectError  bool
+		name           string
+		mockClusterId  string
+		mockStatusCode int
+		expectError    bool
 	}{
 		{
-			name:         "HTTP Monitor Id not found",
-			mockResponse: "",
-			mockStatus:   http.StatusOK,
-			expectError:  false,
+			name:           "HTTP Monitor Id not found",
+			mockClusterId:  "fake-cluster-id",
+			mockStatusCode: http.StatusNoContent,
+			expectError:    true,
 		},
 		{
-			name:         "Successful deletion of HTTP Monitor",
-			mockResponse: "", // Adjust as needed for a successful response
-			mockStatus:   http.StatusOK,
-			expectError:  false,
+			name:           "Successful deletion of HTTP Monitor",
+			mockClusterId:  "mock-cluster-id",
+			mockStatusCode: http.StatusNoContent,
+			expectError:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockServer := setupMockServer(createMockHandlerFunc(tt.mockResponse, tt.mockStatus))
+			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
 			apiClient := dynatrace.NewDynatraceApiClient(mockServer, "mockedToken")
 
 			log := log.Log
-			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{}
+			hostedControlPlane := &hypershiftv1beta1.HostedControlPlane{
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: tt.mockClusterId,
+				},
+			}
 
 			err := deleteDynatraceHttpMonitorResources(apiClient, log, hostedControlPlane)
 

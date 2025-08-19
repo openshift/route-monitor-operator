@@ -151,6 +151,27 @@ func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, r
 	return dynatraceApiClient.httpClient.Do(req)
 }
 
+func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitors(clusterId string) (*ExistsHttpMonitorInDynatraceResponse, error) {
+	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
+
+	path := fmt.Sprintf("/synthetic/monitors/?tag=cluster-id:%s", clusterId)
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&existsHttpMonitorResponse); err != nil {
+		return nil, fmt.Errorf("error parsing JSON: %w", err)
+	}
+
+	return &existsHttpMonitorResponse, nil
+}
+
 func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(locationName string, locationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
 	// Fetch Dynatrace locations using Dynatrace API
 	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, "/synthetic/locations", "")
@@ -247,48 +268,24 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	return monitorId, nil
 }
 
-func (dynatraceApiClient *DynatraceApiClient) ExistsHttpMonitorInDynatrace(monitorId string) (bool, error) {
-	path := ("/synthetic/monitors/")
-	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	// Check if the response status code is OK
-	if resp.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
-	}
-
-	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
-	if err := json.NewDecoder(resp.Body).Decode(&existsHttpMonitorResponse); err != nil {
-		return false, fmt.Errorf("error parsing JSON: %w", err)
-	}
-
-	for _, monitor := range existsHttpMonitorResponse.Monitors {
-		if monitor.EntityId == monitorId {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceHttpMonitor(monitorId string) error {
-	path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
-
-	resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
+func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceMonitorByCluserId(clusterId string) error {
+	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	//monitor already deleted
-	if resp.StatusCode == http.StatusNotFound {
-		return nil
-	}
+	for _, monitor := range existsHttpMonitorResponse.Monitors {
+		monitorId := monitor.EntityId
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
+		path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
+		resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != http.StatusNoContent {
+			return fmt.Errorf("failed to delete monitor. Status code: %d", resp.StatusCode)
+		}
 	}
 	return nil
 }
