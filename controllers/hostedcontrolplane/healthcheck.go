@@ -16,6 +16,7 @@ package hostedcontrolplane
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -175,14 +176,33 @@ func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedC
 		return fmt.Errorf("missing .Status.ControlPlaneEndpoint.Host")
 	}
 
-	url := fmt.Sprintf("https://%s/livez", controlplaneEndpoint)
-	return endpointOK(url)
+	var url string
+	var secure bool
+	if hostedcontrolplane.Spec.Platform.AWS != nil &&
+		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private {
+		url = fmt.Sprintf("https://kube-apiserver.%s.svc.cluster.local:6443/livez", hostedcontrolplane.Namespace)
+		secure = false
+	} else {
+		url = fmt.Sprintf("https://%s/livez", controlplaneEndpoint)
+		secure = true
+	}
+
+	return endpointOK(url, secure)
 }
 
 // endpointOK checks the readiness of the given url, and returns an error if the GET fails, or a non-200
 // response is received
-func endpointOK(endpoint string) error {
-	resp, err := http.Get(endpoint)
+func endpointOK(endpoint string, secure bool) error {
+	// Create HTTP client with appropriate TLS configuration
+	client := &http.Client{}
+	if !secure {
+		// Skip certificate verification when secure is false
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+
+	resp, err := client.Get(endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to GET endpoint: %w", err)
 	}
