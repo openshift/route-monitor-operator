@@ -2,8 +2,9 @@ package blackboxexporter_test
 
 import (
 	"context"
-	"github.com/go-logr/logr"
 	"time"
+
+	"github.com/go-logr/logr"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
@@ -17,6 +18,8 @@ import (
 
 	. "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 var _ = Describe("Blackboxexporter", func() {
@@ -183,14 +186,41 @@ var _ = Describe("Blackboxexporter", func() {
 
 	})
 	Describe("CreateBlackBoxExporterDeployment", func() {
-		BeforeEach(func() {
-			// Arrange
-			get.CalledTimes = 2
+		var (
+			ingresscontroller operatorv1.IngressController
+		)
+
+		When("the ingresscontroller cannot be retrieved", func() {
+			BeforeEach(func() {
+				get.CalledTimes = 1
+				get.ErrorResponse = consterror.NotFoundErr
+			})
+			It("should return the error", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("the ingresscontroller is not fully defined", func() {
+			BeforeEach(func() {
+				ingresscontroller = testPrivateDefaultIC()
+				// clear pointer field to simulate unpopulated object
+				ingresscontroller.Status.EndpointPublishingStrategy = nil
+				get.CalledTimes = 1
+				get.ErrorResponse = consterror.ErrCustomError
+			})
+			It("should return an error", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterDeploymentExists()
+				Expect(err).To(HaveOccurred())
+			})
 		})
 
 		When("the resource(deployment) is Not Found", func() {
 			// Arrange
 			BeforeEach(func() {
+				ingresscontroller = testPrivateDefaultIC()
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				get.CalledTimes = 2
 				get.ErrorResponse = consterror.NotFoundErr
 				create.CalledTimes = 1
 			})
@@ -204,6 +234,9 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
+				ingresscontroller = testPrivateDefaultIC()
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				get.CalledTimes = 2
 				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should return the error and not call `Create`", func() {
@@ -217,6 +250,9 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) Create fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
+				ingresscontroller = testPrivateDefaultIC()
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				get.CalledTimes = 2
 				get.ErrorResponse = consterror.NotFoundErr
 				create = helper.CustomErrorHappensOnce()
 			})
@@ -373,3 +409,25 @@ var _ = Describe("Blackboxexporter", func() {
 	})
 
 })
+
+func testPrivateDefaultIC() operatorv1.IngressController {
+	ic := operatorv1.IngressController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "default",
+			Namespace: "openshift-ingress-operator",
+		},
+		Status: operatorv1.IngressControllerStatus{
+			EndpointPublishingStrategy: &operatorv1.EndpointPublishingStrategy{
+				LoadBalancer: &operatorv1.LoadBalancerStrategy{
+					Scope: operatorv1.InternalLoadBalancer,
+					ProviderParameters: &operatorv1.ProviderLoadBalancerParameters{
+						AWS: &operatorv1.AWSLoadBalancerParameters{
+							Type: operatorv1.AWSNetworkLoadBalancer,
+						},
+					},
+				},
+			},
+		},
+	}
+	return ic
+}

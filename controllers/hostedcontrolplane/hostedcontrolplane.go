@@ -30,7 +30,7 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -142,10 +142,10 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	// Check if the HostedControlPlane is ready
-	if !hostedcontrolplane.Status.Ready {
-		log.Info("skipped deploying monitoring objects: HostedControlPlane not ready")
-		return utilreconcile.Stop()
+	err = r.hcpReady(ctx, hostedcontrolplane)
+	if err != nil {
+		log.Info(fmt.Sprintf("skipped deploying monitoring objects, HostedControlPlane not ready: %v", err))
+		return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
 	}
 
 	log.Info("Deploying internal monitoring objects")
@@ -234,7 +234,7 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 	}
 
 	// Quick fix to discover the API server port from the service resource
-	apiServerService := v1.Service{}
+	apiServerService := corev1.Service{}
 	err = r.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
 	if err != nil {
 		return fmt.Errorf("couldn't query API server service resource: %w", err)
@@ -412,7 +412,7 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 
 func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) (string, string, error) {
 
-	secret := &v1.Secret{}
+	secret := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
 	if err != nil {
 		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)

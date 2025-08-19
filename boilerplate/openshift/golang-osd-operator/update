@@ -31,8 +31,29 @@ fi
 
 # Add dependabot configuration
 mkdir -p $REPO_ROOT/.github
-echo "Copying dependabot.yml to .github/dependabot.yml"
-cp ${HERE}/dependabot.yml ${REPO_ROOT}/.github/dependabot.yml
+TARGET_FILE="${REPO_ROOT}/.github/dependabot.yml"
+BOILERPLATE_FILE="${HERE}/dependabot.yml"
+
+if [[ -f "$TARGET_FILE" ]]; then
+  if grep -q '# BEGIN boilerplate-managed' "$TARGET_FILE"; then
+    echo "Boilerplate-managed section already present in dependabot.yml, skipping append."
+  elif diff -q "$TARGET_FILE" "$BOILERPLATE_FILE" >/dev/null; then
+    echo "Wrapping existing dependabot.yml (which matches boilerplate) with boilerplate-managed markers..."
+    mv "$TARGET_FILE" "${TARGET_FILE}.bak"
+    {
+      echo "# BEGIN boilerplate-managed"
+      cat "${TARGET_FILE}.bak"
+      echo "# END boilerplate-managed"
+    } > "$TARGET_FILE"
+    rm -f "${TARGET_FILE}.bak"
+  else
+    echo "[WARNING] dependabot.yml exists and differs from boilerplate template but has no boilerplate-managed markers."
+    echo "[WARNING] Please review manually to avoid config duplication."
+  fi
+else
+  echo "Copying boilerplate-managed dependabot.yml"
+  cp "$BOILERPLATE_FILE" "$TARGET_FILE"
+fi
 
 # Add olm-registry Dockerfile
 mkdir -p $REPO_ROOT/build
@@ -73,7 +94,8 @@ for file in $DOCKERFILES; do
 
   # Update any UBI images to use a versioned tag of ubi8/ubi-minimal that is compatible with dependabot
   for ubi_latest in $(grep -oE 'registry.access.redhat.com/ubi[7-9]/ubi.*?:.*' ${file}); do
-      replacement_image=$(skopeo inspect --override-os linux --override-arch amd64 docker://registry.access.redhat.com/ubi8/ubi-minimal --format "{{.Name}}:{{.Labels.version}}-{{.Labels.release}}")
+      ubi_base=$(echo "$ubi_latest" | "${SED?}" -n 's|registry.access.redhat.com/\(ubi[0-9]/ubi[^:]*\):.*|\1|p')
+      replacement_image=$(skopeo inspect --override-os linux --override-arch amd64 "docker://registry.access.redhat.com/${ubi_base}" --format "{{.Name}}:{{.Labels.version}}-{{.Labels.release}}")
       echo "Overwriting ${file}'s ${ubi_latest} image to ${replacement_image}"
       ${SED?} -i "s,${ubi_latest},${replacement_image}," ${file}
   done
