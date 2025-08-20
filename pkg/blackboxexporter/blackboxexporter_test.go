@@ -408,6 +408,104 @@ var _ = Describe("Blackboxexporter", func() {
 		})
 	})
 
+	Describe("New", func() {
+		It("should create a BlackBoxExporter with correct properties", func() {
+			bbe := New(mockClient, logr.Discard(), context.Background(), "test-image", "test-namespace")
+			Expect(bbe.Client).To(Equal(mockClient))
+			Expect(bbe.Image).To(Equal("test-image"))
+			Expect(bbe.NamespacedName.Namespace).To(Equal("test-namespace"))
+		})
+	})
+
+	Describe("GetBlackBoxExporterNamespace", func() {
+		It("should return the correct namespace", func() {
+			bbe := New(mockClient, logr.Discard(), context.Background(), "test-image", "test-namespace")
+			result := bbe.GetBlackBoxExporterNamespace()
+			Expect(result).To(Equal("test-namespace"))
+		})
+	})
+
+	Describe("EnsureBlackBoxExporterConfigMapExists", func() {
+		When("the resource exists", func() {
+			BeforeEach(func() {
+				get.CalledTimes = 1
+			})
+			It("should not create a new ConfigMap", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapExists()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the resource does not exist", func() {
+			BeforeEach(func() {
+				get = helper.NotFoundErrorHappensOnce()
+				create.CalledTimes = 1
+			})
+			It("should create a new ConfigMap", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapExists()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("Get fails with unexpected error", func() {
+			BeforeEach(func() {
+				get = helper.CustomErrorHappensOnce()
+			})
+			It("should return the error", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapExists()
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.ErrCustomError))
+			})
+		})
+	})
+
+	Describe("EnsureBlackBoxExporterConfigMapAbsent", func() {
+		When("the resource exists", func() {
+			BeforeEach(func() {
+				get.CalledTimes = 1
+				delete.CalledTimes = 1
+			})
+			It("should delete the ConfigMap", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapAbsent()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("the resource does not exist", func() {
+			BeforeEach(func() {
+				get = helper.NotFoundErrorHappensOnce()
+			})
+			It("should not attempt to delete", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapAbsent()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+
+		When("Get fails with unexpected error", func() {
+			BeforeEach(func() {
+				get = helper.CustomErrorHappensOnce()
+			})
+			It("should return the error", func() {
+				err := blackboxExporter.EnsureBlackBoxExporterConfigMapAbsent()
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(MatchError(consterror.ErrCustomError))
+			})
+		})
+	})
+
+	Describe("EnsureBlackBoxExporterResourcesAbsent", func() {
+		BeforeEach(func() {
+			get.CalledTimes = 3
+			delete.CalledTimes = 3
+		})
+		It("should delete all BlackBox Exporter resources", func() {
+			err := blackboxExporter.EnsureBlackBoxExporterResourcesAbsent()
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+
+
 })
 
 func testPrivateDefaultIC() operatorv1.IngressController {
