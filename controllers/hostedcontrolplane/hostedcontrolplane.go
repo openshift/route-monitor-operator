@@ -41,6 +41,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -405,6 +406,9 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hypershiftv1beta1.HostedControlPlane{}, handler.OnlyControllerOwner()),
 			builder.WithPredicates(selectorPredicate),
 		).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1, // Prevent race conditions in monitor creation
+		}).
 		Complete(r)
 }
 
@@ -506,9 +510,11 @@ func ensureHttpMonitor(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedc
 		return false, nil
 
 	case countMonitors > 1:
-		for i := 1; i < countMonitors; i++ {
-			if err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId); err != nil {
-				return false, fmt.Errorf("failed to delete monitors for cluster id %s: %w", clusterId, err)
+		// Keep the first monitor, delete the rest
+		monitorsToDelete := existsHttpMonitorResponse.Monitors[1:]
+		for _, monitor := range monitorsToDelete {
+			if err := dynatraceApiClient.DeleteSingleMonitor(monitor.EntityId); err != nil {
+				return false, fmt.Errorf("failed to delete excess monitor %s for cluster id %s: %w", monitor.EntityId, clusterId, err)
 			}
 		}
 		return true, nil
@@ -566,11 +572,11 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
 
 	// Ensure the HTTP monitor has been created, and there is only a single instance of the monitor
-	isValid, err := ensureHttpMonitor(dynatraceApiClient, hostedcontrolplane)
+	present, err := ensureHttpMonitor(dynatraceApiClient, hostedcontrolplane)
 	if err != nil {
 		return fmt.Errorf("failed to validate the http monitor: %v", err)
 	}
-	if isValid {
+	if present {
 		log.Info(fmt.Sprintf("HTTP monitor found. Skipping any actions for monitor %s", monitorName))
 		return nil
 	}
