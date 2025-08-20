@@ -388,4 +388,68 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 		})
 	})
+
+	Describe("NewMonitorResourceCommon", func() {
+		It("should create a MonitorResourceCommon with correct properties", func() {
+			client := mockClient
+			ctx := context.Background()
+			result := reconcilecommon.NewMonitorResourceCommon(ctx, client)
+
+			Expect(result.Client).To(Equal(client))
+			Expect(result.Ctx).To(Equal(ctx))
+			Expect(result.Comparer).NotTo(BeNil())
+		})
+	})
+
+	Describe("ResourceComparer", func() {
+		var comparer reconcilecommon.ResourceComparer
+
+		Describe("DeepEqual", func() {
+			It("should return true for equal values", func() {
+				result := comparer.DeepEqual("test", "test")
+				Expect(result).To(BeTrue())
+			})
+
+			It("should return false for different values", func() {
+				result := comparer.DeepEqual("test1", "test2")
+				Expect(result).To(BeFalse())
+			})
+
+			It("should return true for equal structs", func() {
+				struct1 := v1alpha1.RouteMonitor{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+				struct2 := v1alpha1.RouteMonitor{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+				result := comparer.DeepEqual(struct1, struct2)
+				Expect(result).To(BeTrue())
+			})
+		})
+	})
+
+	Describe("GetOSDClusterID", func() {
+		When("ClusterVersion not found", func() {
+			BeforeEach(func() {
+				get.CalledTimes = 1
+				get.ErrorResponse = consterror.NotFoundErr
+			})
+			It("should return error", func() {
+				result, err := rc.GetOSDClusterID()
+				Expect(err).To(HaveOccurred())
+				Expect(result).To(Equal(""))
+			})
+		})
+	})
+
+	Describe("GetServiceMonitor", func() {
+		When("ServiceMonitor not found", func() {
+			BeforeEach(func() {
+				get.CalledTimes = 1
+				get.ErrorResponse = consterror.NotFoundErr
+			})
+			It("should return error", func() {
+				namespacedName := types.NamespacedName{Name: "test", Namespace: "test"}
+				result, err := rc.GetServiceMonitor(namespacedName)
+				Expect(err).To(HaveOccurred())
+				Expect(result).NotTo(BeNil()) // It returns an empty ServiceMonitor, not nil
+			})
+		})
+	})
 })
