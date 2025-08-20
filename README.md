@@ -51,6 +51,18 @@ To support this, the operator [takes into account](https://github.com/openshift/
 
 Currently the blackbox exporter deployment is only using the default config file which only allows a limit set of probes.
 
+## Configuration
+
+### Probe API URL (Experimental)
+
+For RHOBS synthetics integration with HostedCluster monitoring, configure the probe API URL:
+
+```bash
+--probe-api-url="https://observatorium.api.openshift.com/api/metrics/v1/probes"
+```
+
+When empty (default), uses standard blackbox exporter behavior.
+
 ## Development
 
 In order to develop the repo follow these steps to get an env started:

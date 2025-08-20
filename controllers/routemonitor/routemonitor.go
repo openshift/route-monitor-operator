@@ -48,7 +48,7 @@ type RouteMonitorReconciler struct {
 	Common           controllers.MonitorResourceHandler
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *RouteMonitorReconciler {
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool, probeAPIURL string) *RouteMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("RouteMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()

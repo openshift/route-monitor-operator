@@ -17,6 +17,9 @@ parameters:
 - name: REPO_NAME
   value: route-monitor-operator
   required: true
+- name: PROBE_API_URL
+  value: ""
+  required: false
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -83,3 +86,10 @@ objects:
           olm.operatorframework.io/exclude-global-namespace-resolution: 'true'
       spec:
         upgradeStrategy: TechPreviewUnsafeFailForward
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: ${REPO_NAME}-config
+        namespace: ${NAMESPACE}
+      data:
+        probe-api-url: ${PROBE_API_URL}

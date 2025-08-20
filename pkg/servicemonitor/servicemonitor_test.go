@@ -213,13 +213,13 @@ var _ = Describe("CR Deployment Handling", func() {
 
 	Describe("TemplateAndUpdateServiceMonitorDeployment", func() {
 		var (
-			routeURL                   = "https://example.com"
-			blackBoxExporterNamespace  = "test-namespace"
-			namespacedName             = serviceMonitorRef
-			clusterID                  = "test-cluster"
-			isHCPMonitor               = false
-			useInsecure                = false
-			owner                      *metav1.OwnerReference
+			routeURL                  = "https://example.com"
+			blackBoxExporterNamespace = "test-namespace"
+			namespacedName            = serviceMonitorRef
+			clusterID                 = "test-cluster"
+			isHCPMonitor              = false
+			useInsecure               = false
+			owner                     *metav1.OwnerReference
 		)
 
 		BeforeEach(func() {
