@@ -3,6 +3,7 @@ package dynatrace
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"testing"
 
@@ -228,24 +229,35 @@ func TestAPIClient_GetDynatraceHttpMonitors(t *testing.T) {
 	}
 }
 
-func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
-	// Create a list of test cases
+func TestAPIClient_DeleteSingleMonitor(t *testing.T) {
 	tests := []struct {
 		name           string
-		mockClusterId  string
+		monitorId      string
 		mockStatusCode int
 		expectError    bool
 	}{
 		{
-			name:           "Successful DELETE request",
-			mockClusterId:  "mock-cluster-id",
+			name:           "Successful single monitor deletion",
+			monitorId:      "HTTP_CHECK-4CDBAE581E7FD304",
 			mockStatusCode: http.StatusNoContent,
 			expectError:    false,
 		},
 		{
-			name:           "Failed DELETE request",
-			mockClusterId:  "mock-cluster-id",
+			name:           "Failed single monitor deletion - not found",
+			monitorId:      "HTTP_CHECK-NONEXISTENT",
+			mockStatusCode: http.StatusNotFound,
+			expectError:    true,
+		},
+		{
+			name:           "Failed single monitor deletion - server error",
+			monitorId:      "HTTP_CHECK-4CDBAE581E7FD304",
 			mockStatusCode: http.StatusInternalServerError,
+			expectError:    true,
+		},
+		{
+			name:           "Failed single monitor deletion - unauthorized",
+			monitorId:      "HTTP_CHECK-4CDBAE581E7FD304",
+			mockStatusCode: http.StatusUnauthorized,
 			expectError:    true,
 		},
 	}
@@ -254,6 +266,79 @@ func TestAPIClient_DeleteDynatraceHTTPMonitor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Mock the HTTP server to return the desired response
 			mockServer := setupMockServer(createMockHandlerFunc("", tt.mockStatusCode))
+			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
+
+			// Call the method under test
+			err := apiClient.DeleteSingleMonitor(tt.monitorId)
+
+			// Check for errors based on the expected outcome
+			if (err != nil) != tt.expectError {
+				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
+			}
+		})
+	}
+}
+
+func TestAPIClient_DeleteDynatraceMonitorByCluserId(t *testing.T) {
+	tests := []struct {
+		name                  string
+		mockClusterId         string
+		getMonitorsResponse   string
+		getMonitorsStatusCode int
+		deleteStatusCode      int
+		expectError           bool
+	}{
+		{
+			name:                  "Successful deletion of multiple monitors",
+			mockClusterId:         "mock-cluster-id",
+			getMonitorsResponse:   `{"monitors":[{"entityId":"HTTP_CHECK-1"},{"entityId":"HTTP_CHECK-2"}]}`,
+			getMonitorsStatusCode: http.StatusOK,
+			deleteStatusCode:      http.StatusNoContent,
+			expectError:           false,
+		},
+		{
+			name:                  "No monitors found for cluster",
+			mockClusterId:         "empty-cluster-id",
+			getMonitorsResponse:   `{"monitors":[]}`,
+			getMonitorsStatusCode: http.StatusOK,
+			deleteStatusCode:      http.StatusNoContent,
+			expectError:           false,
+		},
+		{
+			name:                  "Failed to get monitors",
+			mockClusterId:         "failed-cluster-id",
+			getMonitorsResponse:   "",
+			getMonitorsStatusCode: http.StatusInternalServerError,
+			deleteStatusCode:      http.StatusNoContent,
+			expectError:           true,
+		},
+		{
+			name:                  "Failed to delete monitor",
+			mockClusterId:         "mock-cluster-id",
+			getMonitorsResponse:   `{"monitors":[{"entityId":"HTTP_CHECK-1"}]}`,
+			getMonitorsStatusCode: http.StatusOK,
+			deleteStatusCode:      http.StatusInternalServerError,
+			expectError:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a custom handler that handles both GET and DELETE requests
+			handlerFunc := func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/synthetic/monitors/" && r.URL.RawQuery == "tag=cluster-id:"+tt.mockClusterId:
+					w.WriteHeader(tt.getMonitorsStatusCode)
+					_, _ = w.Write([]byte(tt.getMonitorsResponse))
+				case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/synthetic/monitors/"):
+					w.WriteHeader(tt.deleteStatusCode)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}
+
+			// Mock the HTTP server
+			mockServer := setupMockServer(handlerFunc)
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the method under test
