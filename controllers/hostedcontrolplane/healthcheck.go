@@ -58,6 +58,10 @@ const (
 // "routemonitor.managed.openshift.io/successful-healthchecks" can be added-to/edited-on the configmap with a large number (ie - 999) to bypass
 // this functionality
 func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	if checkClusterOver1Hour(hostedcontrolplane.CreationTimestamp) {
+		return nil
+	}
+
 	healthcheckConfigMap, err := r.getHealthCheckConfigMap(ctx, hostedcontrolplane)
 	if err != nil {
 		if !kerr.IsNotFound(err) {
@@ -94,10 +98,6 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 
 	successes = healthcheckConfigMapSuccesses(healthcheckConfigMap)
 	if successes >= consecutiveSuccessfulHealthchecks {
-		return nil
-	}
-
-	if checkClusterOver1Hour(hostedcontrolplane.CreationTimestamp) {
 		return nil
 	}
 
