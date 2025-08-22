@@ -48,7 +48,7 @@ type ClusterUrlMonitorReconciler struct {
 	Common           controllers.MonitorResourceHandler
 }
 
-func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool) *ClusterUrlMonitorReconciler {
+func NewReconciler(mgr manager.Manager, blackboxExporterImage, blackboxExporterNamespace string, enablehypershift bool, probeAPIURL string) *ClusterUrlMonitorReconciler {
 	log := ctrl.Log.WithName("controllers").WithName("ClusterUrlMonitor")
 	client := mgr.GetClient()
 	ctx := context.Background()

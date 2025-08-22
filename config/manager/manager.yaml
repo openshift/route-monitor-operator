@@ -43,6 +43,7 @@ spec:
             - --zap-log-level=debug
             - --blackbox-image=$(BLACKBOX_IMAGE)
             - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
+            - --probe-api-url=$(PROBE_API_URL)
           env:
             - name: LOG_LEVEL
               # level 1 is debug, so when we want to raise the level we can
@@ -55,6 +56,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: PROBE_API_URL
+              value: ""
           image: controller:latest
           name: manager
           securityContext:

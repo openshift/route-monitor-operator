@@ -504,8 +504,6 @@ var _ = Describe("Blackboxexporter", func() {
 		})
 	})
 
-
-
 })
 
 func testPrivateDefaultIC() operatorv1.IngressController {

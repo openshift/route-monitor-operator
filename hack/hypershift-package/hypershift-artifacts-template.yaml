@@ -13,6 +13,9 @@ parameters:
   required: true
 - name: PACKAGE_TAG
   required: true
+- name: PROBE_API_URL
+  value: ""
+  required: false
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -71,6 +74,8 @@ objects:
                                   name: route-monitor-operator
                               spec:
                                 image: ${PACKAGE_IMAGE}:${PACKAGE_TAG}
+                                config:
+                                  probeApiUrl: ${PROBE_API_URL}
                       pruneObjectBehavior: DeleteIfCreated
                       remediationAction: enforce
                       severity: low

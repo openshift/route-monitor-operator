@@ -11,4 +11,3 @@ func TestReconcileWrapper(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ReconcileWrapper Suite")
 }
-

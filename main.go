@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,15 +88,23 @@ func main() {
 
 	var blackboxExporterImage string
 	var blackboxExporterNamespace string
+	var probeAPIURL string
 
 	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
+	flag.StringVar(&probeAPIURL, "probe-api-url", "", "The fully qualified API URL for RHOBS synthetics probe management (for HostedCluster monitoring). When empty, uses default blackbox exporter behavior.")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Validate probe API URL format (if provided)
+	if probeAPIURL != "" && !strings.HasPrefix(probeAPIURL, "http://") && !strings.HasPrefix(probeAPIURL, "https://") {
+		setupLog.Error(nil, "probe-api-url must be a fully qualified URL starting with 'http://' or 'https://'", "probeAPIURL", probeAPIURL)
+		os.Exit(1)
+	}
 
 	enableHCP, err := shouldEnableHCP()
 	if err != nil {
@@ -167,13 +176,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	routeMonitorReconciler := routemonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
+	routeMonitorReconciler := routemonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift, probeAPIURL)
 	if err := routeMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RouteMonitor")
 		os.Exit(1)
 	}
 
-	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift)
+	clusterUrlMonitorReconciler := clusterurlmonitor.NewReconciler(mgr, blackboxExporterImage, blackboxExporterNamespace, enablehypershift, probeAPIURL)
 	if err := clusterUrlMonitorReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "clusterUrlMonitorReconciler")
 		os.Exit(1)
