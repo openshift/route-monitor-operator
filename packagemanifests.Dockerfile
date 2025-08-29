@@ -6,7 +6,7 @@ ARG BUNDLE_DIR=packagemanifests
 COPY $BUNDLE_DIR manifests
 RUN initializer --permissive
 
-FROM registry.access.redhat.com/ubi8/ubi-micro:8.5-836
+FROM registry.access.redhat.com/ubi8/ubi-micro:8.10-1752574873
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
