@@ -189,7 +189,7 @@ func main() {
 	}
 
 	if enableHCP {
-		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr)
+		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, probeAPIURL)
 		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane")
 			os.Exit(1)
