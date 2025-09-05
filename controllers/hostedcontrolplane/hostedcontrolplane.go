@@ -750,7 +750,8 @@ func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs
 			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
 		}
 		log.V(2).Info("Creating RHOBS client with OIDC authentication")
-		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, "hcp", oidcConfig, log)
+		// Use the OIDC client ID as the tenant name for compatibility with server expectations
+		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.OIDCClientID, oidcConfig, log)
 	}
 
 	log.V(2).Info("Creating RHOBS client without authentication")

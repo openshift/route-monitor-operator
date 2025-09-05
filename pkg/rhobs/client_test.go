@@ -32,6 +32,16 @@ func TestCreateProbe(t *testing.T) {
 			t.Errorf("Expected cluster_id test-cluster, got %s", req.ClusterID)
 		}
 
+		// Check tenant header
+		if r.Header.Get("X-Tenant") != "test-tenant" {
+			t.Errorf("Expected X-Tenant header test-tenant, got %s", r.Header.Get("X-Tenant"))
+		}
+
+		// Check username header (should be empty for non-OIDC client)
+		if r.Header.Get("X-Username") != "" {
+			t.Errorf("Expected empty X-Username header for non-OIDC client, got %s", r.Header.Get("X-Username"))
+		}
+
 		// Return a mock response
 		resp := ProbeResponse{
 			ID:        "probe-123",
@@ -76,6 +86,16 @@ func TestGetProbe(t *testing.T) {
 		expectedSelector := "cluster_id=test-cluster"
 		if labelSelector != expectedSelector {
 			t.Errorf("Expected label_selector %s, got %s", expectedSelector, labelSelector)
+		}
+
+		// Check tenant header
+		if r.Header.Get("X-Tenant") != "test-tenant" {
+			t.Errorf("Expected X-Tenant header test-tenant, got %s", r.Header.Get("X-Tenant"))
+		}
+
+		// Check username header (should be empty for non-OIDC client)
+		if r.Header.Get("X-Username") != "" {
+			t.Errorf("Expected empty X-Username header for non-OIDC client, got %s", r.Header.Get("X-Username"))
 		}
 
 		// Return a mock response
@@ -149,6 +169,16 @@ func TestDeleteProbe(t *testing.T) {
 
 		if req.Status != "terminating" {
 			t.Errorf("Expected status 'terminating', got %s", req.Status)
+		}
+
+		// Check tenant header
+		if r.Header.Get("X-Tenant") != "test-tenant" {
+			t.Errorf("Expected X-Tenant header test-tenant, got %s", r.Header.Get("X-Tenant"))
+		}
+
+		// Check username header (should be empty for non-OIDC client)
+		if r.Header.Get("X-Username") != "" {
+			t.Errorf("Expected empty X-Username header for non-OIDC client, got %s", r.Header.Get("X-Username"))
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -716,6 +746,18 @@ func TestOIDCTokenFlow(t *testing.T) {
 			t.Errorf("Expected Authorization 'Bearer mock-access-token', got %s", auth)
 		}
 
+		// Check tenant header
+		tenant := r.Header.Get("X-Tenant")
+		if tenant != "test-tenant" {
+			t.Errorf("Expected X-Tenant 'test-tenant', got %s", tenant)
+		}
+
+		// Check username header (should be client ID for OIDC client)
+		username := r.Header.Get("X-Username")
+		if username != "test-client" {
+			t.Errorf("Expected X-Username 'test-client', got %s", username)
+		}
+
 		// Return mock probe response
 		resp := ProbeResponse{
 			ID:        "probe-123",
@@ -880,10 +922,10 @@ func TestOIDCTokenCaching(t *testing.T) {
 
 func TestOIDCTokenURL(t *testing.T) {
 	tests := []struct {
-		name            string
-		issuerURL       string
-		expectedPath    string
-		description     string
+		name         string
+		issuerURL    string
+		expectedPath string
+		description  string
 	}{
 		{
 			name:         "issuer URL without token path",

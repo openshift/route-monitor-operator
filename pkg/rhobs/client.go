@@ -30,6 +30,8 @@ const (
 
 	// HTTP headers
 	contentTypeJSON = "application/json"
+	tenantHeader    = "X-Tenant"
+	usernameHeader  = "X-Username"
 
 	// Query parameters
 	labelSelectorParam = "label_selector"
@@ -129,13 +131,20 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	}
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
+	
+	// Add RHOBS-specific headers (tenant and username)
+	c.addRHOBSHeaders(httpReq)
 
 	// Add authentication headers if OIDC is configured
 	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
 		return nil, fmt.Errorf("failed to add auth headers: %w", err)
 	}
 
-	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "url", url, "cluster_id", req.ClusterID)
+	username := ""
+	if c.oidcConfig != nil {
+		username = c.oidcConfig.ClientID
+	}
+	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "url", url, "cluster_id", req.ClusterID, "tenant", c.tenant, "username", username)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -174,12 +183,19 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	q.Add(labelSelectorParam, fmt.Sprintf("cluster_id=%s", clusterID))
 	httpReq.URL.RawQuery = q.Encode()
 
+	// Add RHOBS-specific headers (tenant and username)
+	c.addRHOBSHeaders(httpReq)
+
 	// Add authentication headers if OIDC is configured
 	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
 		return nil, fmt.Errorf("failed to add auth headers: %w", err)
 	}
 
-	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "url", httpReq.URL.String(), "cluster_id", clusterID)
+	username := ""
+	if c.oidcConfig != nil {
+		username = c.oidcConfig.ClientID
+	}
+	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "url", httpReq.URL.String(), "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -258,13 +274,20 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	}
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
+	
+	// Add RHOBS-specific headers (tenant and username)
+	c.addRHOBSHeaders(httpReq)
 
 	// Add authentication headers if OIDC is configured
 	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
 		return fmt.Errorf("failed to add auth headers: %w", err)
 	}
 
-	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "url", url, "cluster_id", clusterID)
+	username := ""
+	if c.oidcConfig != nil {
+		username = c.oidcConfig.ClientID
+	}
+	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -384,4 +407,15 @@ func (c *Client) addAuthHeaders(ctx context.Context, req *http.Request) error {
 	}
 
 	return nil
+}
+
+// addRHOBSHeaders adds RHOBS-specific headers to the request
+func (c *Client) addRHOBSHeaders(req *http.Request) {
+	// Set tenant header
+	req.Header.Set(tenantHeader, c.tenant)
+	
+	// Set username header if OIDC is configured, use client ID as username
+	if c.oidcConfig != nil {
+		req.Header.Set(usernameHeader, c.oidcConfig.ClientID)
+	}
 }
