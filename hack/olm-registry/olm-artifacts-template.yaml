@@ -86,6 +86,30 @@ objects:
           olm.operatorframework.io/exclude-global-namespace-resolution: 'true'
       spec:
         upgradeStrategy: TechPreviewUnsafeFailForward
+
+###############################################################################
+# Hypershift (MC-only) Configuration
+###############################################################################
+- apiVersion: hive.openshift.io/v1
+  kind: SelectorSyncSet
+  metadata:
+    labels:
+      managed.openshift.io/gitHash: ${IMAGE_TAG}
+      managed.openshift.io/gitRepoName: ${REPO_NAME}
+      managed.openshift.io/osd: 'true'
+    name: route-monitor-operator-config
+  spec:
+    clusterDeploymentSelector:
+      matchLabels:
+        api.openshift.com/managed: 'true'
+      matchExpressions:
+        - key: ext-hypershift.openshift.io/cluster-type
+          operator: In
+          values:
+            - "management-cluster"
+    resourceApplyMode: Sync
+    applyBehavior: CreateOrUpdate
+    resources:
     - apiVersion: v1
       kind: ConfigMap
       metadata:

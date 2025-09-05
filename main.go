@@ -100,6 +100,17 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Try to read probe API URL from ConfigMap, fallback to command-line flag
+	configMapProbeAPIURL, err := getProbeAPIURLFromConfigMap()
+	if err != nil {
+		setupLog.Error(err, "failed to read probe API URL from ConfigMap, using command-line flag")
+	} else if configMapProbeAPIURL != "" {
+		setupLog.Info("Using probe API URL from ConfigMap", "probeAPIURL", configMapProbeAPIURL)
+		probeAPIURL = configMapProbeAPIURL
+	} else {
+		setupLog.Info("No probe API URL ConfigMap found, skipping probe management")
+	}
+
 	// Validate probe API URL format (if provided)
 	if probeAPIURL != "" && !strings.HasPrefix(probeAPIURL, "http://") && !strings.HasPrefix(probeAPIURL, "https://") {
 		setupLog.Error(nil, "probe-api-url must be a fully qualified URL starting with 'http://' or 'https://'", "probeAPIURL", probeAPIURL)
@@ -235,4 +246,52 @@ func shouldEnableHCP() (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// getProbeAPIURLFromConfigMap reads the probe-api-url from the route-monitor-operator-config ConfigMap
+func getProbeAPIURLFromConfigMap() (string, error) {
+	c, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
+	if err != nil {
+		return "", err
+	}
+
+	configMapName := config.OperatorName + "-config"
+	configMap := &corev1.ConfigMap{}
+	err = c.Get(context.TODO(), types.NamespacedName{
+		Name:      configMapName,
+		Namespace: config.OperatorNamespace,
+	}, configMap)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// ConfigMap doesn't exist, return empty string (no error)
+			// This is a normal case and not an error condition
+			setupLog.V(2).Info("ConfigMap not found, will use command-line flag",
+				"configmap", configMapName,
+				"namespace", config.OperatorNamespace)
+			return "", nil
+		}
+		// This is an actual error (network, permissions, etc.)
+		return "", err
+	}
+
+	probeAPIURL, exists := configMap.Data["probe-api-url"]
+	if !exists {
+		// ConfigMap exists but doesn't have the expected key
+		setupLog.V(2).Info("ConfigMap exists but probe-api-url key not found, will use command-line flag",
+			"configmap", configMapName,
+			"namespace", config.OperatorNamespace)
+		return "", nil
+	}
+
+	trimmedURL := strings.TrimSpace(probeAPIURL)
+	if trimmedURL == "" {
+		// Key exists but value is empty
+		setupLog.V(2).Info("ConfigMap probe-api-url is empty, will use command-line flag",
+			"configmap", configMapName,
+			"namespace", config.OperatorNamespace)
+		return "", nil
+	}
+
+	return trimmedURL, nil
 }
