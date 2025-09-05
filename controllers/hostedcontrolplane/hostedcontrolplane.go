@@ -74,19 +74,27 @@ const (
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
 
+// RHOBSConfig holds RHOBS API configuration
+type RHOBSConfig struct {
+	ProbeAPIURL      string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCIssuerURL    string
+}
+
 // HostedControlPlaneReconciler reconciles a HostedControlPlane object
 type HostedControlPlaneReconciler struct {
 	client.Client
 	Scheme      *runtime.Scheme
-	ProbeAPIURL string
+	RHOBSConfig RHOBSConfig
 }
 
 // NewHostedControlPlaneReconciler creates a HostedControlPlaneReconciler
-func NewHostedControlPlaneReconciler(mgr manager.Manager, probeAPIURL string) *HostedControlPlaneReconciler {
+func NewHostedControlPlaneReconciler(mgr manager.Manager, rhobsConfig RHOBSConfig) *HostedControlPlaneReconciler {
 	return &HostedControlPlaneReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
-		ProbeAPIURL: probeAPIURL,
+		RHOBSConfig: rhobsConfig,
 	}
 }
 
@@ -131,7 +139,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 
 		// Delete RHOBS probe if API URL is configured
-		if r.ProbeAPIURL != "" {
+		if r.RHOBSConfig.ProbeAPIURL != "" {
 			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane)
 			if err != nil {
 				log.Error(err, "failed to delete RHOBS probe")
@@ -195,7 +203,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Deploy RHOBS probe if API URL is configured
-	if r.ProbeAPIURL != "" {
+	if r.RHOBSConfig.ProbeAPIURL != "" {
 		log.Info("Deploying RHOBS probe")
 		err = r.ensureRHOBSProbe(ctx, log, hostedcontrolplane)
 		if err != nil {
@@ -667,7 +675,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	apiServerURL = fmt.Sprintf("https://%s/livez", apiServerURL)
 
 	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := rhobs.NewClient(r.ProbeAPIURL, "hcp", log)
+	client := r.createRHOBSClient(log)
 
 	// Check if probe already exists
 	existingProbe, err := client.GetProbe(ctx, clusterID)
@@ -721,7 +729,7 @@ func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log
 	}
 
 	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := rhobs.NewClient(r.ProbeAPIURL, "hcp", log)
+	client := r.createRHOBSClient(log)
 
 	// Delete the probe (sets status to terminating)
 	err := client.DeleteProbe(ctx, clusterID)
@@ -731,4 +739,20 @@ func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log
 
 	log.Info("Successfully marked RHOBS probe for termination", "cluster_id", clusterID)
 	return nil
+}
+
+// createRHOBSClient creates an RHOBS client with or without OIDC authentication based on configuration
+func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs.Client {
+	if r.RHOBSConfig.OIDCClientID != "" && r.RHOBSConfig.OIDCClientSecret != "" && r.RHOBSConfig.OIDCIssuerURL != "" {
+		oidcConfig := rhobs.OIDCConfig{
+			ClientID:     r.RHOBSConfig.OIDCClientID,
+			ClientSecret: r.RHOBSConfig.OIDCClientSecret,
+			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
+		}
+		log.V(2).Info("Creating RHOBS client with OIDC authentication")
+		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, "hcp", oidcConfig, log)
+	}
+
+	log.V(2).Info("Creating RHOBS client without authentication")
+	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, "hcp", log)
 }

@@ -89,10 +89,16 @@ func main() {
 	var blackboxExporterImage string
 	var blackboxExporterNamespace string
 	var probeAPIURL string
+	var oidcClientID string
+	var oidcClientSecret string
+	var oidcIssuerURL string
 
 	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
 	flag.StringVar(&probeAPIURL, "probe-api-url", "", "The fully qualified API URL for RHOBS synthetics probe management (for HostedCluster monitoring). When empty, uses default blackbox exporter behavior.")
+	flag.StringVar(&oidcClientID, "oidc-client-id", "", "OIDC client ID for RHOBS API authentication. When empty, no OIDC authentication is used.")
+	flag.StringVar(&oidcClientSecret, "oidc-client-secret", "", "OIDC client secret for RHOBS API authentication. When empty, no OIDC authentication is used.")
+	flag.StringVar(&oidcIssuerURL, "oidc-issuer-url", "", "OIDC issuer URL for RHOBS API authentication. When empty, no OIDC authentication is used.")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -100,15 +106,57 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Try to read probe API URL from ConfigMap, fallback to command-line flag
-	configMapProbeAPIURL, err := getProbeAPIURLFromConfigMap()
+	// Try to read configuration from ConfigMap, fallback to command-line flags
+	configData, err := getConfigFromConfigMap()
 	if err != nil {
-		setupLog.Error(err, "failed to read probe API URL from ConfigMap, using command-line flag")
-	} else if configMapProbeAPIURL != "" {
-		setupLog.Info("Using probe API URL from ConfigMap", "probeAPIURL", configMapProbeAPIURL)
-		probeAPIURL = configMapProbeAPIURL
+		setupLog.Error(err, "Failed to read ConfigMap, using command-line flags for all parameters")
 	} else {
-		setupLog.Info("No probe API URL ConfigMap found, skipping probe management")
+		configMapParams := []string{}
+		flagParams := []string{}
+
+		// Use ConfigMap values if they exist, otherwise keep command-line flag values
+		if configData.ProbeAPIURL != "" {
+			setupLog.V(1).Info("Using probe API URL from ConfigMap", "probeAPIURL", configData.ProbeAPIURL)
+			probeAPIURL = configData.ProbeAPIURL
+			configMapParams = append(configMapParams, "probe-api-url")
+		} else {
+			flagParams = append(flagParams, "probe-api-url")
+		}
+
+		if configData.OIDCClientID != "" {
+			setupLog.V(1).Info("Using OIDC client ID from ConfigMap")
+			oidcClientID = configData.OIDCClientID
+			configMapParams = append(configMapParams, "oidc-client-id")
+		} else {
+			flagParams = append(flagParams, "oidc-client-id")
+		}
+
+		if configData.OIDCClientSecret != "" {
+			setupLog.V(1).Info("Using OIDC client secret from ConfigMap")
+			oidcClientSecret = configData.OIDCClientSecret
+			configMapParams = append(configMapParams, "oidc-client-secret")
+		} else {
+			flagParams = append(flagParams, "oidc-client-secret")
+		}
+
+		if configData.OIDCIssuerURL != "" {
+			setupLog.V(1).Info("Using OIDC issuer URL from ConfigMap", "oidcIssuerURL", configData.OIDCIssuerURL)
+			oidcIssuerURL = configData.OIDCIssuerURL
+			configMapParams = append(configMapParams, "oidc-issuer-url")
+		} else {
+			flagParams = append(flagParams, "oidc-issuer-url")
+		}
+
+		// Summarize configuration sources
+		if len(configMapParams) > 0 && len(flagParams) > 0 {
+			setupLog.Info("Using mixed configuration sources",
+				"from_configmap", configMapParams,
+				"from_flags", flagParams)
+		} else if len(configMapParams) > 0 {
+			setupLog.Info("Using ConfigMap for all parameters", "parameters", configMapParams)
+		} else {
+			setupLog.Info("ConfigMap found but all parameters empty, using command-line flags for all parameters")
+		}
 	}
 
 	// Validate probe API URL format (if provided)
@@ -200,7 +248,13 @@ func main() {
 	}
 
 	if enableHCP {
-		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, probeAPIURL)
+		rhobsConfig := hostedcontrolplane.RHOBSConfig{
+			ProbeAPIURL:      probeAPIURL,
+			OIDCClientID:     oidcClientID,
+			OIDCClientSecret: oidcClientSecret,
+			OIDCIssuerURL:    oidcIssuerURL,
+		}
+		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, rhobsConfig)
 		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane")
 			os.Exit(1)
@@ -248,11 +302,19 @@ func shouldEnableHCP() (bool, error) {
 	return true, nil
 }
 
-// getProbeAPIURLFromConfigMap reads the probe-api-url from the route-monitor-operator-config ConfigMap
-func getProbeAPIURLFromConfigMap() (string, error) {
+// OperatorConfig holds configuration values from ConfigMap
+type OperatorConfig struct {
+	ProbeAPIURL      string
+	OIDCClientID     string
+	OIDCClientSecret string
+	OIDCIssuerURL    string
+}
+
+// getConfigFromConfigMap reads configuration from the route-monitor-operator-config ConfigMap
+func getConfigFromConfigMap() (*OperatorConfig, error) {
 	c, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	configMapName := config.OperatorName + "-config"
@@ -264,34 +326,58 @@ func getProbeAPIURLFromConfigMap() (string, error) {
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// ConfigMap doesn't exist, return empty string (no error)
+			// ConfigMap doesn't exist, return empty config (no error)
 			// This is a normal case and not an error condition
-			setupLog.V(2).Info("ConfigMap not found, will use command-line flag",
+			setupLog.Info("ConfigMap not found, using command-line flags for all parameters",
 				"configmap", configMapName,
 				"namespace", config.OperatorNamespace)
-			return "", nil
+			return &OperatorConfig{}, nil
 		}
 		// This is an actual error (network, permissions, etc.)
-		return "", err
+		return nil, err
 	}
 
-	probeAPIURL, exists := configMap.Data["probe-api-url"]
-	if !exists {
-		// ConfigMap exists but doesn't have the expected key
-		setupLog.V(2).Info("ConfigMap exists but probe-api-url key not found, will use command-line flag",
-			"configmap", configMapName,
-			"namespace", config.OperatorNamespace)
-		return "", nil
+	// Extract configuration values, trimming whitespace
+	cfg := &OperatorConfig{
+		ProbeAPIURL:      strings.TrimSpace(configMap.Data["probe-api-url"]),
+		OIDCClientID:     strings.TrimSpace(configMap.Data["oidc-client-id"]),
+		OIDCClientSecret: strings.TrimSpace(configMap.Data["oidc-client-secret"]),
+		OIDCIssuerURL:    strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
 	}
 
-	trimmedURL := strings.TrimSpace(probeAPIURL)
-	if trimmedURL == "" {
-		// Key exists but value is empty
-		setupLog.V(2).Info("ConfigMap probe-api-url is empty, will use command-line flag",
-			"configmap", configMapName,
-			"namespace", config.OperatorNamespace)
-		return "", nil
+	// Log detailed information about what was found in the ConfigMap
+	foundParams := []string{}
+	missingParams := []string{}
+
+	if cfg.ProbeAPIURL != "" {
+		foundParams = append(foundParams, "probe-api-url")
+	} else {
+		missingParams = append(missingParams, "probe-api-url")
 	}
 
-	return trimmedURL, nil
+	if cfg.OIDCClientID != "" {
+		foundParams = append(foundParams, "oidc-client-id")
+	} else {
+		missingParams = append(missingParams, "oidc-client-id")
+	}
+
+	if cfg.OIDCClientSecret != "" {
+		foundParams = append(foundParams, "oidc-client-secret")
+	} else {
+		missingParams = append(missingParams, "oidc-client-secret")
+	}
+
+	if cfg.OIDCIssuerURL != "" {
+		foundParams = append(foundParams, "oidc-issuer-url")
+	} else {
+		missingParams = append(missingParams, "oidc-issuer-url")
+	}
+
+	setupLog.Info("ConfigMap found and processed",
+		"configmap", configMapName,
+		"namespace", config.OperatorNamespace,
+		"found_parameters", foundParams,
+		"missing_or_empty_parameters", missingParams)
+
+	return cfg, nil
 }
