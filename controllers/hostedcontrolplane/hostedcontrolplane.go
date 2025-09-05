@@ -218,6 +218,14 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
+	// TODO: This is temporary for SREP-1297 and can be removed once the dynatrace/rhobs probe work reliably.
+	log.Info("Deploying external monitoring objects")
+	err = r.deployExternalMonitoringObjects(ctx, log, hostedcontrolplane)
+	if err != nil {
+		log.Error(err, "failed to deploy external monitoring components")
+		return utilreconcile.RequeueWith(err)
+	}
+
 	return ctrl.Result{}, err
 }
 
@@ -252,6 +260,93 @@ func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, h
 		// Unknown state, return an error
 		return false, fmt.Errorf("VPC Endpoint %s/%s is in an unknown state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
 	}
+}
+
+// This will install another RouteMonitor for the external FQDN of the apiserver.
+// We also install Dynatrace probes for this, but those might get replaced, so this is ensuring alerting is maintained.
+func (r *HostedControlPlaneReconciler) deployExternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	if hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private {
+		log.Info("Cluster is private - will not setup external RouteMonitor")
+		return nil
+	}
+	// The Route we want to monitor should already exist
+	apiserverRoute := routev1.Route{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: hostedcontrolplane.Namespace,
+		Name:      "kube-apiserver",
+	}, &apiserverRoute)
+	if err != nil {
+		log.Error(err, "failed to retrieve 'kube-apiserver' route - can not setup routemonitor")
+		return err
+	}
+	apiserverServiceName := apiserverRoute.Spec.To.Name
+	if apiserverServiceName == "" {
+		return fmt.Errorf("kube-apiserver route is not referring to a service in 'Spec.To.Name'")
+	}
+	apiserverService := corev1.Service{}
+	err = r.Get(ctx, types.NamespacedName{
+		Namespace: hostedcontrolplane.Namespace,
+		Name:      apiserverServiceName,
+	}, &apiserverService)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("failed to retrieve '%s' service - can not setup routemonitor", apiserverServiceName))
+		return err
+	}
+
+	var apiserverPort int32
+	if len(apiserverService.Spec.Ports) == 1 {
+		apiserverPort = apiserverService.Spec.Ports[0].Port
+	} else {
+		for _, port := range apiserverService.Spec.Ports {
+			if port.Port == 6443 || port.Port == 443 {
+				apiserverPort = port.Port
+				break
+			}
+		}
+	}
+
+	apiserverRouteMonitor := v1alpha1.RouteMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-apiserver",
+			Namespace: hostedcontrolplane.Namespace,
+			Labels: map[string]string{
+				watchResourceLabel: "true",
+			},
+			OwnerReferences: buildOwnerReferences(hostedcontrolplane),
+		},
+		Spec: v1alpha1.RouteMonitorSpec{
+			Route: v1alpha1.RouteMonitorRouteSpec{
+				Name:      "kube-apiserver",
+				Namespace: hostedcontrolplane.Namespace,
+				Port:      int64(apiserverPort),
+				Suffix:    "/livez",
+			},
+			Slo: v1alpha1.SloSpec{
+				TargetAvailabilityPercent: "99.5",
+			},
+			SkipPrometheusRule:    false,
+			InsecureSkipTLSVerify: false,
+			ServiceMonitorType:    v1alpha1.ServiceMonitorTypeRHOBS,
+		},
+		TypeMeta: metav1.TypeMeta{},
+	}
+	err = r.Create(ctx, &apiserverRouteMonitor)
+	if err != nil {
+		if !kerr.IsAlreadyExists(err) {
+			return err
+		}
+		actualRouteMonitor := v1alpha1.RouteMonitor{}
+		err = r.Get(ctx, types.NamespacedName{Name: apiserverRouteMonitor.Name, Namespace: apiserverRouteMonitor.Namespace}, &actualRouteMonitor)
+		if err != nil {
+			return err
+		}
+		apiserverRouteMonitor.ObjectMeta = buildMetadataForUpdate(apiserverRouteMonitor.ObjectMeta, actualRouteMonitor.ObjectMeta)
+		err = r.Update(ctx, &apiserverRouteMonitor)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
