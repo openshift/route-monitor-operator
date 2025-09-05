@@ -351,6 +351,7 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	data.Set("grant_type", "client_credentials")
 	data.Set("client_id", c.oidcConfig.ClientID)
 	data.Set("client_secret", c.oidcConfig.ClientSecret)
+	data.Set("scope", "profile")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -404,6 +405,7 @@ func (c *Client) addAuthHeaders(ctx context.Context, req *http.Request) error {
 
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+		c.logger.V(debugLogLevel).Info("Using Bearer token authentication", "client_id", c.oidcConfig.ClientID)
 	}
 
 	return nil
