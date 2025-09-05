@@ -639,6 +639,245 @@ func TestGetProbe_LabelSelectorFormat(t *testing.T) {
 	}
 }
 
+func TestNewClientWithOIDC(t *testing.T) {
+	oidcConfig := OIDCConfig{
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		IssuerURL:    "https://auth.example.com",
+	}
+
+	client := NewClientWithOIDC("https://api.example.com", "test-tenant", oidcConfig, testr.New(t))
+
+	if client.oidcConfig == nil {
+		t.Fatal("Expected OIDC config to be set")
+	}
+
+	if client.oidcConfig.ClientID != "test-client" {
+		t.Errorf("Expected client ID 'test-client', got %s", client.oidcConfig.ClientID)
+	}
+
+	if client.oidcConfig.ClientSecret != "test-secret" {
+		t.Errorf("Expected client secret 'test-secret', got %s", client.oidcConfig.ClientSecret)
+	}
+
+	if client.oidcConfig.IssuerURL != "https://auth.example.com" {
+		t.Errorf("Expected issuer URL 'https://auth.example.com', got %s", client.oidcConfig.IssuerURL)
+	}
+}
+
+func TestOIDCTokenFlow(t *testing.T) {
+	// Mock OIDC token server
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			t.Errorf("Expected token path, got %s", r.URL.Path)
+		}
+
+		if r.Method != "POST" {
+			t.Errorf("Expected POST method, got %s", r.Method)
+		}
+
+		if r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
+			t.Errorf("Expected application/x-www-form-urlencoded content type, got %s", r.Header.Get("Content-Type"))
+		}
+
+		// Parse form data
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("Failed to parse form: %v", err)
+		}
+
+		if r.Form.Get("grant_type") != "client_credentials" {
+			t.Errorf("Expected grant_type 'client_credentials', got %s", r.Form.Get("grant_type"))
+		}
+
+		if r.Form.Get("client_id") != "test-client" {
+			t.Errorf("Expected client_id 'test-client', got %s", r.Form.Get("client_id"))
+		}
+
+		if r.Form.Get("client_secret") != "test-secret" {
+			t.Errorf("Expected client_secret 'test-secret', got %s", r.Form.Get("client_secret"))
+		}
+
+		// Return mock token response
+		tokenResp := tokenResponse{
+			AccessToken: "mock-access-token",
+			TokenType:   "Bearer",
+			ExpiresIn:   3600,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tokenResp)
+	}))
+	defer tokenServer.Close()
+
+	// Mock API server that expects Bearer token
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer mock-access-token" {
+			t.Errorf("Expected Authorization 'Bearer mock-access-token', got %s", auth)
+		}
+
+		// Return mock probe response
+		resp := ProbeResponse{
+			ID:        "probe-123",
+			ClusterID: "test-cluster",
+			Status:    "active",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer apiServer.Close()
+
+	// Create OIDC client
+	oidcConfig := OIDCConfig{
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		IssuerURL:    tokenServer.URL,
+	}
+
+	client := NewClientWithOIDC(apiServer.URL, "test-tenant", oidcConfig, testr.New(t))
+
+	// Test creating a probe with OIDC authentication
+	probeReq := ProbeRequest{
+		ClusterID:    "test-cluster",
+		APIServerURL: "https://api.test-cluster.example.com/livez",
+		Private:      false,
+	}
+
+	probe, err := client.CreateProbe(context.Background(), probeReq)
+	if err != nil {
+		t.Fatalf("CreateProbe with OIDC failed: %v", err)
+	}
+
+	if probe.ID != "probe-123" {
+		t.Errorf("Expected probe ID probe-123, got %s", probe.ID)
+	}
+}
+
+func TestOIDCTokenError(t *testing.T) {
+	// Mock OIDC token server that returns error
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("invalid_client"))
+	}))
+	defer tokenServer.Close()
+
+	// Create OIDC client
+	oidcConfig := OIDCConfig{
+		ClientID:     "invalid-client",
+		ClientSecret: "invalid-secret",
+		IssuerURL:    tokenServer.URL,
+	}
+
+	client := NewClientWithOIDC("https://api.example.com", "test-tenant", oidcConfig, testr.New(t))
+
+	// Test creating a probe should fail due to OIDC error
+	probeReq := ProbeRequest{
+		ClusterID:    "test-cluster",
+		APIServerURL: "https://api.test-cluster.example.com/livez",
+		Private:      false,
+	}
+
+	_, err := client.CreateProbe(context.Background(), probeReq)
+	if err == nil {
+		t.Fatal("Expected error due to OIDC token failure, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "failed to add auth headers") {
+		t.Errorf("Expected auth headers error, got %q", err.Error())
+	}
+}
+
+func TestClientWithoutOIDC(t *testing.T) {
+	// Test that regular client (without OIDC) doesn't add auth headers
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth != "" {
+			t.Errorf("Expected no Authorization header, got %s", auth)
+		}
+
+		// Return mock probe response
+		resp := ProbeResponse{
+			ID:        "probe-123",
+			ClusterID: "test-cluster",
+			Status:    "active",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	// Create regular client (no OIDC)
+	client := NewClient(server.URL, "test-tenant", testr.New(t))
+
+	probeReq := ProbeRequest{
+		ClusterID:    "test-cluster",
+		APIServerURL: "https://api.test-cluster.example.com/livez",
+		Private:      false,
+	}
+
+	_, err := client.CreateProbe(context.Background(), probeReq)
+	if err != nil {
+		t.Fatalf("CreateProbe without OIDC failed: %v", err)
+	}
+}
+
+func TestOIDCTokenCaching(t *testing.T) {
+	tokenRequestCount := 0
+	// Mock OIDC token server
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenRequestCount++
+
+		// Return mock token response
+		tokenResp := tokenResponse{
+			AccessToken: fmt.Sprintf("mock-access-token-%d", tokenRequestCount),
+			TokenType:   "Bearer",
+			ExpiresIn:   3600, // 1 hour
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(tokenResp)
+	}))
+	defer tokenServer.Close()
+
+	// Mock API server
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Just return success for any request
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer apiServer.Close()
+
+	// Create OIDC client
+	oidcConfig := OIDCConfig{
+		ClientID:     "test-client",
+		ClientSecret: "test-secret",
+		IssuerURL:    tokenServer.URL,
+	}
+
+	client := NewClientWithOIDC(apiServer.URL, "test-tenant", oidcConfig, testr.New(t))
+
+	// Make multiple requests - should reuse token
+	for i := 0; i < 3; i++ {
+		probeReq := ProbeRequest{
+			ClusterID:    fmt.Sprintf("test-cluster-%d", i),
+			APIServerURL: "https://api.test-cluster.example.com/livez",
+			Private:      false,
+		}
+
+		_, err := client.CreateProbe(context.Background(), probeReq)
+		if err != nil {
+			t.Fatalf("CreateProbe %d failed: %v", i, err)
+		}
+	}
+
+	// Should only have made one token request due to caching
+	if tokenRequestCount != 1 {
+		t.Errorf("Expected 1 token request due to caching, got %d", tokenRequestCount)
+	}
+}
+
 // APIError represents an API error for testing
 type APIError struct {
 	StatusCode int

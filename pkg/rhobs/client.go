@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -59,12 +61,32 @@ type ProbesListResponse struct {
 	Probes []ProbeResponse `json:"probes"`
 }
 
+// OIDCConfig holds OIDC authentication configuration
+type OIDCConfig struct {
+	ClientID     string
+	ClientSecret string
+	IssuerURL    string
+}
+
+// tokenResponse represents an OIDC token response
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
 // Client handles communication with the RHOBS synthetics API
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	tenant     string
+	oidcConfig *OIDCConfig
 	logger     logr.Logger
+
+	// Token management
+	tokenMutex  sync.RWMutex
+	accessToken string
+	tokenExpiry time.Time
 }
 
 // NewClient creates a new RHOBS API client
@@ -76,6 +98,19 @@ func NewClient(baseURL, tenant string, logger logr.Logger) *Client {
 		},
 		tenant: tenant,
 		logger: logger,
+	}
+}
+
+// NewClientWithOIDC creates a new RHOBS API client with OIDC authentication
+func NewClientWithOIDC(baseURL, tenant string, oidcConfig OIDCConfig, logger logr.Logger) *Client {
+	return &Client{
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+		httpClient: &http.Client{
+			Timeout: defaultHTTPTimeout,
+		},
+		tenant:     tenant,
+		oidcConfig: &oidcConfig,
+		logger:     logger,
 	}
 }
 
@@ -94,6 +129,11 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	}
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
+
+	// Add authentication headers if OIDC is configured
+	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		return nil, fmt.Errorf("failed to add auth headers: %w", err)
+	}
 
 	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "url", url, "cluster_id", req.ClusterID)
 
@@ -133,6 +173,11 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	q := httpReq.URL.Query()
 	q.Add(labelSelectorParam, fmt.Sprintf("cluster_id=%s", clusterID))
 	httpReq.URL.RawQuery = q.Encode()
+
+	// Add authentication headers if OIDC is configured
+	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		return nil, fmt.Errorf("failed to add auth headers: %w", err)
+	}
 
 	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "url", httpReq.URL.String(), "cluster_id", clusterID)
 
@@ -214,6 +259,11 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
 
+	// Add authentication headers if OIDC is configured
+	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		return fmt.Errorf("failed to add auth headers: %w", err)
+	}
+
 	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "url", url, "cluster_id", clusterID)
 
 	resp, err := c.httpClient.Do(httpReq)
@@ -238,4 +288,96 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 // IsNon200Error checks if an error represents a non-200 HTTP status
 func IsNon200Error(err error) bool {
 	return err != nil && strings.Contains(err.Error(), apiErrorPrefix)
+}
+
+// GetAccessToken retrieves a valid access token, refreshing if necessary
+func (c *Client) GetAccessToken(ctx context.Context) (string, error) {
+	if c.oidcConfig == nil {
+		return "", nil // No OIDC config, no token needed
+	}
+
+	c.tokenMutex.RLock()
+	if c.accessToken != "" && time.Now().Before(c.tokenExpiry.Add(-30*time.Second)) {
+		token := c.accessToken
+		c.tokenMutex.RUnlock()
+		return token, nil
+	}
+	c.tokenMutex.RUnlock()
+
+	// Need to refresh token
+	return c.refreshAccessToken(ctx)
+}
+
+// refreshAccessToken obtains a new access token using client credentials flow
+func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
+	c.tokenMutex.Lock()
+	defer c.tokenMutex.Unlock()
+
+	// Double-check that we still need to refresh
+	if c.accessToken != "" && time.Now().Before(c.tokenExpiry.Add(-30*time.Second)) {
+		return c.accessToken, nil
+	}
+
+	tokenURL := strings.TrimSuffix(c.oidcConfig.IssuerURL, "/") + "/token"
+
+	data := url.Values{}
+	data.Set("grant_type", "client_credentials")
+	data.Set("client_id", c.oidcConfig.ClientID)
+	data.Set("client_secret", c.oidcConfig.ClientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("failed to create token request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	c.logger.V(debugLogLevel).Info("Requesting OIDC access token", "issuer", c.oidcConfig.IssuerURL)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to request access token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read token response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp tokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return "", fmt.Errorf("failed to parse token response: %w", err)
+	}
+
+	c.accessToken = tokenResp.AccessToken
+	c.tokenExpiry = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+
+	c.logger.V(debugLogLevel).Info("Successfully obtained OIDC access token",
+		"expires_in", tokenResp.ExpiresIn)
+
+	return c.accessToken, nil
+}
+
+// addAuthHeaders adds authentication headers to the request if OIDC is configured
+func (c *Client) addAuthHeaders(ctx context.Context, req *http.Request) error {
+	if c.oidcConfig == nil {
+		return nil // No OIDC config, no auth needed
+	}
+
+	token, err := c.GetAccessToken(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	return nil
 }
