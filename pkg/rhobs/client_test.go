@@ -878,6 +878,84 @@ func TestOIDCTokenCaching(t *testing.T) {
 	}
 }
 
+func TestOIDCTokenURL(t *testing.T) {
+	tests := []struct {
+		name            string
+		issuerURL       string
+		expectedPath    string
+		description     string
+	}{
+		{
+			name:         "issuer URL without token path",
+			issuerURL:    "https://auth.example.com",
+			expectedPath: "/token",
+			description:  "Should append /token to issuer URL",
+		},
+		{
+			name:         "issuer URL with trailing slash",
+			issuerURL:    "https://auth.example.com/",
+			expectedPath: "/token",
+			description:  "Should append /token to issuer URL with trailing slash",
+		},
+		{
+			name:         "direct token endpoint URL",
+			issuerURL:    "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token",
+			expectedPath: "/auth/realms/redhat-external/protocol/openid-connect/token",
+			description:  "Should use direct token endpoint URL as-is",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mock token server that tracks the request path
+			var requestPath string
+			tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requestPath = r.URL.Path
+
+				// Return mock token response
+				tokenResp := tokenResponse{
+					AccessToken: "test-token",
+					TokenType:   "Bearer",
+					ExpiresIn:   3600,
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(tokenResp)
+			}))
+			defer tokenServer.Close()
+
+			// For direct token endpoint test, use the full URL; for others, use server URL
+			var issuerURL string
+			if tt.name == "direct token endpoint URL" {
+				issuerURL = tokenServer.URL + "/auth/realms/redhat-external/protocol/openid-connect/token"
+			} else {
+				// Replace the example domain with the test server URL
+				issuerURL = strings.Replace(tt.issuerURL, "https://auth.example.com", tokenServer.URL, 1)
+			}
+
+			// Create OIDC client
+			oidcConfig := OIDCConfig{
+				ClientID:     "test-client",
+				ClientSecret: "test-secret",
+				IssuerURL:    issuerURL,
+			}
+
+			client := NewClientWithOIDC("https://api.example.com", "test-tenant", oidcConfig, testr.New(t))
+
+			// Request token
+			_, err := client.GetAccessToken(context.Background())
+			if err != nil {
+				t.Fatalf("GetAccessToken failed: %v", err)
+			}
+
+			// Verify the request path
+			if requestPath != tt.expectedPath {
+				t.Errorf("Expected request path %s, got %s. %s", tt.expectedPath, requestPath, tt.description)
+			}
+		})
+	}
+}
+
 // APIError represents an API error for testing
 type APIError struct {
 	StatusCode int

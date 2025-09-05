@@ -318,7 +318,11 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 		return c.accessToken, nil
 	}
 
-	tokenURL := strings.TrimSuffix(c.oidcConfig.IssuerURL, "/") + "/token"
+	// Handle both direct token endpoint URLs and issuer URLs that need /token appended
+	tokenURL := c.oidcConfig.IssuerURL
+	if !strings.HasSuffix(tokenURL, "/token") {
+		tokenURL = strings.TrimSuffix(tokenURL, "/") + "/token"
+	}
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
@@ -333,7 +337,7 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	c.logger.V(debugLogLevel).Info("Requesting OIDC access token", "issuer", c.oidcConfig.IssuerURL)
+	c.logger.V(debugLogLevel).Info("Requesting OIDC access token", "issuer_url", c.oidcConfig.IssuerURL, "token_url", tokenURL)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
