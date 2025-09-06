@@ -89,6 +89,7 @@ func main() {
 	var blackboxExporterImage string
 	var blackboxExporterNamespace string
 	var probeAPIURL string
+	var probeTenant string
 	var oidcClientID string
 	var oidcClientSecret string
 	var oidcIssuerURL string
@@ -96,6 +97,7 @@ func main() {
 	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
 	flag.StringVar(&probeAPIURL, "probe-api-url", "", "The fully qualified API URL for RHOBS synthetics probe management (for HostedCluster monitoring). When empty, uses default blackbox exporter behavior.")
+	flag.StringVar(&probeTenant, "probe-tenant", "hcp", "RHOBS tenant name used in API URLs. Defaults to 'hcp'.")
 	flag.StringVar(&oidcClientID, "oidc-client-id", "", "OIDC client ID for RHOBS API authentication. When empty, no OIDC authentication is used.")
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", "", "OIDC client secret for RHOBS API authentication. When empty, no OIDC authentication is used.")
 	flag.StringVar(&oidcIssuerURL, "oidc-issuer-url", "", "OIDC issuer URL for RHOBS API authentication. When empty, no OIDC authentication is used.")
@@ -121,6 +123,13 @@ func main() {
 			configMapParams = append(configMapParams, "probe-api-url")
 		} else {
 			flagParams = append(flagParams, "probe-api-url")
+		}
+		if configData.ProbeTenant != "" {
+			setupLog.V(1).Info("Using probe tenant from ConfigMap", "probeTenant", configData.ProbeTenant)
+			probeTenant = configData.ProbeTenant
+			configMapParams = append(configMapParams, "probe-tenant")
+		} else {
+			flagParams = append(flagParams, "probe-tenant")
 		}
 
 		if configData.OIDCClientID != "" {
@@ -250,6 +259,7 @@ func main() {
 	if enableHCP {
 		rhobsConfig := hostedcontrolplane.RHOBSConfig{
 			ProbeAPIURL:      probeAPIURL,
+			Tenant:           probeTenant,
 			OIDCClientID:     oidcClientID,
 			OIDCClientSecret: oidcClientSecret,
 			OIDCIssuerURL:    oidcIssuerURL,
@@ -305,6 +315,7 @@ func shouldEnableHCP() (bool, error) {
 // OperatorConfig holds configuration values from ConfigMap
 type OperatorConfig struct {
 	ProbeAPIURL      string
+	ProbeTenant      string
 	OIDCClientID     string
 	OIDCClientSecret string
 	OIDCIssuerURL    string
@@ -340,6 +351,7 @@ func getConfigFromConfigMap() (*OperatorConfig, error) {
 	// Extract configuration values, trimming whitespace
 	cfg := &OperatorConfig{
 		ProbeAPIURL:      strings.TrimSpace(configMap.Data["probe-api-url"]),
+		ProbeTenant:      strings.TrimSpace(configMap.Data["probe-tenant"]),
 		OIDCClientID:     strings.TrimSpace(configMap.Data["oidc-client-id"]),
 		OIDCClientSecret: strings.TrimSpace(configMap.Data["oidc-client-secret"]),
 		OIDCIssuerURL:    strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
@@ -353,6 +365,12 @@ func getConfigFromConfigMap() (*OperatorConfig, error) {
 		foundParams = append(foundParams, "probe-api-url")
 	} else {
 		missingParams = append(missingParams, "probe-api-url")
+	}
+
+	if cfg.ProbeTenant != "" {
+		foundParams = append(foundParams, "probe-tenant")
+	} else {
+		missingParams = append(missingParams, "probe-tenant")
 	}
 
 	if cfg.OIDCClientID != "" {
