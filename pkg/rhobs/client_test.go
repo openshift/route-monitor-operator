@@ -19,8 +19,8 @@ func TestCreateProbe(t *testing.T) {
 			t.Errorf("Expected POST method, got %s", r.Method)
 		}
 
-		if r.URL.Path != "/test-tenant/metrics/probes" {
-			t.Errorf("Expected path /test-tenant/metrics/probes, got %s", r.URL.Path)
+		if r.URL.Path != "/api/metrics/v1/test-tenant/probes" {
+			t.Errorf("Expected path /api/metrics/v1/test-tenant/probes, got %s", r.URL.Path)
 		}
 
 		var req ProbeRequest
@@ -157,8 +157,8 @@ func TestDeleteProbe(t *testing.T) {
 			t.Errorf("Expected PATCH method, got %s", r.Method)
 		}
 
-		if r.URL.Path != "/test-tenant/metrics/probes/test-cluster" {
-			t.Errorf("Expected path /test-tenant/metrics/probes/test-cluster, got %s", r.URL.Path)
+		if r.URL.Path != "/api/metrics/v1/test-tenant/probes/test-cluster" {
+			t.Errorf("Expected path /api/metrics/v1/test-tenant/probes/test-cluster, got %s", r.URL.Path)
 		}
 
 		// Verify PATCH payload
