@@ -28,8 +28,8 @@ func TestCreateProbe(t *testing.T) {
 			t.Fatalf("Failed to decode request: %v", err)
 		}
 
-		if req.ClusterID != "test-cluster" {
-			t.Errorf("Expected cluster_id test-cluster, got %s", req.ClusterID)
+		if req.Labels["cluster-id"] != "test-cluster" {
+			t.Errorf("Expected cluster-id test-cluster, got %s", req.Labels["cluster-id"])
 		}
 
 		// Check tenant header
@@ -44,9 +44,9 @@ func TestCreateProbe(t *testing.T) {
 
 		// Return a mock response
 		resp := ProbeResponse{
-			ID:        "probe-123",
-			ClusterID: "test-cluster",
-			Status:    "active",
+			ID:     "probe-123",
+			Labels: map[string]string{"cluster-id": "test-cluster"},
+			Status: "active",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -60,9 +60,11 @@ func TestCreateProbe(t *testing.T) {
 
 	// Test create probe
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	probe, err := client.CreateProbe(context.Background(), probeReq)
@@ -83,7 +85,7 @@ func TestGetProbe(t *testing.T) {
 		}
 
 		labelSelector := r.URL.Query().Get("label_selector")
-		expectedSelector := "cluster_id=test-cluster"
+		expectedSelector := "cluster-id=test-cluster"
 		if labelSelector != expectedSelector {
 			t.Errorf("Expected label_selector %s, got %s", expectedSelector, labelSelector)
 		}
@@ -102,9 +104,9 @@ func TestGetProbe(t *testing.T) {
 		resp := ProbesListResponse{
 			Probes: []ProbeResponse{
 				{
-					ID:        "probe-123",
-					ClusterID: "test-cluster",
-					Status:    "active",
+					ID:     "probe-123",
+					Labels: map[string]string{"cluster-id": "test-cluster"},
+					Status: "active",
 				},
 			},
 		}
@@ -142,9 +144,9 @@ func TestDeleteProbe(t *testing.T) {
 			resp := ProbesListResponse{
 				Probes: []ProbeResponse{
 					{
-						ID:        "probe-123",
-						ClusterID: "test-cluster",
-						Status:    "active",
+						ID:     "probe-123",
+						Labels: map[string]string{"cluster-id": "test-cluster"},
+						Status: "active",
 					},
 				},
 			}
@@ -230,9 +232,11 @@ func TestCreateProbe_Errors(t *testing.T) {
 
 			client := NewClient(server.URL, "test-tenant", testr.New(t))
 			probeReq := ProbeRequest{
-				ClusterID:    "test-cluster",
-				APIServerURL: "https://api.test-cluster.example.com/livez",
-				Private:      false,
+				StaticURL: "https://api.test-cluster.example.com/livez",
+				Labels: map[string]string{
+					"cluster-id": "test-cluster",
+					"private":    "false",
+				},
 			}
 
 			_, err := client.CreateProbe(context.Background(), probeReq)
@@ -257,9 +261,11 @@ func TestCreateProbe_InvalidJSON(t *testing.T) {
 
 	client := NewClient(server.URL, "test-tenant", testr.New(t))
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	_, err := client.CreateProbe(context.Background(), probeReq)
@@ -317,9 +323,9 @@ func TestGetProbe_NoMatchingCluster(t *testing.T) {
 		resp := ProbesListResponse{
 			Probes: []ProbeResponse{
 				{
-					ID:        "probe-123",
-					ClusterID: "different-cluster",
-					Status:    "active",
+					ID:     "probe-123",
+					Labels: map[string]string{"cluster-id": "different-cluster"},
+					Status: "active",
 				},
 			},
 		}
@@ -408,9 +414,9 @@ func TestDeleteProbe_ServerError(t *testing.T) {
 			resp := ProbesListResponse{
 				Probes: []ProbeResponse{
 					{
-						ID:        "probe-123",
-						ClusterID: "test-cluster",
-						Status:    "active",
+						ID:     "probe-123",
+						Labels: map[string]string{"cluster-id": "test-cluster"},
+						Status: "active",
 					},
 				},
 			}
@@ -477,9 +483,11 @@ func TestCreateProbe_NetworkError(t *testing.T) {
 	// Use invalid URL to trigger HTTP client error
 	client := NewClient("http://invalid-host-12345.invalid", "test-tenant", testr.New(t))
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	_, err := client.CreateProbe(context.Background(), probeReq)
@@ -530,9 +538,9 @@ func TestDeleteProbe_FailedProbeHandling(t *testing.T) {
 			resp := ProbesListResponse{
 				Probes: []ProbeResponse{
 					{
-						ID:        "probe-123",
-						ClusterID: "test-cluster",
-						Status:    "failed",
+						ID:     "probe-123",
+						Labels: map[string]string{"cluster-id": "test-cluster"},
+						Status: "failed",
 					},
 				},
 			}
@@ -604,9 +612,9 @@ func TestDeleteProbe_PatchError(t *testing.T) {
 			resp := ProbesListResponse{
 				Probes: []ProbeResponse{
 					{
-						ID:        "probe-123",
-						ClusterID: "test-cluster",
-						Status:    "active",
+						ID:     "probe-123",
+						Labels: map[string]string{"cluster-id": "test-cluster"},
+						Status: "active",
 					},
 				},
 			}
@@ -643,8 +651,8 @@ func TestGetProbe_LabelSelectorFormat(t *testing.T) {
 		}
 
 		labelSelector := r.URL.Query().Get("label_selector")
-		if labelSelector != "cluster_id=my-cluster-123" {
-			t.Errorf("Expected label_selector 'cluster_id=my-cluster-123', got '%s'", labelSelector)
+		if labelSelector != "cluster-id=my-cluster-123" {
+			t.Errorf("Expected label_selector 'cluster-id=my-cluster-123', got '%s'", labelSelector)
 		}
 
 		// Return empty list
@@ -760,9 +768,9 @@ func TestOIDCTokenFlow(t *testing.T) {
 
 		// Return mock probe response
 		resp := ProbeResponse{
-			ID:        "probe-123",
-			ClusterID: "test-cluster",
-			Status:    "active",
+			ID:     "probe-123",
+			Labels: map[string]string{"cluster-id": "test-cluster"},
+			Status: "active",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -781,9 +789,11 @@ func TestOIDCTokenFlow(t *testing.T) {
 
 	// Test creating a probe with OIDC authentication
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	probe, err := client.CreateProbe(context.Background(), probeReq)
@@ -815,9 +825,11 @@ func TestOIDCTokenError(t *testing.T) {
 
 	// Test creating a probe should fail due to OIDC error
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	_, err := client.CreateProbe(context.Background(), probeReq)
@@ -840,9 +852,9 @@ func TestClientWithoutOIDC(t *testing.T) {
 
 		// Return mock probe response
 		resp := ProbeResponse{
-			ID:        "probe-123",
-			ClusterID: "test-cluster",
-			Status:    "active",
+			ID:     "probe-123",
+			Labels: map[string]string{"cluster-id": "test-cluster"},
+			Status: "active",
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -854,9 +866,11 @@ func TestClientWithoutOIDC(t *testing.T) {
 	client := NewClient(server.URL, "test-tenant", testr.New(t))
 
 	probeReq := ProbeRequest{
-		ClusterID:    "test-cluster",
-		APIServerURL: "https://api.test-cluster.example.com/livez",
-		Private:      false,
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
 	}
 
 	_, err := client.CreateProbe(context.Background(), probeReq)
@@ -903,9 +917,11 @@ func TestOIDCTokenCaching(t *testing.T) {
 	// Make multiple requests - should reuse token
 	for i := 0; i < 3; i++ {
 		probeReq := ProbeRequest{
-			ClusterID:    fmt.Sprintf("test-cluster-%d", i),
-			APIServerURL: "https://api.test-cluster.example.com/livez",
-			Private:      false,
+			StaticURL: "https://api.test-cluster.example.com/livez",
+			Labels: map[string]string{
+				"cluster-id": fmt.Sprintf("test-cluster-%d", i),
+				"private":    "false",
+			},
 		}
 
 		_, err := client.CreateProbe(context.Background(), probeReq)
@@ -1025,9 +1041,9 @@ func TestFullURLSupport(t *testing.T) {
 
 				// Return a mock response
 				resp := ProbeResponse{
-					ID:        "probe-123",
-					ClusterID: "test-cluster",
-					Status:    "active",
+					ID:     "probe-123",
+					Labels: map[string]string{"cluster-id": "test-cluster"},
+					Status: "active",
 				}
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(resp)
@@ -1046,9 +1062,11 @@ func TestFullURLSupport(t *testing.T) {
 
 			// Test CreateProbe
 			req := ProbeRequest{
-				ClusterID:    "test-cluster",
-				APIServerURL: "https://api.test-cluster.example.com:6443",
-				Private:      false,
+				StaticURL: "https://api.test-cluster.example.com/livez",
+				Labels: map[string]string{
+					"cluster-id": "test-cluster",
+					"private":    "false",
+				},
 			}
 
 			_, err := client.CreateProbe(context.Background(), req)
@@ -1098,9 +1116,9 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 					// Mock GetProbe response
 					listResp := ProbesListResponse{
 						Probes: []ProbeResponse{{
-							ID:        "probe-123",
-							ClusterID: tt.clusterID,
-							Status:    "active",
+							ID:     "probe-123",
+							Labels: map[string]string{"cluster-id": tt.clusterID},
+							Status: "active",
 						}},
 					}
 					w.Header().Set("Content-Type", "application/json")
@@ -1145,4 +1163,54 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	return e.Message
+}
+
+func TestNewProbeRequest(t *testing.T) {
+	staticURL := "https://example.com/health"
+	labels := map[string]string{
+		"service": "my-service",
+		"env":     "production",
+	}
+
+	req := NewProbeRequest(staticURL, labels)
+
+	if req.StaticURL != staticURL {
+		t.Errorf("Expected StaticURL %s, got %s", staticURL, req.StaticURL)
+	}
+
+	if len(req.Labels) != len(labels) {
+		t.Errorf("Expected %d labels, got %d", len(labels), len(req.Labels))
+	}
+
+	for key, value := range labels {
+		if req.Labels[key] != value {
+			t.Errorf("Expected label %s=%s, got %s", key, value, req.Labels[key])
+		}
+	}
+}
+
+func TestNewClusterProbeRequest(t *testing.T) {
+	clusterID := "test-cluster-123"
+	monitoringURL := "https://api.test-cluster.example.com/livez"
+	isPrivate := true
+
+	req := NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
+
+	if req.StaticURL != monitoringURL {
+		t.Errorf("Expected StaticURL %s, got %s", monitoringURL, req.StaticURL)
+	}
+
+	if req.Labels["cluster-id"] != clusterID {
+		t.Errorf("Expected cluster-id %s, got %s", clusterID, req.Labels["cluster-id"])
+	}
+
+	if req.Labels["private"] != "true" {
+		t.Errorf("Expected private 'true', got %s", req.Labels["private"])
+	}
+
+	// Test with private=false
+	req2 := NewClusterProbeRequest(clusterID, monitoringURL, false)
+	if req2.Labels["private"] != "false" {
+		t.Errorf("Expected private 'false', got %s", req2.Labels["private"])
+	}
 }

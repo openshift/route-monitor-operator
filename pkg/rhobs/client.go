@@ -45,17 +45,33 @@ const (
 
 // ProbeRequest represents the payload for creating/updating a probe
 type ProbeRequest struct {
-	ClusterID           string `json:"cluster_id"`
-	APIServerURL        string `json:"apiserver_url"`
-	ManagementClusterID string `json:"management_cluster_id,omitempty"`
-	Private             bool   `json:"private"`
+	StaticURL string            `json:"static_url"` // URL to monitor - can be any endpoint (API, web service, etc.)
+	Labels    map[string]string `json:"labels"`     // Key-value labels for probe identification and metadata
 }
 
 // ProbeResponse represents the response from the RHOBS API
 type ProbeResponse struct {
-	ID        string `json:"id"`
-	ClusterID string `json:"cluster_id"`
-	Status    string `json:"status"`
+	ID     string            `json:"id"`
+	Labels map[string]string `json:"labels"`
+	Status string            `json:"status"`
+}
+
+// NewProbeRequest creates a new probe request for monitoring any URL
+func NewProbeRequest(staticURL string, labels map[string]string) ProbeRequest {
+	return ProbeRequest{
+		StaticURL: staticURL,
+		Labels:    labels,
+	}
+}
+
+// NewClusterProbeRequest creates a probe request specifically for cluster monitoring
+// This is a convenience function for the current use case but can be extended
+func NewClusterProbeRequest(clusterID, monitoringURL string, isPrivate bool) ProbeRequest {
+	labels := map[string]string{
+		"cluster-id": clusterID,
+		"private":    fmt.Sprintf("%t", isPrivate),
+	}
+	return NewProbeRequest(monitoringURL, labels)
 }
 
 // ProbesListResponse represents the response from GET probes endpoint
@@ -144,7 +160,7 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	if c.oidcConfig != nil {
 		username = c.oidcConfig.ClientID
 	}
-	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "method", "POST", "url", url, "cluster_id", req.ClusterID, "tenant", c.tenant, "username", username)
+	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "method", "POST", "url", url, "static_url", req.StaticURL, "cluster_id", req.Labels["cluster-id"], "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "POST", "url", url, "operation", "create-probe")
 
 	resp, err := c.httpClient.Do(httpReq)
@@ -181,9 +197,9 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	// Add label_selector query parameter for cluster_id
+	// Add label_selector query parameter for cluster-id
 	q := httpReq.URL.Query()
-	q.Add(labelSelectorParam, fmt.Sprintf("cluster_id=%s", clusterID))
+	q.Add(labelSelectorParam, fmt.Sprintf("cluster-id=%s", clusterID))
 	httpReq.URL.RawQuery = q.Encode()
 
 	// Add RHOBS-specific headers (tenant and username)
@@ -227,9 +243,9 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	// Find the probe with matching cluster_id
+	// Find the probe with matching cluster-id label
 	for _, probe := range listResp.Probes {
-		if probe.ClusterID == clusterID {
+		if probe.Labels != nil && probe.Labels["cluster-id"] == clusterID {
 			return &probe, nil
 		}
 	}
