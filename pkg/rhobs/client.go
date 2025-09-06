@@ -118,7 +118,7 @@ func NewClientWithOIDC(baseURL, tenant string, oidcConfig OIDCConfig, logger log
 
 // CreateProbe creates a new probe in RHOBS
 func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeResponse, error) {
-	url := fmt.Sprintf("%s"+probesEndpointPath, c.baseURL, c.tenant)
+	url := c.buildProbesURL()
 
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -144,7 +144,8 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	if c.oidcConfig != nil {
 		username = c.oidcConfig.ClientID
 	}
-	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "url", url, "cluster_id", req.ClusterID, "tenant", c.tenant, "username", username)
+	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "method", "POST", "url", url, "cluster_id", req.ClusterID, "tenant", c.tenant, "username", username)
+	c.logger.Info("Sending RHOBS API request", "method", "POST", "url", url, "operation", "create-probe")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -156,6 +157,8 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	c.logger.Info("Received RHOBS API response", "method", "POST", "url", url, "status_code", resp.StatusCode, "operation", "create-probe")
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("%s %d: %s", apiErrorPrefix, resp.StatusCode, string(body))
@@ -171,7 +174,7 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 
 // GetProbe retrieves a probe by cluster ID
 func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse, error) {
-	url := fmt.Sprintf("%s"+probesEndpointPath, c.baseURL, c.tenant)
+	url := c.buildProbesURL()
 
 	httpReq, err := http.NewRequestWithContext(ctx, httpMethodGet, url, nil)
 	if err != nil {
@@ -195,7 +198,8 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	if c.oidcConfig != nil {
 		username = c.oidcConfig.ClientID
 	}
-	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "url", httpReq.URL.String(), "cluster_id", clusterID, "tenant", c.tenant, "username", username)
+	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "method", "GET", "url", httpReq.URL.String(), "cluster_id", clusterID, "tenant", c.tenant, "username", username)
+	c.logger.Info("Sending RHOBS API request", "method", "GET", "url", httpReq.URL.String(), "operation", "get-probe")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -207,6 +211,8 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	c.logger.Info("Received RHOBS API response", "method", "GET", "url", httpReq.URL.String(), "status_code", resp.StatusCode, "operation", "get-probe")
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil // Probe doesn't exist
@@ -256,7 +262,7 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 		// Note: Actual probe deletion will be handled by agents
 	}
 
-	url := fmt.Sprintf("%s"+probeEndpointPath, c.baseURL, c.tenant, clusterID)
+	url := c.buildProbeURL(clusterID)
 
 	// Create patch request to set status to terminating
 	patchReq := ProbePatchRequest{
@@ -287,13 +293,16 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	if c.oidcConfig != nil {
 		username = c.oidcConfig.ClientID
 	}
-	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
+	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "method", "PATCH", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
+	c.logger.Info("Sending RHOBS API request", "method", "PATCH", "url", url, "operation", "delete-probe")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	c.logger.Info("Received RHOBS API response", "method", "PATCH", "url", url, "status_code", resp.StatusCode, "operation", "delete-probe")
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Probe already doesn't exist, consider this success
@@ -420,4 +429,29 @@ func (c *Client) addRHOBSHeaders(req *http.Request) {
 	if c.oidcConfig != nil {
 		req.Header.Set(usernameHeader, c.oidcConfig.ClientID)
 	}
+}
+
+// buildProbesURL constructs the URL for the probes endpoint
+func (c *Client) buildProbesURL() string {
+	// Check if baseURL already contains the probes path
+	if strings.Contains(c.baseURL, "/probes") {
+		return c.baseURL
+	}
+	// Otherwise, build the URL with tenant path
+	return fmt.Sprintf("%s"+probesEndpointPath, c.baseURL, c.tenant)
+}
+
+// buildProbeURL constructs the URL for a specific probe endpoint
+func (c *Client) buildProbeURL(clusterID string) string {
+	// Check if baseURL already contains the probes path
+	if strings.Contains(c.baseURL, "/probes") {
+		// If baseURL ends with /probes, append the cluster ID
+		if strings.HasSuffix(c.baseURL, "/probes") {
+			return fmt.Sprintf("%s/%s", c.baseURL, clusterID)
+		}
+		// If baseURL contains /probes but doesn't end with it, use as-is and append cluster ID
+		return fmt.Sprintf("%s/%s", c.baseURL, clusterID)
+	}
+	// Otherwise, build the URL with tenant path and cluster ID
+	return fmt.Sprintf("%s"+probeEndpointPath, c.baseURL, c.tenant, clusterID)
 }

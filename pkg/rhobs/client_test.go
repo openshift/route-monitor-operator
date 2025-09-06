@@ -998,6 +998,145 @@ func TestOIDCTokenURL(t *testing.T) {
 	}
 }
 
+func TestFullURLSupport(t *testing.T) {
+	tests := []struct {
+		name        string
+		baseURL     string
+		expectedURL string
+	}{
+		{
+			name:        "full URL with /probes endpoint",
+			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+		},
+		{
+			name:        "base URL without path",
+			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test server that captures the request URL
+			var actualURL string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				actualURL = fmt.Sprintf("https://%s%s", r.Host, r.URL.Path)
+
+				// Return a mock response
+				resp := ProbeResponse{
+					ID:        "probe-123",
+					ClusterID: "test-cluster",
+					Status:    "active",
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+			}))
+			defer server.Close()
+
+			// Replace the example domain with test server for the full URL test
+			baseURL := tt.baseURL
+			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			} else {
+				baseURL = server.URL
+			}
+
+			client := NewClient(baseURL, "test-tenant", testr.New(t))
+
+			// Test CreateProbe
+			req := ProbeRequest{
+				ClusterID:    "test-cluster",
+				APIServerURL: "https://api.test-cluster.example.com:6443",
+				Private:      false,
+			}
+
+			_, err := client.CreateProbe(context.Background(), req)
+			if err != nil {
+				t.Fatalf("CreateProbe failed: %v", err)
+			}
+
+			// Verify the URL used
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			if !strings.HasSuffix(actualURL, expectedPath) {
+				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
+			}
+		})
+	}
+}
+
+func TestFullURLSupportForSpecificProbe(t *testing.T) {
+	// Test that the buildProbeURL method works correctly with full URLs
+	tests := []struct {
+		name        string
+		baseURL     string
+		clusterID   string
+		expectedURL string
+	}{
+		{
+			name:        "full URL with /probes endpoint for specific probe",
+			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			clusterID:   "test-cluster-123",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes/test-cluster-123",
+		},
+		{
+			name:        "base URL without path for specific probe",
+			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
+			clusterID:   "test-cluster-123",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/test-cluster-123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test server that captures the request URL
+			var actualURL string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				actualURL = fmt.Sprintf("https://%s%s", r.Host, r.URL.Path)
+
+				if r.Method == "GET" {
+					// Mock GetProbe response
+					listResp := ProbesListResponse{
+						Probes: []ProbeResponse{{
+							ID:        "probe-123",
+							ClusterID: tt.clusterID,
+							Status:    "active",
+						}},
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_ = json.NewEncoder(w).Encode(listResp)
+				} else {
+					// Mock PATCH response
+					w.WriteHeader(http.StatusOK)
+				}
+			}))
+			defer server.Close()
+
+			// Replace the example domain with test server for the full URL test
+			baseURL := tt.baseURL
+			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			} else {
+				baseURL = server.URL
+			}
+
+			client := NewClient(baseURL, "test-tenant", testr.New(t))
+
+			// Test DeleteProbe which uses buildProbeURL
+			err := client.DeleteProbe(context.Background(), tt.clusterID)
+			if err != nil {
+				t.Fatalf("DeleteProbe failed: %v", err)
+			}
+
+			// Verify the URL used
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			if !strings.HasSuffix(actualURL, expectedPath) {
+				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
+			}
+		})
+	}
+}
+
 // APIError represents an API error for testing
 type APIError struct {
 	StatusCode int
