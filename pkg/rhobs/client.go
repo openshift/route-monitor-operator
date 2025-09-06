@@ -25,8 +25,8 @@ const (
 	httpMethodPatch = "PATCH"
 
 	// API endpoint paths
-	probesEndpointPath = "/metrics/probes"
-	probeEndpointPath  = "/metrics/probes/%s"
+	probesEndpointPath = "/api/metrics/v1/%s/probes"
+	probeEndpointPath  = "/api/metrics/v1/%s/probes/%s"
 
 	// HTTP headers
 	contentTypeJSON = "application/json"
@@ -118,7 +118,7 @@ func NewClientWithOIDC(baseURL, tenant string, oidcConfig OIDCConfig, logger log
 
 // CreateProbe creates a new probe in RHOBS
 func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeResponse, error) {
-	url := fmt.Sprintf("%s/%s%s", c.baseURL, c.tenant, probesEndpointPath)
+	url := fmt.Sprintf("%s"+probesEndpointPath, c.baseURL, c.tenant)
 
 	payload, err := json.Marshal(req)
 	if err != nil {
@@ -131,7 +131,7 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	}
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
-	
+
 	// Add RHOBS-specific headers (tenant and username)
 	c.addRHOBSHeaders(httpReq)
 
@@ -171,7 +171,7 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 
 // GetProbe retrieves a probe by cluster ID
 func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse, error) {
-	url := fmt.Sprintf("%s/%s%s", c.baseURL, c.tenant, probesEndpointPath)
+	url := fmt.Sprintf("%s"+probesEndpointPath, c.baseURL, c.tenant)
 
 	httpReq, err := http.NewRequestWithContext(ctx, httpMethodGet, url, nil)
 	if err != nil {
@@ -256,7 +256,7 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 		// Note: Actual probe deletion will be handled by agents
 	}
 
-	url := fmt.Sprintf("%s/%s"+probeEndpointPath, c.baseURL, c.tenant, clusterID)
+	url := fmt.Sprintf("%s"+probeEndpointPath, c.baseURL, c.tenant, clusterID)
 
 	// Create patch request to set status to terminating
 	patchReq := ProbePatchRequest{
@@ -274,7 +274,7 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	}
 
 	httpReq.Header.Set("Content-Type", contentTypeJSON)
-	
+
 	// Add RHOBS-specific headers (tenant and username)
 	c.addRHOBSHeaders(httpReq)
 
@@ -415,7 +415,7 @@ func (c *Client) addAuthHeaders(ctx context.Context, req *http.Request) error {
 func (c *Client) addRHOBSHeaders(req *http.Request) {
 	// Set tenant header
 	req.Header.Set(tenantHeader, c.tenant)
-	
+
 	// Set username header if OIDC is configured, use client ID as username
 	if c.oidcConfig != nil {
 		req.Header.Set(usernameHeader, c.oidcConfig.ClientID)
