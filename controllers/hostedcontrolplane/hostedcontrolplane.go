@@ -77,6 +77,7 @@ var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedContro
 // RHOBSConfig holds RHOBS API configuration
 type RHOBSConfig struct {
 	ProbeAPIURL      string
+	Tenant           string
 	OIDCClientID     string
 	OIDCClientSecret string
 	OIDCIssuerURL    string
@@ -750,10 +751,10 @@ func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs
 			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
 		}
 		log.V(2).Info("Creating RHOBS client with OIDC authentication")
-		// Use the OIDC client ID as the tenant name for compatibility with server expectations
-		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.OIDCClientID, oidcConfig, log)
+		// Use configurable tenant name in URL path, OIDC client ID is used for authentication headers
+		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, oidcConfig, log)
 	}
 
 	log.V(2).Info("Creating RHOBS client without authentication")
-	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, "hcp", log)
+	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, log)
 }
