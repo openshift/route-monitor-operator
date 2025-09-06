@@ -668,12 +668,12 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		return fmt.Errorf("cluster ID is empty")
 	}
 
-	// Get API server URL
-	apiServerURL, err := GetAPIServerHostname(hostedcontrolplane)
+	// Get monitoring URL (API server health endpoint in this case)
+	monitoringURL, err := GetAPIServerHostname(hostedcontrolplane)
 	if err != nil {
 		return fmt.Errorf("failed to get API server hostname: %w", err)
 	}
-	apiServerURL = fmt.Sprintf("https://%s/livez", apiServerURL)
+	monitoringURL = fmt.Sprintf("https://%s/livez", monitoringURL)
 
 	// Create RHOBS client - using "hcp" as temporary tenant name
 	client := r.createRHOBSClient(log)
@@ -704,13 +704,9 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
 		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
-	// Create probe request
-	probeReq := rhobs.ProbeRequest{
-		ClusterID:    clusterID,
-		APIServerURL: apiServerURL,
-		Private:      isPrivate,
-		// ManagementClusterID can be added if needed
-	}
+	// Create probe request using the convenience function
+	// Note: Additional labels like management-cluster-id can be added in the future
+	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
 
 	// Create the probe
 	probe, err := client.CreateProbe(ctx, probeReq)
