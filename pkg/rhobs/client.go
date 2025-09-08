@@ -176,6 +176,17 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 
 	c.logger.Info("Received RHOBS API response", "method", "POST", "url", url, "status_code", resp.StatusCode, "operation", "create-probe")
 
+	if resp.StatusCode == http.StatusConflict {
+		// Probe already exists for this URL, which is fine - treat as success
+		c.logger.Info("RHOBS probe already exists for URL", "static_url", req.StaticURL, "status_code", resp.StatusCode)
+		// Return a synthetic response since we can't parse the error body as a ProbeResponse
+		return &ProbeResponse{
+			ID:     "existing", // Placeholder ID
+			Labels: req.Labels,
+			Status: "active", // Assume active status for existing probe
+		}, nil
+	}
+
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("%s %d: %s", apiErrorPrefix, resp.StatusCode, string(body))
 	}
