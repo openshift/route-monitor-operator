@@ -251,6 +251,45 @@ func TestCreateProbe_Errors(t *testing.T) {
 	}
 }
 
+func TestCreateProbe_Conflict(t *testing.T) {
+	// Test that 409 conflict is treated as success
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":{"message":"a probe for static_url \"https://api.test-cluster.example.com/livez\" already exists"}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-tenant", testr.New(t))
+	probeReq := ProbeRequest{
+		StaticURL: "https://api.test-cluster.example.com/livez",
+		Labels: map[string]string{
+			"cluster-id": "test-cluster",
+			"private":    "false",
+		},
+	}
+
+	probe, err := client.CreateProbe(context.Background(), probeReq)
+	if err != nil {
+		t.Fatalf("CreateProbe should succeed on 409 conflict, got error: %v", err)
+	}
+
+	if probe == nil {
+		t.Fatal("Expected probe response, got nil")
+	}
+
+	if probe.ID != "existing" {
+		t.Errorf("Expected probe ID 'existing', got %s", probe.ID)
+	}
+
+	if probe.Status != "active" {
+		t.Errorf("Expected probe status 'active', got %s", probe.Status)
+	}
+
+	if probe.Labels["cluster-id"] != "test-cluster" {
+		t.Errorf("Expected cluster-id 'test-cluster', got %s", probe.Labels["cluster-id"])
+	}
+}
+
 func TestCreateProbe_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
