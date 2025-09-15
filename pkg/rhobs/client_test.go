@@ -159,8 +159,8 @@ func TestDeleteProbe(t *testing.T) {
 			t.Errorf("Expected PATCH method, got %s", r.Method)
 		}
 
-		if r.URL.Path != "/api/metrics/v1/test-tenant/probes/test-cluster" {
-			t.Errorf("Expected path /api/metrics/v1/test-tenant/probes/test-cluster, got %s", r.URL.Path)
+		if r.URL.Path != "/api/metrics/v1/test-tenant/probes/probe-123" {
+			t.Errorf("Expected path /api/metrics/v1/test-tenant/probes/probe-123, got %s", r.URL.Path)
 		}
 
 		// Verify PATCH payload
@@ -1134,13 +1134,13 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 			name:        "full URL with /probes endpoint for specific probe",
 			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes/test-cluster-123",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes/probe-123",
 		},
 		{
 			name:        "base URL without path for specific probe",
 			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/test-cluster-123",
+			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/probe-123",
 		},
 	}
 

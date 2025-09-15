@@ -141,6 +141,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 		// Delete RHOBS probe if API URL is configured
 		if r.RHOBSConfig.ProbeAPIURL != "" {
+			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", r.RHOBSConfig.ProbeAPIURL)
 			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane)
 			if err != nil {
 				log.Error(err, "failed to delete RHOBS probe")
