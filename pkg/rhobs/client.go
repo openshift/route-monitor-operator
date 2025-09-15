@@ -289,7 +289,8 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 		// Note: Actual probe deletion will be handled by agents
 	}
 
-	url := c.buildProbeURL(clusterID)
+	probeID := existingProbe.ID
+	url := c.buildProbeURL(probeID)
 
 	// Create patch request to set status to terminating
 	patchReq := ProbePatchRequest{
@@ -469,16 +470,16 @@ func (c *Client) buildProbesURL() string {
 }
 
 // buildProbeURL constructs the URL for a specific probe endpoint
-func (c *Client) buildProbeURL(clusterID string) string {
+func (c *Client) buildProbeURL(probeID string) string {
 	// Check if baseURL already contains the probes path
 	if strings.Contains(c.baseURL, "/probes") {
 		// If baseURL ends with /probes, append the cluster ID
 		if strings.HasSuffix(c.baseURL, "/probes") {
-			return fmt.Sprintf("%s/%s", c.baseURL, clusterID)
+			return fmt.Sprintf("%s/%s", c.baseURL, probeID)
 		}
 		// If baseURL contains /probes but doesn't end with it, use as-is and append cluster ID
-		return fmt.Sprintf("%s/%s", c.baseURL, clusterID)
+		return fmt.Sprintf("%s/%s", c.baseURL, probeID)
 	}
 	// Otherwise, build the URL with tenant path and cluster ID
-	return fmt.Sprintf("%s"+probeEndpointPath, c.baseURL, c.tenant, clusterID)
+	return fmt.Sprintf("%s"+probeEndpointPath, c.baseURL, c.tenant, probeID)
 }
