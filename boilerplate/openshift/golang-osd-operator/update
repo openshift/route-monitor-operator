@@ -108,7 +108,7 @@ echo "Writing .ci-operator.yaml in your repository root with:"
 echo "    namespace: $IMAGE_NAMESPACE"
 echo "    name: $IMAGE_NAME"
 echo "    tag: $LATEST_IMAGE_TAG"
-${SED?} "s/__NAMESPACE__/$IMAGE_NAMESPACE/; s/__NAME__/$IMAGE_NAME/; s/__TAG__/$LATEST_IMAGE_TAG/" ${HERE}/.ci-operator.yaml > $REPO_ROOT/.ci-operator.yaml
+${SED?} "s/__NAMESPACE__/$IMAGE_NAMESPACE/; s/__NAME__/$IMAGE_NAME/; s/__TAG__/$LATEST_IMAGE_TAG/" ${HERE}/.ci-operator.yaml >$REPO_ROOT/.ci-operator.yaml
 
 cat <<EOF
 
