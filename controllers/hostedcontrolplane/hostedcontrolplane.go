@@ -19,7 +19,6 @@ package hostedcontrolplane
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -43,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
 	"github.com/openshift/route-monitor-operator/pkg/rhobs"
 )
 
@@ -71,16 +69,6 @@ const (
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
-
-// RHOBSConfig holds RHOBS API configuration
-type RHOBSConfig struct {
-	ProbeAPIURL        string
-	Tenant             string
-	OIDCClientID       string
-	OIDCClientSecret   string
-	OIDCIssuerURL      string
-	OnlyPublicClusters bool
-}
 
 // HostedControlPlaneReconciler reconciles a HostedControlPlane object
 type HostedControlPlaneReconciler struct {
@@ -121,18 +109,16 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	//Create Dynatrace API client
-	valueDynatraceApiToken, valueDynatraceTenant, err := r.getDynatraceSecrets(ctx)
+	dynatraceApiClient, err := r.NewDynatraceApiClient(ctx)
 	if err != nil {
-		log.Error(err, "failed to get secret for Dynatrace API client")
+		log.Error(err, "failed to create dynatrace client")
 		return utilreconcile.RequeueWith(err)
 	}
-	baseURL := fmt.Sprintf("%s/v1", valueDynatraceTenant)
-	dynatraceApiClient := dynatrace.NewDynatraceApiClient(baseURL, valueDynatraceApiToken)
 
 	// If the HostedControlPlane is marked for deletion, clean up
 	shouldDelete := finalizer.WasDeleteRequested(hostedcontrolplane)
 	if shouldDelete {
-		err = deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
+		err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
 		if err != nil {
 			log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
 			return utilreconcile.RequeueWith(err)
@@ -424,312 +410,4 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			builder.WithPredicates(selectorPredicate),
 		).
 		Complete(r)
-}
-
-// ------------------------------synthetic-monitoring--------------------------
-
-func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) (string, string, error) {
-
-	secret := &corev1.Secret{}
-	err := r.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
-	if err != nil {
-		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)
-	}
-
-	valueBytesDynatraceApiToken, ok := secret.Data[dynatraceApiKey]
-	if !ok {
-		return "", "", fmt.Errorf("secret did not contain key %s", dynatraceApiKey)
-	}
-	if len(valueBytesDynatraceApiToken) == 0 {
-		return "", "", fmt.Errorf("%s is empty", dynatraceApiKey)
-	}
-	valueDynatraceApiToken := string(valueBytesDynatraceApiToken)
-
-	valueBytesDynatraceTenant, ok := secret.Data[dynatraceTenantKey]
-	if !ok {
-		return "", "", fmt.Errorf("secret did not contain key %s", dynatraceTenantKey)
-	}
-	if len(valueBytesDynatraceTenant) == 0 {
-		return "", "", fmt.Errorf("%s is empty", dynatraceTenantKey)
-	}
-	valueDynatraceTenant := string(valueBytesDynatraceTenant)
-
-	return valueDynatraceApiToken, valueDynatraceTenant, nil
-}
-
-func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, error) {
-	// Adapted from spreadsheet in https://issues.redhat.com/browse/SDE-3754
-	// Coming soon regions - il-central-1, ca-west-1
-	awsRegionToDynatraceRegionMapping := map[string]string{
-		"us-east-1":      "N. Virginia",
-		"us-east-2":      "N. Virginia",
-		"us-west-1":      "Oregon",
-		"us-west-2":      "Oregon",
-		"af-south-1":     "São Paulo",
-		"ap-southeast-1": "Singapore",
-		"ap-southeast-2": "Sydney",
-		"ap-southeast-3": "Singapore",
-		"ap-southeast-4": "Sydney",
-		"ap-northeast-1": "Singapore",
-		"ap-northeast-2": "Sydney",
-		"ap-northeast-3": "Singapore",
-		"ap-south-1":     "Mumbai",
-		"ap-south-2":     "Mumbai",
-		"ap-east-1":      "Singapore",
-		"ca-central-1":   "Montreal",
-		"eu-west-1":      "Dublin",
-		"eu-west-2":      "London",
-		"eu-west-3":      "Frankfurt",
-		"eu-central-1":   "Frankfurt",
-		"eu-central-2":   "Frankfurt",
-		"eu-south-1":     "Frankfurt",
-		"eu-south-2":     "Frankfurt",
-		"eu-north-1":     "London",
-		"me-south-1":     "Mumbai",
-		"me-central-1":   "Mumbai",
-		"sa-east-1":      "São Paulo",
-	}
-
-	// Look up the equivalent dynatrace location name based on the aws region in map
-	//e.g. "us-east-2" in aws has equivalent "N. Virginia" in Dynatrace Locations
-	dynatraceLocationName, ok := awsRegionToDynatraceRegionMapping[clusterRegion]
-	if !ok {
-		return "", fmt.Errorf("location not found for region: %s", clusterRegion)
-	}
-	return dynatraceLocationName, nil
-}
-
-func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
-	for _, service := range hostedcontrolplane.Spec.Services {
-		if service.Service == "APIServer" {
-			return service.Route.Hostname, nil
-		}
-	}
-	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
-}
-
-func ensureHttpMonitor(dynatraceApiClient *dynatrace.DynatraceApiClient, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
-	clusterId := hostedcontrolplane.Spec.ClusterID
-
-	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
-	if err != nil {
-		return false, fmt.Errorf("failed calling ExistsHttpMonitorInDynatrace [clusterId:%s]: %v", clusterId, err)
-	}
-	countMonitors := len(existsHttpMonitorResponse.Monitors)
-	switch {
-	case countMonitors == 1:
-		return true, nil
-
-	case countMonitors == 0:
-		return false, nil
-
-	case countMonitors > 1:
-		// Keep the first monitor, delete the rest
-		monitorsToDelete := existsHttpMonitorResponse.Monitors[1:]
-		for _, monitor := range monitorsToDelete {
-			if err := dynatraceApiClient.DeleteSingleMonitor(monitor.EntityId); err != nil {
-				return false, fmt.Errorf("failed to delete excess monitor %s for cluster id %s: %w", monitor.EntityId, clusterId, err)
-			}
-		}
-		return true, nil
-	}
-
-	return false, nil
-}
-
-func getClusterRegion(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
-	if hostedcontrolplane == nil {
-		return "", fmt.Errorf("hostedcontrolplane is nil %v", hostedcontrolplane)
-	}
-
-	clusterRegion := hostedcontrolplane.Spec.Platform.AWS.Region
-	if clusterRegion == "" {
-		return "", fmt.Errorf("aws region is not set in hcp %v", hostedcontrolplane)
-	}
-
-	return clusterRegion, nil
-}
-
-func determineDynatraceClusterRegionName(clusterRegion string, monitorLocationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
-	//public
-	switch monitorLocationType {
-	case hypershiftv1beta1.PublicAndPrivate:
-		return getDynatraceEquivalentClusterRegionName(clusterRegion)
-	case hypershiftv1beta1.Private:
-		// cspell:ignore backplanei03xyz
-		/*
-			For "Private" HCPs, we have one backplane location deployed per dynatrace tenant. E.g. "name": "backplanei03xyz"
-			"backplane" is returned from this function and passed to GetLocationEntityIdFromDynatrace function and this location is
-			searched for in dynatrace - if strings.Contains(loc.Name, locationName) && loc.Type == "PRIVATE" && loc.Status == "ENABLED".
-			Ref: https://issues.redhat.com/browse/OSD-25167
-		*/
-		return "backplane", nil
-	default:
-		return "", fmt.Errorf("monitorLocationType '%s' not supported", monitorLocationType)
-	}
-}
-
-func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	//if http monitor does not exist, and hcp is not marked for deletion, and hcp is ready, then create http monitor
-	//get apiserver
-	apiServerHostname, err := GetAPIServerHostname(hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("failed to get APIServer hostname %v", err)
-	}
-	monitorName := strings.Replace(apiServerHostname, "api.", "", 1)
-	// apiServerHostname := hostedcontrolplane.Spec.Services[1].ServicePublishingStrategy.Route.Hostname
-	monitorLocationType := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
-
-	//in hcp, spec.services.service["APIServer"].servicePublishingStrategy.route.hostname is api.test-rs1.dgcj.i3.devshift.org // cspell:ignore dgcj, devshift
-	// apiUrl := "https://api.hb-testing.j1b6.i3.devshift.org/livez"
-
-	apiUrl := fmt.Sprintf("https://%s/livez", apiServerHostname)
-
-	// Ensure the HTTP monitor has been created, and there is only a single instance of the monitor
-	present, err := ensureHttpMonitor(dynatraceApiClient, hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("failed to validate the http monitor: %v", err)
-	}
-	if present {
-		log.Info(fmt.Sprintf("HTTP monitor found. Skipping any actions for monitor %s", monitorName))
-		return nil
-	}
-
-	clusterId := hostedcontrolplane.Spec.ClusterID
-	/* determine cluster region, find cluster region equivalent name in dynatrace, fetch locationId/entityId
-	of the cluster region equivalent name in dynatrace, create http monitor and then update hcp labels.
-	*/
-	clusterRegion, err := getClusterRegion(hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("error calling getClusterRegion: %v", err)
-	}
-	dynatraceClusterRegionName, err := determineDynatraceClusterRegionName(clusterRegion, monitorLocationType)
-	if err != nil {
-		return fmt.Errorf("error calling determineDynatraceClusterRegionId: %v", err)
-	}
-
-	locationId, err := dynatraceApiClient.GetLocationEntityIdFromDynatrace(dynatraceClusterRegionName, monitorLocationType)
-	if err != nil {
-		return fmt.Errorf("error calling GetLocationEntityIdFromDynatrace: %v", err)
-	}
-
-	monitorId, err := dynatraceApiClient.CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, locationId, clusterRegion)
-	if err != nil {
-		return fmt.Errorf("error creating HTTP monitor: %v", err)
-	}
-
-	log.Info("Created HTTP monitor ", monitorId, clusterId)
-
-	return nil
-}
-
-func deleteDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	clusterId := hostedcontrolplane.Spec.ClusterID
-
-	err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId)
-	if err != nil {
-		return fmt.Errorf("error deleting HTTP monitor(s). Status Code: %v", err)
-	}
-	log.Info("Successfully deleted HTTP monitor(s)")
-	return nil
-}
-
-// ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
-func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	clusterID := hostedcontrolplane.Spec.ClusterID
-	if clusterID == "" {
-		return fmt.Errorf("cluster ID is empty")
-	}
-
-	// Determine if cluster is private
-	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
-		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
-
-	// Skip private clusters if OnlyPublicClusters flag is set
-	if r.RHOBSConfig.OnlyPublicClusters && isPrivate {
-		log.V(2).Info("Skipping probe creation for private cluster (only-public-clusters is enabled)", "cluster_id", clusterID)
-		return nil
-	}
-
-	// Get monitoring URL (API server health endpoint in this case)
-	monitoringURL, err := GetAPIServerHostname(hostedcontrolplane)
-	if err != nil {
-		return fmt.Errorf("failed to get API server hostname: %w", err)
-	}
-	monitoringURL = fmt.Sprintf("https://%s/livez", monitoringURL)
-
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
-
-	// Check if probe already exists
-	existingProbe, err := client.GetProbe(ctx, clusterID)
-	if err != nil {
-		return fmt.Errorf("failed to check existing probe: %w", err)
-	}
-
-	if existingProbe != nil {
-		// Handle failed probes by deleting and recreating them
-		if existingProbe.Status == "failed" {
-			log.Info("Found probe in failed state, recreating", "cluster_id", clusterID, "probe_id", existingProbe.ID)
-			// Delete the failed probe first
-			err := client.DeleteProbe(ctx, clusterID)
-			if err != nil {
-				return fmt.Errorf("failed to delete failed probe: %w", err)
-			}
-			// Continue to create new probe below
-		} else {
-			log.V(2).Info("RHOBS probe already exists", "cluster_id", clusterID, "probe_id", existingProbe.ID, "status", existingProbe.Status)
-			return nil
-		}
-	}
-
-	// Create probe request using the convenience function
-	// Note: Additional labels like management-cluster-id can be added in the future
-	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
-
-	// Create the probe
-	probe, err := client.CreateProbe(ctx, probeReq)
-	if err != nil {
-		return fmt.Errorf("failed to create RHOBS probe: %w", err)
-	}
-
-	log.Info("Successfully created RHOBS probe", "cluster_id", clusterID, "probe_id", probe.ID)
-	return nil
-}
-
-// deleteRHOBSProbe deletes the RHOBS probe for the HostedControlPlane
-func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	clusterID := hostedcontrolplane.Spec.ClusterID
-	if clusterID == "" {
-		return fmt.Errorf("cluster ID is empty")
-	}
-
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
-
-	// Delete the probe (sets status to terminating)
-	err := client.DeleteProbe(ctx, clusterID)
-	if err != nil {
-		return fmt.Errorf("failed to delete RHOBS probe: %w", err)
-	}
-
-	log.Info("Successfully marked RHOBS probe for termination", "cluster_id", clusterID)
-	return nil
-}
-
-// createRHOBSClient creates an RHOBS client with or without OIDC authentication based on configuration
-func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs.Client {
-	if r.RHOBSConfig.OIDCClientID != "" && r.RHOBSConfig.OIDCClientSecret != "" && r.RHOBSConfig.OIDCIssuerURL != "" {
-		oidcConfig := rhobs.OIDCConfig{
-			ClientID:     r.RHOBSConfig.OIDCClientID,
-			ClientSecret: r.RHOBSConfig.OIDCClientSecret,
-			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
-		}
-		log.V(2).Info("Creating RHOBS client with OIDC authentication")
-		// Use configurable tenant name in URL path, OIDC client ID is used for authentication headers
-		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, oidcConfig, log)
-	}
-
-	log.V(2).Info("Creating RHOBS client without authentication")
-	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, log)
 }
