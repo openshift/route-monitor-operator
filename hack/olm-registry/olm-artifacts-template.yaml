@@ -29,6 +29,9 @@ parameters:
 - name: OIDC_ISSUER_URL
   value: ""
   required: false
+- name: ONLY_PUBLIC_CLUSTERS
+  value: ""
+  required: false
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -129,3 +132,4 @@ objects:
         oidc-client-id: ${OIDC_CLIENT_ID}
         oidc-client-secret: ${OIDC_CLIENT_SECRET}
         oidc-issuer-url: ${OIDC_ISSUER_URL}
+        only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
