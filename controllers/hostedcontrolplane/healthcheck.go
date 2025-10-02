@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"time"
 
+	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -41,12 +43,16 @@ const (
 
 	// healthcheckIntervalSeconds defines the wait period between requeues when an HCP cluster in the process of being healthchecked
 	healthcheckIntervalSeconds = 30
+
+	// hcpHealthCheckSkipAge defines the minimum age an HCP cluster needs to be before it will no longer be healthchecked
+	hcpHealthCheckSkipAge = 3 * time.Hour
 )
 
-// hcpReady attempts to determine the readiness of an HCP cluster. A non-nil error return indicates the cluster should not be considered ready
-// to reconcile, with the contents of the error indicating why
+// hcpReady attempts to determine the readiness of an HCP cluster. It returns a boolean indicating readiness, as well as string indicating
+// the reason. An error indicates an issue was encountered while performing the healthcheck operation, and does not necessarily mean there is
+// an issue with the HCP cluster itself.
 //
-// An HCP is considered ready if its kube-apiserver's /livez endpoint can be polled successfully several times in a row. Polling history is
+// A new HCP is considered ready if its kube-apiserver's /livez endpoint can be polled successfully several times in a row; any cluster older than 3h is automatically considered ready. Polling history is
 // stored in the annotation of a configmap object within the HCP's namespace.
 //
 // If the configmap's annotation indicates a cluster has already been polled successfully in the past, then this function returns true. If
@@ -57,28 +63,28 @@ const (
 // HCP namespace, and this process will be restarted. Additionally, should healthchecking need to be skipped for any reason, the annotation
 // "routemonitor.managed.openshift.io/successful-healthchecks" can be added-to/edited-on the configmap with a large number (ie - 999) to bypass
 // this functionality
-func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
-	if checkClusterOver1Hour(hostedcontrolplane.CreationTimestamp) {
-		return nil
+func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	if olderThan(hostedcontrolplane, hcpHealthCheckSkipAge) {
+		return true, nil
 	}
 
 	healthcheckConfigMap, err := r.getHealthCheckConfigMap(ctx, hostedcontrolplane)
 	if err != nil {
 		if !kerr.IsNotFound(err) {
 			// if error is not related to the configmap not existing, return
-			return fmt.Errorf("failed to retrieve healthcheck configmap: %w", err)
+			return false, fmt.Errorf("failed to retrieve healthcheck configmap: %w", err)
 		}
 
 		// healthcheck configmap does not exist - create it
 		healthcheckConfigMap, err = r.createHealthcheckConfigMap(ctx, hostedcontrolplane)
 		if err != nil {
-			return fmt.Errorf("failed to create new healthcheck configmap: %w", err)
+			return false, fmt.Errorf("failed to create new healthcheck configmap: %w", err)
 		}
 	}
 
 	successes := healthcheckConfigMapSuccesses(healthcheckConfigMap)
 	if successes >= consecutiveSuccessfulHealthchecks {
-		return nil
+		return true, nil
 	}
 
 	err = healthcheckHostedControlPlane(hostedcontrolplane)
@@ -86,22 +92,22 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 		_, resetErr := r.resetHealthCheckSuccesses(ctx, healthcheckConfigMap)
 		if resetErr != nil {
 			err = errors.Join(err, resetErr)
-			return fmt.Errorf("failed to update configmap healthcheck count following healthchecking failure. Errors: %w", err)
+			return false, fmt.Errorf("failed to update configmap healthcheck count following healthchecking failure. Errors: %w", err)
 		}
-		return fmt.Errorf("healthcheck failed for HCP: %w", err)
+		return false, nil
 	}
 
 	healthcheckConfigMap, err = r.addHealthCheckSuccess(ctx, healthcheckConfigMap)
 	if err != nil {
-		return fmt.Errorf("failed to increment healthcheck success count: %w", err)
+		return false, fmt.Errorf("failed to increment healthcheck success count: %w", err)
 	}
 
 	successes = healthcheckConfigMapSuccesses(healthcheckConfigMap)
 	if successes >= consecutiveSuccessfulHealthchecks {
-		return nil
+		return true, nil
 	}
 
-	return fmt.Errorf("insufficient successful health check attempts")
+	return false, nil
 }
 
 // getHealthCheckConfigMap retrieves the healthcheck configmap for the provided HCP from the cluster
@@ -214,8 +220,41 @@ func endpointOK(endpoint string, secure bool) error {
 }
 
 // checkClusterOver1Hour determines if the HCP cluster is over one hour old
-func checkClusterOver1Hour(creationTimestamp metav1.Time) bool {
+func olderThan(obj metav1.Object, age time.Duration) bool {
 	now := time.Now()
-	oneHourAgo := now.Add((-1 * time.Hour))
-	return creationTimestamp.Time.Before(oneHourAgo)
+	minCreationTime := now.Add((-1 * age))
+	return obj.GetCreationTimestamp().Time.Before(minCreationTime)
+}
+
+// isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
+func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	// Create an instance of the VpcEndpoint
+	vpcEndpoint := &avov1alpha2.VpcEndpoint{}
+
+	// Construct the name and namespace of the VpcEndpoint
+	vpcEndpointName := "private-hcp"
+	vpcEndpointNamespace := hostedcontrolplane.Namespace
+
+	// Fetch the VpcEndpoint resource
+	err := r.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
+	if err != nil {
+		return false, err
+	}
+
+	// Check readiness using the Status field
+	// Cases can be found here: https://github.com/openshift/aws-vpce-operator/blob/main/controllers/vpcendpoint/validation.go#L148
+	switch vpcEndpoint.Status.Status {
+	case "available":
+		// VPC Endpoint is ready
+		return true, nil
+	case "pendingAcceptance", "pending", "deleting":
+		// These states mean the VPC Endpoint is transitioning, so we return false (without an error)
+		return false, nil
+	case "rejected", "failed", "deleted":
+		// Bad states, return an error
+		return false, fmt.Errorf("VPC Endpoint %s/%s is in a bad state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
+	default:
+		// Unknown state, return an error
+		return false, fmt.Errorf("VPC Endpoint %s/%s is in an unknown state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
+	}
 }
