@@ -271,17 +271,22 @@ type ProbePatchRequest struct {
 
 // DeleteProbe marks a probe for termination by cluster ID using PATCH method
 func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
+	c.logger.Info("DeleteProbe called", "cluster_id", clusterID)
+
 	// First check if probe exists and get its current state
 	existingProbe, err := c.GetProbe(ctx, clusterID)
 	if err != nil {
+		c.logger.Error(err, "Failed to get existing probe", "cluster_id", clusterID)
 		return fmt.Errorf("failed to check existing probe: %w", err)
 	}
 
 	if existingProbe == nil {
 		// Probe doesn't exist, consider this success
-		c.logger.V(debugLogLevel).Info("Probe not found, nothing to delete", "cluster_id", clusterID)
+		c.logger.Info("Probe not found, nothing to delete", "cluster_id", clusterID)
 		return nil
 	}
+
+	c.logger.Info("Found existing probe", "cluster_id", clusterID, "probe_id", existingProbe.ID, "status", existingProbe.Status)
 
 	// Handle failed probes by recreating them in terminating state
 	if existingProbe.Status == "failed" {
@@ -291,6 +296,7 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 
 	probeID := existingProbe.ID
 	url := c.buildProbeURL(probeID)
+	c.logger.Info("Preparing PATCH request", "cluster_id", clusterID, "probe_id", probeID, "url", url)
 
 	// Create patch request to set status to terminating
 	patchReq := ProbePatchRequest{
@@ -299,11 +305,14 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 
 	payload, err := json.Marshal(patchReq)
 	if err != nil {
+		c.logger.Error(err, "Failed to marshal patch request", "cluster_id", clusterID)
 		return fmt.Errorf("failed to marshal patch request: %w", err)
 	}
+	c.logger.Info("Marshaled PATCH payload", "cluster_id", clusterID, "payload", string(payload))
 
 	httpReq, err := http.NewRequestWithContext(ctx, httpMethodPatch, url, bytes.NewBuffer(payload))
 	if err != nil {
+		c.logger.Error(err, "Failed to create HTTP request", "cluster_id", clusterID)
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
@@ -313,7 +322,9 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	c.addRHOBSHeaders(httpReq)
 
 	// Add authentication headers if OIDC is configured
+	c.logger.Info("Adding auth headers", "cluster_id", clusterID, "has_oidc_config", c.oidcConfig != nil)
 	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		c.logger.Error(err, "Failed to add auth headers", "cluster_id", clusterID)
 		return fmt.Errorf("failed to add auth headers: %w", err)
 	}
 
@@ -321,11 +332,12 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	if c.oidcConfig != nil {
 		username = c.oidcConfig.ClientID
 	}
-	c.logger.V(debugLogLevel).Info("Terminating RHOBS probe", "method", "PATCH", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
+	c.logger.Info("Terminating RHOBS probe", "method", "PATCH", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "PATCH", "url", url, "operation", "delete-probe")
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		c.logger.Error(err, "Failed to send HTTP request", "cluster_id", clusterID, "url", url)
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -334,14 +346,17 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Probe already doesn't exist, consider this success
+		c.logger.Info("Probe not found (404), considering deletion successful", "cluster_id", clusterID)
 		return nil
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
+		c.logger.Error(nil, "Received non-success status code", "cluster_id", clusterID, "status_code", resp.StatusCode, "body", string(body))
 		return fmt.Errorf("%s %d: %s", apiErrorPrefix, resp.StatusCode, string(body))
 	}
 
+	c.logger.Info("Successfully marked probe for termination", "cluster_id", clusterID, "probe_id", probeID)
 	return nil
 }
 

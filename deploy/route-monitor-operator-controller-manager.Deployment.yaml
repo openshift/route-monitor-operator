@@ -40,6 +40,9 @@ spec:
             - --blackbox-image=$(BLACKBOX_IMAGE)
             - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
             - --probe-api-url=$(PROBE_API_URL)
+            - --oidc-client-id=$(OIDC_CLIENT_ID)
+            - --oidc-client-secret=$(OIDC_CLIENT_SECRET)
+            - --oidc-issuer-url=$(OIDC_ISSUER_URL)
           command:
             - /manager
           env:
@@ -52,7 +55,29 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: PROBE_API_URL
-              value: ""
+              valueFrom:
+                configMapKeyRef:
+                  key: probe-api-url
+                  name: route-monitor-operator-config
+                  optional: true
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  key: oidc-client-id
+                  name: route-monitor-operator-config
+                  optional: true
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  key: oidc-client-secret
+                  name: route-monitor-operator-config
+                  optional: true
+            - name: OIDC_ISSUER_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: oidc-issuer-url
+                  name: route-monitor-operator-config
+                  optional: true
           image: route-monitor-operator:latest
           livenessProbe:
             httpGet:
