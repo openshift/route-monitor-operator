@@ -47,6 +47,7 @@ spec:
             - --oidc-client-id=$(OIDC_CLIENT_ID)
             - --oidc-client-secret=$(OIDC_CLIENT_SECRET)
             - --oidc-issuer-url=$(OIDC_ISSUER_URL)
+            - --only-public-clusters=$(ONLY_PUBLIC_CLUSTERS)
           env:
             - name: LOG_LEVEL
               # level 1 is debug, so when we want to raise the level we can
@@ -60,29 +61,15 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: PROBE_API_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: route-monitor-operator-config
-                  key: probe-api-url
-                  optional: true
+              value: ""  # Default to empty - can be overridden in app-interface
             - name: OIDC_CLIENT_ID
-              valueFrom:
-                configMapKeyRef:
-                  name: route-monitor-operator-config
-                  key: oidc-client-id
-                  optional: true
+              value: ""  # Default to empty - can be overridden in app-interface
             - name: OIDC_CLIENT_SECRET
-              valueFrom:
-                configMapKeyRef:
-                  name: route-monitor-operator-config
-                  key: oidc-client-secret
-                  optional: true
+              value: ""  # Default to empty - can be overridden in app-interface
             - name: OIDC_ISSUER_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: route-monitor-operator-config
-                  key: oidc-issuer-url
-                  optional: true
+              value: ""  # Default to empty - can be overridden in app-interface
+            - name: ONLY_PUBLIC_CLUSTERS
+              value: "false"  # Default to false - can be overridden in app-interface
           image: controller:latest
           name: manager
           securityContext:

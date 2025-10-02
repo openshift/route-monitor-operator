@@ -76,11 +76,12 @@ var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedContro
 
 // RHOBSConfig holds RHOBS API configuration
 type RHOBSConfig struct {
-	ProbeAPIURL      string
-	Tenant           string
-	OIDCClientID     string
-	OIDCClientSecret string
-	OIDCIssuerURL    string
+	ProbeAPIURL        string
+	Tenant             string
+	OIDCClientID       string
+	OIDCClientSecret   string
+	OIDCIssuerURL      string
+	OnlyPublicClusters bool
 }
 
 // HostedControlPlaneReconciler reconciles a HostedControlPlane object
@@ -669,6 +670,16 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		return fmt.Errorf("cluster ID is empty")
 	}
 
+	// Determine if cluster is private
+	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
+		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
+
+	// Skip private clusters if OnlyPublicClusters flag is set
+	if r.RHOBSConfig.OnlyPublicClusters && isPrivate {
+		log.V(2).Info("Skipping probe creation for private cluster (only-public-clusters is enabled)", "cluster_id", clusterID)
+		return nil
+	}
+
 	// Get monitoring URL (API server health endpoint in this case)
 	monitoringURL, err := GetAPIServerHostname(hostedcontrolplane)
 	if err != nil {
@@ -700,10 +711,6 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 			return nil
 		}
 	}
-
-	// Determine if cluster is private
-	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
-		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
 	// Create probe request using the convenience function
 	// Note: Additional labels like management-cluster-id can be added in the future
