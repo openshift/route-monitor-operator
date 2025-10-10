@@ -37,8 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
-
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -175,27 +173,33 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	err = r.hcpReady(ctx, hostedcontrolplane)
+	// Ensure cluster is ready to be monitored before deploying any probing objects
+	hcpReady, err := r.hcpReady(ctx, hostedcontrolplane)
 	if err != nil {
-		log.Info(fmt.Sprintf("skipped deploying monitoring objects, HostedControlPlane not ready: %v", err))
+		log.Error(err, "HCP readiness check failed")
+		return utilreconcile.RequeueWith(fmt.Errorf("HCP readiness check failed: %v", err))
+	}
+	if !hcpReady {
+		log.Info("skipped deploying monitoring objects, HostedControlPlane not yet ready")
 		return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
 	}
 
+	vpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
+	if err != nil {
+		log.Error(err, "VPC Endpoint check failed")
+		return utilreconcile.RequeueWith(err)
+	}
+	if !vpcEndpointReady {
+		log.Info("VPC Endpoint is not ready, delaying HTTP Monitor deployment")
+		return utilreconcile.RequeueAfter(vpcEndpointRetryTimeout), err
+	}
+
+	// Cluster ready - deploy kube-apiserver monitoring objects
 	log.Info("Deploying internal monitoring objects")
 	err = r.deployInternalMonitoringObjects(ctx, log, hostedcontrolplane)
 	if err != nil {
 		log.Error(err, "failed to deploy internal monitoring components")
 		return utilreconcile.RequeueWith(err)
-	}
-
-	isVpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
-	if err != nil {
-		log.Error(err, "VPC Endpoint check failed")
-		return utilreconcile.RequeueWith(err)
-	}
-	if !isVpcEndpointReady {
-		log.Info("VPC Endpoint is not ready, delaying HTTP Monitor deployment")
-		return utilreconcile.RequeueAfter(vpcEndpointRetryTimeout), err
 	}
 
 	log.Info("Deploying HTTP Monitor Resources")
@@ -220,39 +224,6 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	return ctrl.Result{}, err
-}
-
-// isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
-func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
-	// Create an instance of the VpcEndpoint
-	vpcEndpoint := &avov1alpha2.VpcEndpoint{}
-
-	// Construct the name and namespace of the VpcEndpoint
-	vpcEndpointName := "private-hcp"
-	vpcEndpointNamespace := hostedcontrolplane.Namespace
-
-	// Fetch the VpcEndpoint resource
-	err := r.Get(ctx, client.ObjectKey{Name: vpcEndpointName, Namespace: vpcEndpointNamespace}, vpcEndpoint)
-	if err != nil {
-		return false, err
-	}
-
-	// Check readiness using the Status field
-	// Cases can be found here: https://github.com/openshift/aws-vpce-operator/blob/main/controllers/vpcendpoint/validation.go#L148
-	switch vpcEndpoint.Status.Status {
-	case "available":
-		// VPC Endpoint is ready
-		return true, nil
-	case "pendingAcceptance", "pending", "deleting":
-		// These states mean the VPC Endpoint is transitioning, so we return false (without an error)
-		return false, nil
-	case "rejected", "failed", "deleted":
-		// Bad states, return an error
-		return false, fmt.Errorf("VPC Endpoint %s/%s is in a bad state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
-	default:
-		// Unknown state, return an error
-		return false, fmt.Errorf("VPC Endpoint %s/%s is in an unknown state: %s", vpcEndpointNamespace, vpcEndpointName, vpcEndpoint.Status.Status)
-	}
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
