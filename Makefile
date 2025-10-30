@@ -77,6 +77,10 @@ vet:
 test-integration:
 	hack/test-integration.sh
 
+# Run full end-to-end test including synthetics API and agent
+test-full-e2e:
+	hack/test-full-e2e.sh
+
 # from https://sdk.operatorframework.io/docs/upgrading-sdk-version/v1.6.1/#gov2-gov3-ansiblev1-helmv1-add-opm-and-catalog-build-makefile-targets
 OS = $(shell go env GOOS)
 ARCH = $(shell go env GOARCH)
