@@ -158,7 +158,12 @@ func (a *Agent) poll() {
     }
 }
 func (a *Agent) fetchProbes() {
-    resp, err := http.Get(fmt.Sprintf("%s/api/metrics/v1/test/probes", a.rhobsURL))
+    endpoints := []string{fmt.Sprintf("%s/probes", a.rhobsURL), fmt.Sprintf("%s/api/metrics/v1/test/probes", a.rhobsURL)}
+    var resp *http.Response; var err error
+    for _, ep := range endpoints {
+        if resp, err = http.Get(ep); err == nil && resp.StatusCode == http.StatusOK { break }
+        if resp != nil { resp.Body.Close() }
+    }
     if err != nil { log.Printf("error fetching probes: %v", err); return }
     defer resp.Body.Close()
     if resp.StatusCode != http.StatusOK { b, _ := io.ReadAll(resp.Body); log.Printf("bad status from RHOBS: %d %s", resp.StatusCode, string(b)); return }

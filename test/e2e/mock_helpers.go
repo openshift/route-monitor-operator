@@ -581,9 +581,16 @@ func (m *MockRMOController) createRHOBSProbe(ctx context.Context, hcp *MockHoste
 			"static_url": fmt.Sprintf("https://%s/livez", hcp.Spec.APIServerHostname),
 		}
 		payload, _ := json.Marshal(body)
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/api/metrics/v1/test/probes", apiURL), bytes.NewReader(payload))
-		req.Header.Set("Content-Type", "application/json")
-		http.DefaultClient.Do(req)
+		// Try real API path first (/probes), fall back to mock path
+		endpoints := []string{fmt.Sprintf("%s/probes", apiURL), fmt.Sprintf("%s/api/metrics/v1/test/probes", apiURL)}
+		for _, endpoint := range endpoints {
+			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			if resp, err := http.DefaultClient.Do(req); err == nil && resp.StatusCode < 400 {
+				resp.Body.Close()
+				break
+			}
+		}
 	}
 
 	log.Printf("Created RHOBS probe for cluster: %s", hcp.Spec.ClusterID)
