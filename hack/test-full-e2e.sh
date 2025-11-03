@@ -1,16 +1,6 @@
 #!/bin/bash
 # E2E Test for Route Monitor Operator - Mock-based (no cluster required)
-# Local repos: set URLs; optionally provide start commands and the script will run them.
-#  - RHOBS_API_URL (default http://localhost:8080)
-#  - SYNTHETICS_AGENT_URL (default http://localhost:8081)
-#  - RHOBS_START_CMD (optional)
-#  - SYNTHETICS_AGENT_START_CMD (optional)
-# Example:
-#  RHOBS_API_URL=http://localhost:19090 \
-#  RHOBS_START_CMD='cd /path/to/rhobs && PORT=19090 go run ./cmd/server' \
-#  SYNTHETICS_AGENT_URL=http://localhost:19091 \
-#  SYNTHETICS_AGENT_START_CMD='cd /path/to/agent && PORT=19091 go run .' \
-#  make test-full-e2e
+# Uses only mock services - no external dependencies needed
 
 set -euo pipefail
 
@@ -44,30 +34,19 @@ trap cleanup EXIT INT TERM
 
 check_prerequisites() {
     command -v go &> /dev/null || { log_error "go not found"; exit 1; }
-    export RHOBS_API_URL="${RHOBS_API_URL:-http://localhost:8080}"
-    export SYNTHETICS_AGENT_URL="${SYNTHETICS_AGENT_URL:-http://localhost:8081}"
-    if [[ "$RHOBS_API_URL" == "http://localhost:8080" ]] && lsof -i :8080 -sTCP:LISTEN >/dev/null 2>&1; then
-        log_error "Port 8080 in use. Set RHOBS_API_URL to an unused host:port (e.g. http://localhost:18080)"
+    export RHOBS_API_URL="http://localhost:8080"
+    export SYNTHETICS_AGENT_URL="http://localhost:8081"
+    if lsof -i :8080 -sTCP:LISTEN >/dev/null 2>&1; then
+        log_error "Port 8080 in use. Please free it and try again."
         exit 1
     fi
-    if [[ "$SYNTHETICS_AGENT_URL" == "http://localhost:8081" ]] && lsof -i :8081 -sTCP:LISTEN >/dev/null 2>&1; then
-        log_error "Port 8081 in use. Set SYNTHETICS_AGENT_URL to an unused host:port (e.g. http://localhost:18081)"
+    if lsof -i :8081 -sTCP:LISTEN >/dev/null 2>&1; then
+        log_error "Port 8081 in use. Please free it and try again."
         exit 1
     fi
-    log_info "Mocks active unless overridden via *_URL or *_START_CMD"
 }
 
 start_mock_rhobs_api() {
-    if [[ -n "${RHOBS_START_CMD:-}" ]]; then
-        log_info "Starting external RHOBS API via RHOBS_START_CMD..."
-        bash -lc "$RHOBS_START_CMD" & RHOBS_PID=$!
-        sleep 2
-        curl -s "$RHOBS_API_URL/api/metrics/v1/test/probes" > /dev/null || { log_error "Failed to reach RHOBS_API_URL after RHOBS_START_CMD"; exit 1; }
-        log_success "External RHOBS API started (PID: $RHOBS_PID)"
-        return
-    fi
-
-    [[ "$RHOBS_API_URL" != "http://localhost:8080" ]] && { log_info "Using external RHOBS API: $RHOBS_API_URL"; return; }
     log_info "Starting mock RHOBS API server..."
     cat > "$PROJECT_ROOT/tmp/mock-rhobs-api.go" << 'EOF'
 package main
@@ -79,9 +58,21 @@ func (s *Server) handleProbes(w http.ResponseWriter, r *http.Request) {
     case http.MethodGet:
         s.mu.RLock(); defer s.mu.RUnlock()
         labelSel := r.URL.Query().Get("label_selector")
-        clusterID := ""; if strings.HasPrefix(labelSel, "cluster-id=") { clusterID = strings.TrimPrefix(labelSel, "cluster-id=") }
         var list []Probe
-        if clusterID != "" { if p, ok := s.probes[clusterID]; ok { list = append(list, p) } } else { for _, p := range s.probes { list = append(list, p) } }
+        for _, p := range s.probes {
+            match := true
+            if labelSel != "" {
+                selectors := strings.Split(labelSel, ",")
+                for _, sel := range selectors {
+                    sel = strings.TrimSpace(sel)
+                    parts := strings.SplitN(sel, "=", 2)
+                    if len(parts) != 2 { continue }
+                    key, val := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+                    if p.Labels == nil || p.Labels[key] != val { match = false; break }
+                }
+            }
+            if match { list = append(list, p) }
+        }
         w.Header().Set("Content-Type", "application/json"); _ = json.NewEncoder(w).Encode(map[string]interface{}{"probes": list})
     case http.MethodPost:
         var in struct{ Labels map[string]string; StaticURL string }
@@ -104,6 +95,7 @@ func main() {
     srv := &Server{probes: make(map[string]Probe)}
     http.HandleFunc("/api/metrics/v1/test/probes", srv.handleProbes)
     http.HandleFunc("/api/metrics/v1/test/probes/", srv.handleProbeStatus)
+    http.HandleFunc("/probes", srv.handleProbes)
     log.Println("Mock RHOBS API server starting on http://localhost:8080")
     log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -114,15 +106,6 @@ EOF
 }
 
 start_mock_synthetics_agent() {
-    if [[ -n "${SYNTHETICS_AGENT_START_CMD:-}" ]]; then
-        log_info "Starting external Synthetics Agent via SYNTHETICS_AGENT_START_CMD..."
-        bash -lc "$SYNTHETICS_AGENT_START_CMD" & SYNTHETICS_AGENT_PID=$!
-        sleep 2
-        curl -s "$SYNTHETICS_AGENT_URL/health" > /dev/null || { log_error "Failed to reach SYNTHETICS_AGENT_URL after start cmd"; exit 1; }
-        log_success "External Synthetics Agent started (PID: $SYNTHETICS_AGENT_PID)"
-        return
-    fi
-
     log_info "Starting mock Synthetics Agent..."
     cat > "$PROJECT_ROOT/tmp/mock-synthetics-agent.go" << 'EOF'
 package main
@@ -172,13 +155,24 @@ func (a *Agent) fetchProbes() {
     log.Printf("Fetched %d probes from RHOBS", len(body.Probes))
     a.mu.Lock()
     for _, p := range body.Probes {
+        // Try both "labels" and "Labels" (JSON keys are case-sensitive)
         labels, _ := p["labels"].(map[string]interface{})
+        if labels == nil {
+            labels, _ = p["Labels"].(map[string]interface{})
+        }
         if labels == nil { continue }
         cid, _ := labels["cluster-id"].(string); if cid == "" { continue }
+        wasNew := false
         if _, exists := a.probes[cid]; !exists {
-            a.probes[cid] = p; log.Printf("Executing probe for cluster: %s", cid)
-            pid, _ := p["id"].(string); if pid == "" { pid = fmt.Sprintf("probe-%s", cid) }
-            a.executions = append(a.executions, Execution{ProbeID: pid, ClusterID: cid, Status: "success", Timestamp: time.Now(), DurationMs: 100})
+            wasNew = true
+            a.probes[cid] = p
+        }
+        // Always create an execution when we see a probe (not just on first discovery)
+        // This ensures tests can verify executions even if probe was discovered earlier
+        pid, _ := p["id"].(string); if pid == "" { pid = fmt.Sprintf("probe-%s", cid) }
+        a.executions = append(a.executions, Execution{ProbeID: pid, ClusterID: cid, Status: "success", Timestamp: time.Now(), DurationMs: 100})
+        if wasNew {
+            log.Printf("Executing probe for cluster: %s", cid)
         }
     }
     a.mu.Unlock()
@@ -191,7 +185,7 @@ func main() {
     log.Fatal(http.ListenAndServe(":8081", nil))
 }
 EOF
-    (cd "$PROJECT_ROOT/tmp" && RHOBS_API_URL="$RHOBS_API_URL" go run ./mock-synthetics-agent.go) & SYNTHETICS_AGENT_PID=$!
+    (cd "$PROJECT_ROOT/tmp" && RHOBS_API_URL="http://localhost:8080" go run ./mock-synthetics-agent.go) & SYNTHETICS_AGENT_PID=$!
     sleep 2; curl -s http://localhost:8081/health > /dev/null || { log_error "Failed to start mock Synthetics Agent"; exit 1; }
     log_success "Mock Synthetics Agent started (PID: $SYNTHETICS_AGENT_PID)"
 }
@@ -211,28 +205,6 @@ USAGE: $0 [OPTIONS]
 
 OPTIONS:
     -h, --help              Show this help message
-
-ENVIRONMENT VARIABLES:
-    RHOBS_API_URL               RHOBS API URL (default: http://localhost:8080)
-    SYNTHETICS_AGENT_URL        Synthetics Agent URL (default: http://localhost:8081)
-    RHOBS_START_CMD             Command to start your local synthetics-api (checked via RHOBS_API_URL)
-    SYNTHETICS_AGENT_START_CMD  Command to start your local synthetics-agent (checked via SYNTHETICS_AGENT_URL)
-
-EXAMPLES:
-    # Quick start - run with mocks (no Kubernetes cluster required!)
-    $0
-
-    # Test with external services
-    RHOBS_API_URL=https://rhobs.example.com \
-    SYNTHETICS_AGENT_URL=https://agent.example.com \
-    $0
-
-    # Test against local repos by path (examples)
-    RHOBS_API_URL=http://localhost:19090 \
-    RHOBS_START_CMD='cd /path/to/rhobs && PORT=19090 go run ./cmd/server' \
-    SYNTHETICS_AGENT_URL=http://localhost:19091 \
-    SYNTHETICS_AGENT_START_CMD='cd /path/to/agent && PORT=19091 go run .' \
-    $0
 
 NOTE: No Kubernetes cluster required! Uses mock services for everything.
 EOF

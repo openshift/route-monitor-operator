@@ -4,7 +4,6 @@ package e2e
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -62,23 +61,9 @@ var _ = BeforeSuite(func() {
 	err := mockK8sClient.CreateNamespace(testNamespace)
 	Expect(err).NotTo(HaveOccurred(), "Failed to create test namespace")
 
-	// Set up RHOBS API URL if not provided
-	rhobsAPIURL := os.Getenv("RHOBS_API_URL")
-	if rhobsAPIURL == "" {
-		rhobsAPIURL = "http://localhost:8080"
-	}
-
-	// Set up Synthetics Agent URL if not provided
-	syntheticsAgentURL := os.Getenv("SYNTHETICS_AGENT_URL")
-	if syntheticsAgentURL == "" {
-		syntheticsAgentURL = "http://localhost:8081"
-	}
-
 	testLogger.Info("Mock environment setup complete",
 		"namespace", testNamespace,
-		"clusterID", testClusterID,
-		"rhobsAPIURL", rhobsAPIURL,
-		"syntheticsAgentURL", syntheticsAgentURL)
+		"clusterID", testClusterID)
 })
 
 var _ = AfterSuite(func() {
@@ -165,13 +150,8 @@ var _ = Describe("Full End-to-End Test for Route Monitor Operator", Ordered, fun
 			}, probeTimeout, 1*time.Second).Should(BeTrue(), "RHOBS probe should be created")
 
 			By("Waiting for synthetics agent to execute probe")
-			syntheticsAgentURL := os.Getenv("SYNTHETICS_AGENT_URL")
-			if syntheticsAgentURL == "" {
-				syntheticsAgentURL = "http://localhost:8081"
-			}
-
 			Eventually(func() bool {
-				return VerifySyntheticsAgentExecution(syntheticsAgentURL, testClusterID)
+				return VerifySyntheticsAgentExecution("http://localhost:8081", testClusterID)
 			}, verificationTimeout, 2*time.Second).Should(BeTrue(), "Synthetics agent should execute probe")
 		})
 

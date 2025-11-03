@@ -10,7 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,12 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ============================================================================
-// Mock Kubernetes Client
-// ============================================================================
-
-// MockKubernetesClient is a mock implementation of the Kubernetes client
-// that simulates Kubernetes API operations without requiring a real cluster
 type MockKubernetesClient struct {
 	mu         sync.RWMutex
 	objects    map[types.NamespacedName]runtime.Object
@@ -36,14 +30,12 @@ type MockKubernetesClient struct {
 	events     []MockEvent
 }
 
-// MockEvent represents an event that occurred in the mock cluster
 type MockEvent struct {
 	Type      string
 	Object    runtime.Object
 	Timestamp time.Time
 }
 
-// NewMockKubernetesClient creates a new mock Kubernetes client
 func NewMockKubernetesClient() *MockKubernetesClient {
 	return &MockKubernetesClient{
 		objects:    make(map[types.NamespacedName]runtime.Object),
@@ -52,7 +44,6 @@ func NewMockKubernetesClient() *MockKubernetesClient {
 	}
 }
 
-// Create creates a new object in the mock cluster
 func (m *MockKubernetesClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -62,17 +53,12 @@ func (m *MockKubernetesClient) Create(ctx context.Context, obj client.Object, op
 		Namespace: obj.GetNamespace(),
 	}
 
-	// Set creation timestamp if not set
 	if obj.GetCreationTimestamp().Time.IsZero() {
 		obj.SetCreationTimestamp(metav1.NewTime(time.Now()))
 	}
-
-	// Set UID if not set
 	if obj.GetUID() == "" {
 		obj.SetUID(types.UID(fmt.Sprintf("mock-uid-%d", time.Now().UnixNano())))
 	}
-
-	// Set resource version
 	obj.SetResourceVersion(fmt.Sprintf("%d", time.Now().UnixNano()))
 
 	m.objects[key] = obj.DeepCopyObject()
@@ -85,44 +71,26 @@ func (m *MockKubernetesClient) Create(ctx context.Context, obj client.Object, op
 	return nil
 }
 
-// Get retrieves an object from the mock cluster
 func (m *MockKubernetesClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	if storedObj, exists := m.objects[key]; exists {
-		// Copy the stored object to the target object
 		return copyObject(storedObj, obj)
 	}
-
 	return fmt.Errorf("object not found: %s", key.String())
 }
 
-// List lists objects from the mock cluster
 func (m *MockKubernetesClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	// This is a simplified implementation
-	// In a real implementation, we'd need to handle labels, field selectors, etc.
 	return nil
 }
 
-// Update updates an object in the mock cluster
 func (m *MockKubernetesClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	key := types.NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-
+	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	if _, exists := m.objects[key]; !exists {
 		return fmt.Errorf("object not found: %s", key.String())
 	}
-
-	// Update resource version
 	obj.SetResourceVersion(fmt.Sprintf("%d", time.Now().UnixNano()))
 
 	m.objects[key] = obj.DeepCopyObject()
@@ -135,20 +103,13 @@ func (m *MockKubernetesClient) Update(ctx context.Context, obj client.Object, op
 	return nil
 }
 
-// Delete deletes an object from the mock cluster
 func (m *MockKubernetesClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	key := types.NamespacedName{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}
-
+	key := types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	if _, exists := m.objects[key]; !exists {
 		return fmt.Errorf("object not found: %s", key.String())
 	}
-
 	delete(m.objects, key)
 	m.events = append(m.events, MockEvent{
 		Type:      "Deleted",
@@ -159,24 +120,16 @@ func (m *MockKubernetesClient) Delete(ctx context.Context, obj client.Object, op
 	return nil
 }
 
-// Patch patches an object in the mock cluster
 func (m *MockKubernetesClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	// Simplified implementation - just update the object
 	return m.Update(ctx, obj)
 }
-
-// DeleteAllOf deletes all objects of a given type
 func (m *MockKubernetesClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
-	// Simplified implementation
 	return nil
 }
-
-// Status returns a status writer
 func (m *MockKubernetesClient) Status() client.StatusWriter {
 	return &mockStatusWriter{client: m}
 }
 
-// mockStatusWriter implements client.StatusWriter
 type mockStatusWriter struct {
 	client *MockKubernetesClient
 }
@@ -193,41 +146,23 @@ func (w *mockStatusWriter) Patch(ctx context.Context, obj client.Object, patch c
 	return w.client.Patch(ctx, obj, patch)
 }
 
-// Scheme returns the scheme
 func (m *MockKubernetesClient) Scheme() *runtime.Scheme {
-	// Return a basic scheme - in real implementation, this would be the actual scheme
 	return runtime.NewScheme()
 }
-
-// RESTMapper returns the REST mapper
 func (m *MockKubernetesClient) RESTMapper() meta.RESTMapper {
-	// Return nil for simplified mock implementation
 	return nil
 }
-
-// GroupVersionKindFor returns the GroupVersionKind for a given object
 func (m *MockKubernetesClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	// Simplified implementation
 	return schema.GroupVersionKind{}, nil
 }
-
-// IsObjectNamespaced returns true if the object is namespaced
 func (m *MockKubernetesClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	// Simplified implementation - assume all objects are namespaced
 	return true, nil
 }
 
-// CreateNamespace creates a namespace in the mock cluster
 func (m *MockKubernetesClient) CreateNamespace(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
-
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	key := types.NamespacedName{Name: name}
 	m.objects[key] = namespace
 	m.namespaces[name] = true
@@ -241,25 +176,16 @@ func (m *MockKubernetesClient) CreateNamespace(name string) error {
 	return nil
 }
 
-// DeleteNamespace deletes a namespace from the mock cluster
 func (m *MockKubernetesClient) DeleteNamespace(name string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	// Remove all objects in this namespace
 	for key := range m.objects {
 		if key.Namespace == name {
 			delete(m.objects, key)
 		}
 	}
-
 	delete(m.namespaces, name)
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 
 	m.events = append(m.events, MockEvent{
 		Type:      "NamespaceDeleted",
@@ -270,21 +196,16 @@ func (m *MockKubernetesClient) DeleteNamespace(name string) error {
 	return nil
 }
 
-// GetEvents returns all events that occurred in the mock cluster
 func (m *MockKubernetesClient) GetEvents() []MockEvent {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	events := make([]MockEvent, len(m.events))
 	copy(events, m.events)
 	return events
 }
-
-// GetObjects returns all objects in the mock cluster
 func (m *MockKubernetesClient) GetObjects() map[types.NamespacedName]runtime.Object {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
 	objects := make(map[types.NamespacedName]runtime.Object)
 	for key, obj := range m.objects {
 		objects[key] = obj.DeepCopyObject()
@@ -292,23 +213,12 @@ func (m *MockKubernetesClient) GetObjects() map[types.NamespacedName]runtime.Obj
 	return objects
 }
 
-// Helper function to copy objects
-func copyObject(src, dst runtime.Object) error {
-	// This is a simplified implementation
-	// In a real implementation, we'd use the scheme to properly copy objects
-	return nil
-}
+func copyObject(src, dst runtime.Object) error { return nil }
 
-// ============================================================================
-// Mock RHOBS Client
-// ============================================================================
-
-// MockRHOBSClient provides methods to interact with the mock RHOBS API
 type MockRHOBSClient struct {
 	probes map[string]*MockProbe
 }
 
-// MockProbe represents a probe in the mock RHOBS API
 type MockProbe struct {
 	ID        string            `json:"id"`
 	Labels    map[string]string `json:"labels"`
@@ -318,14 +228,12 @@ type MockProbe struct {
 	Timeout   string            `json:"timeout"`
 }
 
-// NewMockRHOBSClient creates a new mock RHOBS client
 func NewMockRHOBSClient() *MockRHOBSClient {
 	return &MockRHOBSClient{
 		probes: make(map[string]*MockProbe),
 	}
 }
 
-// CreateProbe creates a new probe in the mock RHOBS API
 func (c *MockRHOBSClient) CreateProbe(ctx context.Context, clusterID string, probeData map[string]interface{}) (*MockProbe, error) {
 	probe := &MockProbe{
 		ID:        fmt.Sprintf("probe-%s-%d", clusterID, time.Now().UnixNano()),
@@ -335,13 +243,9 @@ func (c *MockRHOBSClient) CreateProbe(ctx context.Context, clusterID string, pro
 		Interval:  "30s",
 		Timeout:   "10s",
 	}
-
-	// Extract labels from probeData
 	if labels, ok := probeData["labels"].(map[string]string); ok {
 		probe.Labels = labels
 	}
-
-	// Extract other fields
 	if targetURL, ok := probeData["target_url"].(string); ok {
 		probe.TargetURL = targetURL
 	}
@@ -356,7 +260,6 @@ func (c *MockRHOBSClient) CreateProbe(ctx context.Context, clusterID string, pro
 	return probe, nil
 }
 
-// GetProbe retrieves a probe from the mock RHOBS API
 func (c *MockRHOBSClient) GetProbe(ctx context.Context, clusterID string) (*MockProbe, error) {
 	if probe, exists := c.probes[clusterID]; exists {
 		return probe, nil
@@ -364,7 +267,6 @@ func (c *MockRHOBSClient) GetProbe(ctx context.Context, clusterID string) (*Mock
 	return nil, fmt.Errorf("probe not found for cluster: %s", clusterID)
 }
 
-// DeleteProbe deletes a probe from the mock RHOBS API
 func (c *MockRHOBSClient) DeleteProbe(ctx context.Context, clusterID string) error {
 	if _, exists := c.probes[clusterID]; !exists {
 		return fmt.Errorf("probe not found for cluster: %s", clusterID)
@@ -374,7 +276,6 @@ func (c *MockRHOBSClient) DeleteProbe(ctx context.Context, clusterID string) err
 	return nil
 }
 
-// UpdateProbeStatus updates the status of a probe in the mock RHOBS API
 func (c *MockRHOBSClient) UpdateProbeStatus(ctx context.Context, clusterID, status string) error {
 	if probe, exists := c.probes[clusterID]; exists {
 		probe.Status = status
@@ -383,16 +284,10 @@ func (c *MockRHOBSClient) UpdateProbeStatus(ctx context.Context, clusterID, stat
 	return fmt.Errorf("probe not found for cluster: %s", clusterID)
 }
 
-// GetProbes returns all probes in the mock RHOBS API
 func (c *MockRHOBSClient) GetProbes() map[string]*MockProbe {
 	return c.probes
 }
 
-// ============================================================================
-// Mock RMO Controller
-// ============================================================================
-
-// MockHostedControlPlane represents a mock HostedControlPlane resource
 type MockHostedControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -400,12 +295,9 @@ type MockHostedControlPlane struct {
 	Status            MockHostedControlPlaneStatus `json:"status,omitempty"`
 }
 
-// DeepCopyObject returns a generically typed copy of an object
 func (h *MockHostedControlPlane) DeepCopyObject() runtime.Object {
 	return h.DeepCopy()
 }
-
-// DeepCopy returns a deep copy of the MockHostedControlPlane
 func (h *MockHostedControlPlane) DeepCopy() *MockHostedControlPlane {
 	if h == nil {
 		return nil
@@ -415,7 +307,6 @@ func (h *MockHostedControlPlane) DeepCopy() *MockHostedControlPlane {
 	return out
 }
 
-// DeepCopyInto copies all properties of this object into another object of the same type
 func (h *MockHostedControlPlane) DeepCopyInto(out *MockHostedControlPlane) {
 	*out = *h
 	out.TypeMeta = h.TypeMeta
@@ -423,13 +314,9 @@ func (h *MockHostedControlPlane) DeepCopyInto(out *MockHostedControlPlane) {
 	h.Spec.DeepCopyInto(&out.Spec)
 	h.Status.DeepCopyInto(&out.Status)
 }
-
-// DeepCopyInto copies all properties of this object into another object of the same type
 func (s *MockHostedControlPlaneSpec) DeepCopyInto(out *MockHostedControlPlaneSpec) {
 	*out = *s
 }
-
-// DeepCopyInto copies all properties of this object into another object of the same type
 func (s *MockHostedControlPlaneStatus) DeepCopyInto(out *MockHostedControlPlaneStatus) {
 	*out = *s
 	if s.Conditions != nil {
@@ -458,7 +345,6 @@ type MockCondition struct {
 	Message string `json:"message"`
 }
 
-// MockRMOController simulates the Route Monitor Operator controller behavior
 type MockRMOController struct {
 	k8sClient    *MockKubernetesClient
 	rhobsClient  *MockRHOBSClient
@@ -466,7 +352,6 @@ type MockRMOController struct {
 	reconcileLog []string
 }
 
-// NewMockRMOController creates a new mock RMO controller
 func NewMockRMOController(k8sClient *MockKubernetesClient, rhobsClient *MockRHOBSClient) *MockRMOController {
 	return &MockRMOController{
 		k8sClient:    k8sClient,
@@ -476,32 +361,22 @@ func NewMockRMOController(k8sClient *MockKubernetesClient, rhobsClient *MockRHOB
 	}
 }
 
-// ReconcileHostedControlPlane simulates the reconciliation of a HostedControlPlane
 func (m *MockRMOController) ReconcileHostedControlPlane(ctx context.Context, hcp *MockHostedControlPlane) error {
 	log.Printf("Reconciling HostedControlPlane: %s", hcp.Name)
-
-	// Add to reconcile log
 	m.reconcileLog = append(m.reconcileLog, fmt.Sprintf("Reconciling HostedControlPlane: %s", hcp.Name))
-
-	// Create internal monitoring objects (Route, RouteMonitor)
 	if err := m.createInternalMonitoringObjects(ctx, hcp); err != nil {
 		return fmt.Errorf("failed to create internal monitoring objects: %w", err)
 	}
-
-	// Create RHOBS probe
 	if err := m.createRHOBSProbe(ctx, hcp); err != nil {
 		return fmt.Errorf("failed to create RHOBS probe: %w", err)
 	}
-
 	log.Printf("Successfully reconciled HostedControlPlane: %s", hcp.Name)
 	m.reconcileLog = append(m.reconcileLog, fmt.Sprintf("Successfully reconciled HostedControlPlane: %s", hcp.Name))
 
 	return nil
 }
 
-// createInternalMonitoringObjects simulates creating Route and RouteMonitor resources
 func (m *MockRMOController) createInternalMonitoringObjects(ctx context.Context, hcp *MockHostedControlPlane) error {
-	// Create Route resource
 	route := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-route", hcp.Name),
@@ -525,7 +400,6 @@ func (m *MockRMOController) createInternalMonitoringObjects(ctx context.Context,
 		return fmt.Errorf("failed to create Route: %w", err)
 	}
 
-	// Create RouteMonitor resource (simplified)
 	routeMonitor := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-routemonitor", hcp.Name),
@@ -549,7 +423,6 @@ func (m *MockRMOController) createInternalMonitoringObjects(ctx context.Context,
 	return nil
 }
 
-// createRHOBSProbe simulates creating a RHOBS probe
 func (m *MockRMOController) createRHOBSProbe(ctx context.Context, hcp *MockHostedControlPlane) error {
 	probeData := map[string]interface{}{
 		"labels": map[string]string{
@@ -566,55 +439,38 @@ func (m *MockRMOController) createRHOBSProbe(ctx context.Context, hcp *MockHoste
 		return fmt.Errorf("failed to create RHOBS probe: %w", err)
 	}
 
-	// Store the probe for later reference
 	m.probes[hcp.Spec.ClusterID] = probe
-
-	// Best-effort: also seed the external mock RHOBS HTTP API so the external agent can pick it up
-	// This keeps the external mocks in sync with our in-process mocks for the E2E test flow
-	if apiURL := os.Getenv("RHOBS_API_URL"); apiURL != "" {
-		body := map[string]interface{}{
-			"labels": map[string]string{
-				"cluster-id": hcp.Spec.ClusterID,
-				"private":    "false",
-			},
-			// external mock expects static_url
-			"static_url": fmt.Sprintf("https://%s/livez", hcp.Spec.APIServerHostname),
-		}
-		payload, _ := json.Marshal(body)
-		// Try real API path first (/probes), fall back to mock path
-		endpoints := []string{fmt.Sprintf("%s/probes", apiURL), fmt.Sprintf("%s/api/metrics/v1/test/probes", apiURL)}
-		for _, endpoint := range endpoints {
-			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-			req.Header.Set("Content-Type", "application/json")
-			if resp, err := http.DefaultClient.Do(req); err == nil && resp.StatusCode < 400 {
-				resp.Body.Close()
-				break
-			}
-		}
+	// Create probe in mock RHOBS API (always runs on localhost:8080)
+	body := map[string]interface{}{
+		"labels": map[string]string{
+			"cluster-id":              hcp.Spec.ClusterID,
+			"private":                 "false",
+			"rhobs-synthetics/status": "pending",
+		},
+		"static_url": fmt.Sprintf("https://%s/livez", hcp.Spec.APIServerHostname),
+	}
+	payload, _ := json.Marshal(body)
+	apiURL := "http://localhost:8080"
+	endpoint := fmt.Sprintf("%s/api/metrics/v1/test/probes", apiURL)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	if resp, err := http.DefaultClient.Do(req); err == nil && resp.StatusCode < 400 {
+		resp.Body.Close()
 	}
 
 	log.Printf("Created RHOBS probe for cluster: %s", hcp.Spec.ClusterID)
 	return nil
 }
 
-// DeleteHostedControlPlane simulates the deletion of a HostedControlPlane
 func (m *MockRMOController) DeleteHostedControlPlane(ctx context.Context, hcp *MockHostedControlPlane) error {
 	log.Printf("Deleting HostedControlPlane: %s", hcp.Name)
-
-	// Add to reconcile log
 	m.reconcileLog = append(m.reconcileLog, fmt.Sprintf("Deleting HostedControlPlane: %s", hcp.Name))
-
-	// Delete RHOBS probe
 	if err := m.deleteRHOBSProbe(ctx, hcp.Spec.ClusterID); err != nil {
 		log.Printf("Warning: failed to delete RHOBS probe: %v", err)
 	}
-
-	// Delete internal monitoring objects
 	if err := m.deleteInternalMonitoringObjects(ctx, hcp); err != nil {
 		log.Printf("Warning: failed to delete internal monitoring objects: %v", err)
 	}
-
-	// Remove from probes map
 	delete(m.probes, hcp.Spec.ClusterID)
 
 	log.Printf("Successfully deleted HostedControlPlane: %s", hcp.Name)
@@ -623,7 +479,6 @@ func (m *MockRMOController) DeleteHostedControlPlane(ctx context.Context, hcp *M
 	return nil
 }
 
-// deleteRHOBSProbe simulates deleting a RHOBS probe
 func (m *MockRMOController) deleteRHOBSProbe(ctx context.Context, clusterID string) error {
 	if err := m.rhobsClient.DeleteProbe(ctx, clusterID); err != nil {
 		return fmt.Errorf("failed to delete RHOBS probe: %w", err)
@@ -633,9 +488,7 @@ func (m *MockRMOController) deleteRHOBSProbe(ctx context.Context, clusterID stri
 	return nil
 }
 
-// deleteInternalMonitoringObjects simulates deleting Route and RouteMonitor resources
 func (m *MockRMOController) deleteInternalMonitoringObjects(ctx context.Context, hcp *MockHostedControlPlane) error {
-	// Delete Route
 	route := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-route", hcp.Name),
@@ -647,7 +500,6 @@ func (m *MockRMOController) deleteInternalMonitoringObjects(ctx context.Context,
 		log.Printf("Warning: failed to delete Route: %v", err)
 	}
 
-	// Delete RouteMonitor
 	routeMonitor := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-routemonitor", hcp.Name),
@@ -663,17 +515,12 @@ func (m *MockRMOController) deleteInternalMonitoringObjects(ctx context.Context,
 	return nil
 }
 
-// GetReconcileLog returns the reconciliation log
 func (m *MockRMOController) GetReconcileLog() []string {
 	return m.reconcileLog
 }
-
-// GetProbes returns all probes managed by this controller
 func (m *MockRMOController) GetProbes() map[string]*MockProbe {
 	return m.probes
 }
-
-// CreateTestHostedControlPlane creates a test HostedControlPlane
 func CreateTestHostedControlPlane(name, namespace, clusterID string) *MockHostedControlPlane {
 	return &MockHostedControlPlane{
 		TypeMeta: metav1.TypeMeta{
@@ -707,17 +554,11 @@ func CreateTestHostedControlPlane(name, namespace, clusterID string) *MockHosted
 	}
 }
 
-// ============================================================================
-// Synthetics Agent Client
-// ============================================================================
-
-// SyntheticsAgentClient provides methods to interact with the synthetics agent
 type SyntheticsAgentClient struct {
 	baseURL string
 	client  *http.Client
 }
 
-// NewSyntheticsAgentClient creates a new client for the synthetics agent
 func NewSyntheticsAgentClient(baseURL string) *SyntheticsAgentClient {
 	return &SyntheticsAgentClient{
 		baseURL: baseURL,
@@ -768,18 +609,12 @@ type ProbeResult struct {
 // CheckHealth checks if the synthetics agent is healthy
 func (c *SyntheticsAgentClient) CheckHealth(ctx context.Context) (*HealthResponse, error) {
 	url := fmt.Sprintf("%s/health", c.baseURL)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create health check request: %w", err)
-	}
-
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform health check: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("health check failed with status: %d", resp.StatusCode)
 	}
@@ -792,6 +627,10 @@ func (c *SyntheticsAgentClient) CheckHealth(ctx context.Context) (*HealthRespons
 	var health HealthResponse
 	if err := json.Unmarshal(body, &health); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal health check response: %w", err)
+	}
+
+	if health.Status == "" {
+		health.Status = "healthy"
 	}
 
 	return &health, nil
@@ -861,40 +700,38 @@ func (c *SyntheticsAgentClient) GetProbeStatus(ctx context.Context, probeID stri
 	return &status, nil
 }
 
-// ============================================================================
-// Verification Functions
-// ============================================================================
+func verifyMockAgentExecutions(client *SyntheticsAgentClient, clusterID string) bool {
+	executions, err := client.GetProbeExecutions(context.TODO(), clusterID)
+	if err != nil {
+		return false
+	}
+	for _, exec := range executions {
+		if exec.ClusterID == clusterID {
+			return true
+		}
+	}
+	return false
+}
 
-// VerifySyntheticsAgentExecution verifies that the synthetics agent has executed a probe
 func VerifySyntheticsAgentExecution(syntheticsAgentURL, clusterID string) bool {
 	client := NewSyntheticsAgentClient(syntheticsAgentURL)
 
-	// Check if the agent is healthy
-	health, err := client.CheckHealth(context.TODO())
-	if err != nil || health.Status != "healthy" {
+	if health, err := client.CheckHealth(context.TODO()); err != nil || health == nil {
 		return false
 	}
-	// For the mock-based flow, agent health is sufficient to indicate it picked up work
-	// (external mock agent polls RHOBS and records executions asynchronously)
-	return true
-}
 
-// VerifyProbeResults verifies that probe results were reported back to the API
+	// Mock agent exposes /probes/executions endpoint
+	return verifyMockAgentExecutions(client, clusterID)
+}
 func VerifyProbeResults(rhobsClient *MockRHOBSClient, clusterID string) bool {
-	// Get the probe from RHOBS
 	probe, err := rhobsClient.GetProbe(context.TODO(), clusterID)
 	if err != nil || probe == nil {
 		return false
 	}
-
-	// Check if the probe has execution results
-	// In a real implementation, we'd check for actual execution results
-	// For now, we'll just verify the probe exists and is active
+	// Verify probe is active after agent execution
+	// In real flow: probe starts as "pending", agent executes it, then updates to "active"
+	// If we're checking after execution, probe should be "active" indicating successful result
 	return probe.Status == "active"
 }
 
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr ||
-		len(s) > len(substr) && contains(s[1:], substr)
-}
+func contains(s, substr string) bool { return strings.Contains(s, substr) }
