@@ -107,7 +107,14 @@ func (m *RealAPIManager) Start() error {
 		return fmt.Errorf("failed to build API: %w", err)
 	}
 
-	// Create data directory
+	// Clean up old data directory to ensure a fresh start
+	if _, err := os.Stat(m.dataDir); err == nil {
+		if err := os.RemoveAll(m.dataDir); err != nil {
+			return fmt.Errorf("failed to remove old data directory: %w", err)
+		}
+	}
+
+	// Create fresh data directory
 	if err := os.MkdirAll(m.dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}

@@ -6,6 +6,7 @@ package e2e
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -142,8 +143,8 @@ log_format: text
 func (m *AgentManager) startAgent() error {
 	binaryPath := filepath.Join(m.agentPath, "agent")
 	
-	// Try with -config (single dash) instead of --config (double dash)
-	m.cmd = exec.CommandContext(m.ctx, binaryPath, "-config", m.configPath)
+	// Agent uses Cobra with "start" subcommand
+	m.cmd = exec.CommandContext(m.ctx, binaryPath, "start", "--config", m.configPath)
 	m.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Capture stdout and stderr
@@ -182,19 +183,47 @@ func (m *AgentManager) streamLogs(reader io.Reader, prefix string) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Filter out known noise (flag/command errors, usage text)
-		if strings.Contains(line, "unknown flag") || 
-		   strings.Contains(line, "unknown command") ||
-		   strings.Contains(line, "Usage:") ||
-		   strings.Contains(line, "Flags:") {
-			continue // Skip startup noise
-		}
-		// Only print if it contains useful information
-		if strings.Contains(line, "error") || strings.Contains(line, "ERROR") ||
-			strings.Contains(line, "fetched") || strings.Contains(line, "probe") {
+		
+		// Filter to only show important agent activity
+		// Show: startup, probe processing, status updates, errors
+		// Skip: routine reconciliation cycles, fetching counts, prometheus messages
+		if containsAny(line, []string{
+			"Agent started with config",
+			"Processing probe",
+			"Successfully updated probe",
+			"Successfully processed probe",
+			"Failed to create Kubernetes",
+			"error", "ERROR", "Error:",
+			"Probe .* processed",
+		}) {
+			// Skip overly verbose source info in JSON logs
+			if strings.Contains(line, `"source":`) {
+				// Parse JSON and extract just time, level, and msg
+				var logEntry map[string]interface{}
+				if err := json.Unmarshal([]byte(line), &logEntry); err == nil {
+					if msg, ok := logEntry["msg"].(string); ok {
+						level := "INFO"
+						if l, ok := logEntry["level"].(string); ok {
+							level = l
+						}
+						fmt.Printf("[Agent %s] %s: %s\n", prefix, level, msg)
+						continue
+					}
+				}
+			}
 			fmt.Printf("[Agent %s] %s\n", prefix, line)
 		}
 	}
+}
+
+// containsAny checks if a string contains any of the given substrings
+func containsAny(s string, substrs []string) bool {
+	for _, substr := range substrs {
+		if strings.Contains(s, substr) {
+			return true
+		}
+	}
+	return false
 }
 
 // Stop stops the agent

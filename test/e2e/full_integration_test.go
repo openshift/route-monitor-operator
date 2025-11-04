@@ -260,7 +260,12 @@ func TestFullStackIntegration(t *testing.T) {
 
 		t.Log("✅ Agent started successfully")
 		t.Log("⏱️  Waiting for agent to fetch and process probes...")
-		time.Sleep(7 * time.Second)
+		
+		// Wait longer to give agent time to:
+		// 1. Fetch probes from API
+		// 2. Process probes (create K8s resources or run in dry-run mode)
+		// 3. Update probe status to "active" via PATCH request
+		time.Sleep(10 * time.Second)
 
 		// Verify the agent fetched the probe
 		probes, err := listProbes(apiURL, "")
@@ -289,20 +294,27 @@ func TestFullStackIntegration(t *testing.T) {
 			t.Log("✅ Agent successfully fetched probe from API")
 		}
 
-		// Check if agent processed the probe (status should change from pending to active)
-		t.Log("📋 Validating agent probe processing...")
+		// Check if agent processed the probe and updated status from pending to active
+		t.Log("📋 Validating agent probe processing and status update...")
 		if probeStatus == "active" {
-			t.Log("✅ Agent successfully processed probe and updated status to 'active'")
+			t.Log("✅ Agent successfully processed probe and updated status to 'active'!")
+			t.Log("✅ Full E2E workflow verified: RMO → API → Agent → Status Update")
 		} else {
-			// Give agent more time to process
+			// Give agent more time to process and update status
+			t.Log("⏱️  Probe still 'pending', waiting additional time for agent to process...")
 			time.Sleep(5 * time.Second)
 			probe, err := getProbeByID(apiURL, testProbeID)
 			if err == nil && probe.Status == "active" {
 				t.Log("✅ Agent successfully processed probe and updated status to 'active' (after retry)")
+				t.Log("✅ Full E2E workflow verified: RMO → API → Agent → Status Update")
 			} else {
-				t.Logf("⚠️  Probe status is '%s' (expected 'active'). This is normal - agent needs Kubernetes resources for full execution.", probeStatus)
-				t.Log("💡 Agent successfully fetched probes from API, but needs cluster resources (ServiceMonitor, etc.) to fully execute.")
-				t.Log("✅ Agent integration verified - it can discover and fetch probes from the API!")
+				currentStatus := probeStatus
+				if err == nil {
+					currentStatus = probe.Status
+				}
+				t.Errorf("❌ Agent failed to update probe status to 'active' (current status: %s)", currentStatus)
+				t.Log("💡 This indicates the agent couldn't process the probe correctly")
+				t.Log("💡 Check agent logs above for errors or connection issues")
 			}
 		}
 
