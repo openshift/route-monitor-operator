@@ -78,8 +78,6 @@ test-integration:
 	hack/test-integration.sh
 
 # Run full end-to-end integration tests with RHOBS components
-# This test suite runs without requiring a Kubernetes cluster or Docker
-# Uses actual RMO controller code + real RHOBS Synthetics API + Agent (built from source)
 # 
 # Prerequisites: Local copies of RHOBS repos
 # The test will auto-detect sibling directories or you can set env vars explicitly:
