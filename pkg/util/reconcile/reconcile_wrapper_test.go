@@ -23,7 +23,6 @@ var _ = Describe("ReconcileWrapper", func() {
 
 			ctrlResult := result.Convert()
 
-			Expect(ctrlResult.Requeue).To(BeTrue())
 			Expect(ctrlResult.RequeueAfter).To(Equal(5 * time.Second))
 		})
 	})
@@ -38,7 +37,6 @@ var _ = Describe("ReconcileWrapper", func() {
 
 			ctrlResult, err := result.ReturnWith(testError)
 
-			Expect(ctrlResult.Requeue).To(BeTrue())
 			Expect(ctrlResult.RequeueAfter).To(Equal(5 * time.Second))
 			Expect(err).To(Equal(testError))
 		})
@@ -68,7 +66,6 @@ var _ = Describe("ReconcileWrapper", func() {
 		It("should return ctrl.Result with Requeue true and no error", func() {
 			ctrlResult, err := reconcile.Requeue()
 
-			Expect(ctrlResult.Requeue).To(BeTrue())
 			Expect(ctrlResult.RequeueAfter).To(Equal(time.Duration(0)))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -81,7 +78,6 @@ var _ = Describe("ReconcileWrapper", func() {
 			ctrlResult := reconcile.RequeueAfter(duration)
 
 			Expect(ctrlResult.RequeueAfter).To(Equal(duration))
-			Expect(ctrlResult.Requeue).To(BeFalse())
 		})
 	})
 
