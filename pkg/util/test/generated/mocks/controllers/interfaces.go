@@ -28,7 +28,6 @@ import (
 type MockMonitorResourceHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockMonitorResourceHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockMonitorResourceHandlerMockRecorder is the mock recorder for MockMonitorResourceHandler.
@@ -199,7 +198,6 @@ func (mr *MockMonitorResourceHandlerMockRecorder) UpdateMonitorResourceStatus(cr
 type MockServiceMonitorHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockServiceMonitorHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockServiceMonitorHandlerMockRecorder is the mock recorder for MockServiceMonitorHandler.
@@ -279,7 +277,6 @@ func (mr *MockServiceMonitorHandlerMockRecorder) UpdateServiceMonitorDeployment(
 type MockPrometheusRuleHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockPrometheusRuleHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockPrometheusRuleHandlerMockRecorder is the mock recorder for MockPrometheusRuleHandler.
@@ -331,7 +328,6 @@ func (mr *MockPrometheusRuleHandlerMockRecorder) UpdatePrometheusRuleDeployment(
 type MockBlackBoxExporterHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockBlackBoxExporterHandlerMockRecorder
-	isgomock struct{}
 }
 
 // MockBlackBoxExporterHandlerMockRecorder is the mock recorder for MockBlackBoxExporterHandler.
