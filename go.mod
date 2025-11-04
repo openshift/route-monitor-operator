@@ -15,9 +15,9 @@ require (
 	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364
 	github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c
 	github.com/openshift/osde2e-common v0.0.0-20240604133256-b7200cad0cca
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.86.1
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
 	github.com/prometheus/common v0.67.2
-	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.83.0-rhobs1
+	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
 	go.uber.org/mock v0.4.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.34.1
@@ -99,3 +99,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+// E2E tests need local RHOBS repos - keep these replace directives uncommented
+replace github.com/rhobs/rhobs-synthetics-api => ../rhobs-synthetics-api
+
+replace github.com/rhobs/rhobs-synthetics-agent => ../rhobs-synthetics-agent
