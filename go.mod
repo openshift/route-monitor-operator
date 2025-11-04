@@ -99,8 +99,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-// E2E tests need local RHOBS repos - keep these replace directives uncommented
-replace github.com/rhobs/rhobs-synthetics-api => ../rhobs-synthetics-api
-
-replace github.com/rhobs/rhobs-synthetics-agent => ../rhobs-synthetics-agent
