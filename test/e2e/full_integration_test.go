@@ -34,17 +34,16 @@ import (
 //
 // USING LOCAL REPOSITORIES:
 //
-// 1. RMO changes - already in the local repo
+// By default, the test looks for RHOBS components in sibling directories:
+//   - ../rhobs-synthetics-api (from test/e2e/)
+//   - ../../rhobs-synthetics-agent (from test/e2e/)
 //
-// 2. rhobs-synthetics-api changes:
-//    - Set environment: export RHOBS_SYNTHETICS_API_PATH=/path/to/rhobs-synthetics-api
-//    - Or use go.mod replace directive (see go.mod)
+// To use different local paths, set environment variables:
+//   export RHOBS_SYNTHETICS_API_PATH=/path/to/rhobs-synthetics-api
+//   export RHOBS_SYNTHETICS_AGENT_PATH=/path/to/rhobs-synthetics-agent
 //
-// 3. rhobs-synthetics-agent changes:
-//    - Already configured via go.mod replace directive (see go.mod)
-//
-// Both API and Agent have replace directives for local development.
-// Don't forget to remove/re-comment them before committing!
+// The test will build both API and Agent binaries from source and run them locally.
+// No Docker or Kubernetes cluster required!
 func TestFullStackIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping full integration test in short mode")
