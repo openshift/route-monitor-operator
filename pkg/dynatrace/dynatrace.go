@@ -28,7 +28,11 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 )
 
-// ------------------------------synthetic-monitoring--------------------------
+const (
+	httpMonitorPath = "/synthetic/monitors"
+	locationPath    = "/synthetic/locations"
+)
+
 type DynatraceApiClient struct {
 	baseURL    string
 	apiToken   string
@@ -103,16 +107,32 @@ var publicMonitorTemplate = `
 }
 `
 
+// BasicHttpMonitor defines the minimal HTTP monitor object returned when using certain HTTP methods (ie - list)
+// See https://docs.dynatrace.com/docs/discover-dynatrace/references/dynatrace-api/environment-api/synthetic/synthetic-monitors/get-all-monitors
+// for more info
+type BasicHttpMonitor struct {
+	Enabled  bool   `json:"enabled,omitempty"`
+	EntityId string `json:"entityId,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Type     string `json:"type,omitempty"`
+}
+
+// HttpMonitor is the fully defined HTTP monitor object in Dynatrace
+//
+// NOTE: this structure does not contain all possible fields - only the ones needed for this package. See
+// https://docs.dynatrace.com/docs/discover-dynatrace/references/dynatrace-api/environment-api/synthetic/synthetic-monitors/models#expand--httpsyntheticmonitor--2
+// for more information
+type HttpMonitor struct {
+	BasicHttpMonitor
+	Locations []string `json:"locations,omitempty"`
+}
+
 type DynatraceMonitorConfig struct {
 	MonitorName                        string
 	ApiUrl                             string
 	DynatraceEquivalentClusterRegionId string
 	ClusterId                          string
 	ClusterRegion                      string
-}
-
-type DynatraceCreatedMonitor struct {
-	EntityId string `json:"entityId"`
 }
 
 type DynatraceLocation struct {
@@ -125,13 +145,6 @@ type DynatraceLocation struct {
 	} `json:"locations"`
 }
 
-type ExistsHttpMonitorInDynatraceResponse struct {
-	Monitors []struct {
-		EntityId string `json:"entityId"`
-	} `json:"monitors"`
-}
-
-// ------------------------------synthetic-monitoring--------------------------
 // helper function to make Dynatrace api requests
 func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, renderedJSON string) (*http.Response, error) {
 	url := dynatraceApiClient.baseURL + path
@@ -151,10 +164,8 @@ func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, r
 	return dynatraceApiClient.httpClient.Do(req)
 }
 
-func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitors(clusterId string) (*ExistsHttpMonitorInDynatraceResponse, error) {
-	var existsHttpMonitorResponse ExistsHttpMonitorInDynatraceResponse
-
-	path := fmt.Sprintf("/synthetic/monitors/?tag=cluster-id:%s", clusterId)
+func (dynatraceApiClient *DynatraceApiClient) ListDynatraceHttpMonitorsForCluster(clusterId string) ([]BasicHttpMonitor, error) {
+	path := fmt.Sprintf("%s/?tag=cluster-id:%s", httpMonitorPath, clusterId)
 	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
 	if err != nil {
 		return nil, err
@@ -165,16 +176,38 @@ func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitors(clusterId
 		return nil, fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&existsHttpMonitorResponse); err != nil {
+	response := struct {
+		Monitors []BasicHttpMonitor `json:"monitors,omitempty"`
+	}{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("error parsing JSON: %w", err)
 	}
 
-	return &existsHttpMonitorResponse, nil
+	return response.Monitors, nil
+}
+
+func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitor(entityId string) (HttpMonitor, error) {
+	path := fmt.Sprintf("%s/%s", httpMonitorPath, entityId)
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, path, "")
+	if err != nil {
+		return HttpMonitor{}, fmt.Errorf("failed to GET HTTP monitor from Dynatrace: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return HttpMonitor{}, fmt.Errorf("unexpected response from Dynatrace when retrieving monitor %q: expected status code %d, got %d.\nFull response: %#v", entityId, http.StatusOK, resp.StatusCode, resp)
+	}
+
+	monitor := HttpMonitor{}
+	err = json.NewDecoder(resp.Body).Decode(&monitor)
+	if err != nil {
+		return HttpMonitor{}, fmt.Errorf("failed to decode response body: %w", err)
+	}
+	return monitor, nil
 }
 
 func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(locationName string, locationType hypershiftv1beta1.AWSEndpointAccessType) (string, error) {
 	// Fetch Dynatrace locations using Dynatrace API
-	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, "/synthetic/locations", "")
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodGet, locationPath, "")
 	if err != nil {
 		return "", err
 	}
@@ -229,6 +262,7 @@ func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(l
 	return "", fmt.Errorf("location '%s' not found for location type '%s'", locationName, locationType)
 }
 
+// CreateDynatraceHttpMonitor creates a new HTTP monitor in dynatrace, returning the resulting monitor's EntityId
 func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitorName, apiUrl, clusterId, dynatraceEquivalentClusterRegionId, clusterRegion string) (string, error) {
 
 	tmpl := template.Must(template.New("jsonTemplate").Parse(publicMonitorTemplate))
@@ -248,7 +282,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	}
 	renderedJSON := tplBuffer.String()
 
-	resp, err := dynatraceApiClient.MakeRequest(http.MethodPost, "/synthetic/monitors", renderedJSON)
+	resp, err := dynatraceApiClient.MakeRequest(http.MethodPost, httpMonitorPath, renderedJSON)
 	if err != nil {
 		return "", err
 	}
@@ -259,7 +293,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	}
 
 	//return monitor id
-	var createdMonitor DynatraceCreatedMonitor
+	var createdMonitor BasicHttpMonitor
 	err = json.NewDecoder(resp.Body).Decode(&createdMonitor)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch monitor id: %v", err)
@@ -269,7 +303,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 }
 
 func (dynatraceApiClient *DynatraceApiClient) DeleteSingleMonitor(monitorId string) error {
-	path := fmt.Sprintf("/synthetic/monitors/%s", monitorId)
+	path := fmt.Sprintf("%s/%s", httpMonitorPath, monitorId)
 	resp, err := dynatraceApiClient.MakeRequest(http.MethodDelete, path, "")
 	if err != nil {
 		return err
@@ -283,12 +317,12 @@ func (dynatraceApiClient *DynatraceApiClient) DeleteSingleMonitor(monitorId stri
 }
 
 func (dynatraceApiClient *DynatraceApiClient) DeleteDynatraceMonitorByCluserId(clusterId string) error {
-	existsHttpMonitorResponse, err := dynatraceApiClient.GetDynatraceHttpMonitors(clusterId)
+	monitors, err := dynatraceApiClient.ListDynatraceHttpMonitorsForCluster(clusterId)
 	if err != nil {
 		return err
 	}
 
-	for _, monitor := range existsHttpMonitorResponse.Monitors {
+	for _, monitor := range monitors {
 		err := dynatraceApiClient.DeleteSingleMonitor(monitor.EntityId)
 		if err != nil {
 			return err

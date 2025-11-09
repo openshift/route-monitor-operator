@@ -212,14 +212,14 @@ func TestAPIClient_GetDynatraceHttpMonitors(t *testing.T) {
 			apiClient := NewDynatraceApiClient(mockServer, "mockedToken")
 
 			// Call the function to test
-			exists, err := apiClient.GetDynatraceHttpMonitors(tt.clusterId)
+			monitors, err := apiClient.ListDynatraceHttpMonitorsForCluster(tt.clusterId)
 
 			// Verify the results
 			// Check for errors based on the expected outcome
 			if err == nil {
-				monitorsExist := len(exists.Monitors) > 0
+				monitorsExist := len(monitors) > 0
 				if monitorsExist != tt.expectExists {
-					t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, exists)
+					t.Errorf("Unexpected exists status. Expected: %v, got: %v", tt.expectExists, monitors)
 				}
 			}
 			if (err != nil) != tt.expectError {
