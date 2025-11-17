@@ -77,34 +77,8 @@ vet:
 test-integration:
 	hack/test-integration.sh
 
-# Run full end-to-end integration tests with RHOBS components
-# 
-# Prerequisites: Local copies of RHOBS repos
-# The test will auto-detect sibling directories or you can set env vars explicitly:
-#
-#   export RHOBS_SYNTHETICS_API_PATH=/path/to/rhobs-synthetics-api
-#   export RHOBS_SYNTHETICS_AGENT_PATH=/path/to/rhobs-synthetics-agent
-#
-# Quick setup:
-#   cd .. && git clone https://github.com/rhobs/rhobs-synthetics-api.git
-#   cd .. && git clone https://github.com/rhobs/rhobs-synthetics-agent.git
-#   cd route-monitor-operator && make test-e2e-full
 test-e2e-full:
-	@echo "Running full E2E integration tests..."
-	@API_PATH="$$RHOBS_SYNTHETICS_API_PATH"; \
-	AGENT_PATH="$$RHOBS_SYNTHETICS_AGENT_PATH"; \
-	if [ -z "$$API_PATH" ] && [ -d "../rhobs-synthetics-api" ]; then \
-		API_PATH="$$(cd ../rhobs-synthetics-api && pwd)"; \
-		echo "Auto-detected RHOBS Synthetics API at: $$API_PATH"; \
-	fi; \
-	if [ -z "$$AGENT_PATH" ] && [ -d "../rhobs-synthetics-agent" ]; then \
-		AGENT_PATH="$$(cd ../rhobs-synthetics-agent && pwd)"; \
-		echo "Auto-detected RHOBS Synthetics Agent at: $$AGENT_PATH"; \
-	fi; \
-	cd test/e2e && \
-		RHOBS_SYNTHETICS_API_PATH="$$API_PATH" \
-		RHOBS_SYNTHETICS_AGENT_PATH="$$AGENT_PATH" \
-		./run-e2e.sh
+	cd test/e2e && ./run-e2e.sh
 
 # from https://sdk.operatorframework.io/docs/upgrading-sdk-version/v1.6.1/#gov2-gov3-ansiblev1-helmv1-add-opm-and-catalog-build-makefile-targets
 OS = $(shell go env GOOS)

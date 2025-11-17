@@ -24,28 +24,30 @@ echo "Route Monitor Operator - Full E2E Test"
 echo "=============================================="
 echo ""
 
-# Check for required paths
+# Auto-detect or validate RHOBS repo paths
 MISSING_PATHS=0
 
-# Check API path
+# Check/detect API path (script runs from test/e2e directory)
 if [ -n "$RHOBS_SYNTHETICS_API_PATH" ]; then
     echo "✓ Using RHOBS Synthetics API from: $RHOBS_SYNTHETICS_API_PATH"
-elif [ -d "../rhobs-synthetics-api" ]; then
-    echo "✓ Will auto-detect RHOBS Synthetics API at: ../rhobs-synthetics-api"
+elif [ -d "../../../rhobs-synthetics-api" ]; then
+    export RHOBS_SYNTHETICS_API_PATH="$(cd ../../../rhobs-synthetics-api && pwd)"
+    echo "✓ Auto-detected RHOBS Synthetics API at: $RHOBS_SYNTHETICS_API_PATH"
 else
     echo "❌ RHOBS Synthetics API path not set"
-    echo "   Set RHOBS_SYNTHETICS_API_PATH or clone to ../rhobs-synthetics-api"
+    echo "   Set RHOBS_SYNTHETICS_API_PATH or clone to ../rhobs-synthetics-api (sibling to route-monitor-operator)"
     MISSING_PATHS=1
 fi
 
-# Check Agent path
+# Check/detect Agent path (script runs from test/e2e directory)
 if [ -n "$RHOBS_SYNTHETICS_AGENT_PATH" ]; then
     echo "✓ Using RHOBS Synthetics Agent from: $RHOBS_SYNTHETICS_AGENT_PATH"
-elif [ -d "../../rhobs-synthetics-agent" ]; then
-    echo "✓ Will auto-detect RHOBS Synthetics Agent at: ../../rhobs-synthetics-agent"
+elif [ -d "../../../rhobs-synthetics-agent" ]; then
+    export RHOBS_SYNTHETICS_AGENT_PATH="$(cd ../../../rhobs-synthetics-agent && pwd)"
+    echo "✓ Auto-detected RHOBS Synthetics Agent at: $RHOBS_SYNTHETICS_AGENT_PATH"
 else
     echo "❌ RHOBS Synthetics Agent path not set"
-    echo "   Set RHOBS_SYNTHETICS_AGENT_PATH or clone to ../rhobs-synthetics-agent"
+    echo "   Set RHOBS_SYNTHETICS_AGENT_PATH or clone to ../rhobs-synthetics-agent (sibling to route-monitor-operator)"
     MISSING_PATHS=1
 fi
 
