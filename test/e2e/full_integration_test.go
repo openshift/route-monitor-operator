@@ -39,8 +39,9 @@ import (
 //   - ../../rhobs-synthetics-agent (from test/e2e/)
 //
 // To use different local paths, set environment variables:
-//   export RHOBS_SYNTHETICS_API_PATH=/path/to/rhobs-synthetics-api
-//   export RHOBS_SYNTHETICS_AGENT_PATH=/path/to/rhobs-synthetics-agent
+//
+//	export RHOBS_SYNTHETICS_API_PATH=/path/to/rhobs-synthetics-api
+//	export RHOBS_SYNTHETICS_AGENT_PATH=/path/to/rhobs-synthetics-agent
 //
 // The test will build both API and Agent binaries from source and run them locally.
 // No Docker or Kubernetes cluster required!
@@ -88,8 +89,8 @@ func TestFullStackIntegration(t *testing.T) {
 			Build()
 
 		rhobsConfig := rmocontrollers.RHOBSConfig{
-			ProbeAPIURL:        apiURL + "/probes",  // Full path to probes endpoint
-			Tenant:             "",                  // No tenant for local API
+			ProbeAPIURL:        apiURL + "/probes", // Full path to probes endpoint
+			Tenant:             "",                 // No tenant for local API
 			OnlyPublicClusters: false,
 		}
 
@@ -259,7 +260,7 @@ func TestFullStackIntegration(t *testing.T) {
 
 		t.Log("✅ Agent started successfully")
 		t.Log("⏱️  Waiting for agent to fetch and process probes...")
-		
+
 		// Wait longer to give agent time to:
 		// 1. Fetch probes from API
 		// 2. Process probes (create K8s resources or run in dry-run mode)
@@ -341,4 +342,3 @@ func TestFullStackIntegration(t *testing.T) {
 		}
 	})
 }
-

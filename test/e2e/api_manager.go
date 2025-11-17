@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -37,19 +36,9 @@ type RealAPIManager struct {
 func NewRealAPIManager() *RealAPIManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Get API path - must be set via environment variable
+	// Get API path - must be set via environment variable or use default sibling directory
 	// The API must be available as source code to build the binary
 	apiPath := os.Getenv("RHOBS_SYNTHETICS_API_PATH")
-	var needsCopy bool = false
-
-	// If using module cache, copy to a writable temp directory
-	if needsCopy {
-		tempDir := filepath.Join(os.TempDir(), "rhobs-synthetics-api-build")
-		if err := copyDir(apiPath, tempDir); err == nil {
-			apiPath = tempDir
-		}
-		// If copy fails, will try to use module cache directly (may fail at build)
-	}
 
 	return &RealAPIManager{
 		port:     8080,
@@ -59,41 +48,6 @@ func NewRealAPIManager() *RealAPIManager {
 		ctx:      ctx,
 		cancel:   cancel,
 	}
-}
-
-// getModulePath returns the filesystem path of a Go module from the module cache
-func getModulePath(moduleName string) (string, error) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", moduleName)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to find module %s: %w", moduleName, err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-// copyDir recursively copies a directory from src to dst
-func copyDir(src, dst string) error {
-	// Remove existing temp directory if it exists
-	_ = os.RemoveAll(dst)
-
-	// Create destination directory
-	if err := os.MkdirAll(dst, 0755); err != nil {
-		return fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	// Use cp command for faster copying (works on Unix-like systems)
-	cmd := exec.Command("cp", "-R", src+"/.", dst)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to copy directory: %w", err)
-	}
-
-	// Make all files writable (module cache files are read-only)
-	chmodCmd := exec.Command("chmod", "-R", "+w", dst)
-	if err := chmodCmd.Run(); err != nil {
-		return fmt.Errorf("failed to make files writable: %w", err)
-	}
-
-	return nil
 }
 
 // Start builds and starts the real RHOBS Synthetics API server
@@ -191,10 +145,10 @@ Or clone it to a sibling directory:
   make test-e2e-full`)
 	}
 
-	// Check if Makefile exists (local repo) or use go build directly (module cache)
+	// Check if Makefile exists (use make build) or fallback to go build
 	makefilePath := filepath.Join(m.apiPath, "Makefile")
 	if _, err := os.Stat(makefilePath); err == nil {
-		// Local repo with Makefile - use make
+		// Local repo with Makefile - use make build
 		cleanCmd := exec.CommandContext(m.ctx, "make", "clean")
 		cleanCmd.Dir = m.apiPath
 		_ = cleanCmd.Run() // Ignore errors from clean
@@ -208,7 +162,7 @@ Or clone it to a sibling directory:
 			return fmt.Errorf("failed to build API: %w", err)
 		}
 	} else {
-		// Module cache or no Makefile - use go build directly
+		// No Makefile - use go build directly
 		cmd := exec.CommandContext(m.ctx, "go", "build", "-o", "rhobs-synthetics-api", "./cmd/api")
 		cmd.Dir = m.apiPath
 		cmd.Stdout = os.Stdout
