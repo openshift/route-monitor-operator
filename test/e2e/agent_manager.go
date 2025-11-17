@@ -4,57 +4,54 @@
 package e2e
 
 import (
-	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"time"
 )
+
+// agent_manager.go - Manages the RHOBS Synthetics Agent lifecycle for E2E tests
+//
+// This manager builds and runs the RHOBS Synthetics Agent as a local binary.
+// The agent connects to the API to fetch probes but cannot fully process them
+// without a Kubernetes cluster (see full_integration_test.go for mock approach).
+//
+// Key responsibilities:
+//   - Build the agent binary from source
+//   - Create agent configuration (API URL, sync interval, metrics port)
+//   - Start the agent process
+//   - Filter verbose agent logs for test readability
+//   - Gracefully stop the agent
 
 // AgentManager manages the lifecycle of the RHOBS Synthetics Agent
 type AgentManager struct {
-	cmd         *exec.Cmd
-	agentPath   string
-	configPath  string
-	apiURL      string
-	stopChan    chan struct{}
-	started     bool
-	ctx         context.Context
-	cancel      context.CancelFunc
+	*ProcessManager
+	configPath string
+	apiURL     string
 }
 
 // NewAgentManager creates a new manager for the agent
 func NewAgentManager(apiURL string) *AgentManager {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Get agent path - must be set via environment variable
-	// The agent must be available as source code to build the binary
-	agentPath := os.Getenv("RHOBS_SYNTHETICS_AGENT_PATH")
-
 	return &AgentManager{
-		agentPath: agentPath,
-		apiURL:    apiURL,
-		stopChan:  make(chan struct{}),
-		ctx:       ctx,
-		cancel:    cancel,
+		ProcessManager: NewProcessManager(
+			"RHOBS Synthetics Agent",
+			"RHOBS_SYNTHETICS_AGENT_PATH",
+			"rhobs-synthetics-agent",
+		),
+		apiURL: apiURL,
 	}
 }
 
 // Start builds and starts the agent
 func (m *AgentManager) Start() error {
-	if m.started {
+	if m.IsStarted() {
 		return fmt.Errorf("agent already started")
 	}
 
 	// Build the agent binary
-	if err := m.buildAgent(); err != nil {
+	if err := m.BuildBinary("rhobs-synthetics-agent", "./cmd/agent"); err != nil {
 		return fmt.Errorf("failed to build agent: %w", err)
 	}
 
@@ -68,216 +65,102 @@ func (m *AgentManager) Start() error {
 		return fmt.Errorf("failed to start agent: %w", err)
 	}
 
-	m.started = true
-	return nil
-}
-
-// buildAgent builds the agent binary
-func (m *AgentManager) buildAgent() error {
-	fmt.Println("Building rhobs-synthetics-agent...")
-
-	// Check if agent path exists
-	if m.agentPath == "" {
-		return fmt.Errorf(`RHOBS Synthetics Agent path not set.
-
-To run E2E tests, you need local copies of the RHOBS repos.
-Set the environment variable:
-
-  export RHOBS_SYNTHETICS_AGENT_PATH=/path/to/rhobs-synthetics-agent
-
-Or clone it to a sibling directory:
-
-  cd .. && git clone https://github.com/rhobs/rhobs-synthetics-agent.git
-  cd route-monitor-operator
-  export RHOBS_SYNTHETICS_AGENT_PATH=$(cd ../rhobs-synthetics-agent && pwd)
-  make test-e2e-full`)
-	}
-	
-	if _, err := os.Stat(m.agentPath); os.IsNotExist(err) {
-		return fmt.Errorf("agent path does not exist: %s", m.agentPath)
-	}
-
-	// First, tidy dependencies
-	fmt.Println("Tidying agent dependencies...")
-	tidyCmd := exec.CommandContext(m.ctx, "go", "mod", "tidy")
-	tidyCmd.Dir = m.agentPath
-	if output, err := tidyCmd.CombinedOutput(); err != nil {
-		fmt.Printf("go mod tidy output: %s\n", string(output))
-		return fmt.Errorf("failed to tidy dependencies: %w", err)
-	}
-
-	// Build the agent
-	buildCmd := exec.CommandContext(m.ctx, "go", "build", "-o", "agent", "./cmd/agent")
-	buildCmd.Dir = m.agentPath
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-
-	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build agent: %w", err)
-	}
-
-	fmt.Println("rhobs-synthetics-agent built successfully.")
 	return nil
 }
 
 // createConfig creates the agent configuration file
 func (m *AgentManager) createConfig() error {
-	configContent := fmt.Sprintf(`---
-api_urls:
-  - %s/probes
-label_selector: "app=rhobs-synthetics-probe"
-polling_interval: 2s
-log_level: debug
-log_format: text
-`, m.apiURL)
+	// Agent expects api_urls as an array of complete API URLs including /probes path
+	apiURL := m.apiURL + "/probes"
+	config := map[string]interface{}{
+		"api_urls":      []string{apiURL},
+		"sync_interval": "5s",
+		"log_level":     "info",
+		"metrics_port":  8081, // Use different port than API (8080)
+	}
+
+	configBytes, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
 
 	m.configPath = filepath.Join(os.TempDir(), "agent-config.yaml")
-	if err := os.WriteFile(m.configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(m.configPath, configBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	fmt.Printf("✅ Agent config created at %s\n", m.configPath)
 	return nil
 }
 
-// startAgent starts the agent process
+// startAgent starts the agent binary
 func (m *AgentManager) startAgent() error {
-	binaryPath := filepath.Join(m.agentPath, "agent")
+	sourcePath, err := m.GetSourcePath()
+	if err != nil {
+		return err
+	}
+
+	binaryPath := filepath.Join(sourcePath, "rhobs-synthetics-agent")
 	
-	// Agent uses Cobra with "start" subcommand
-	m.cmd = exec.CommandContext(m.ctx, binaryPath, "start", "--config", m.configPath)
-	m.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd := exec.CommandContext(m.Context(), binaryPath, "start", "--config", m.configPath)
+	cmd.Dir = sourcePath
 
 	// Capture stdout and stderr
-	stdout, err := m.cmd.StdoutPipe()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("failed to get stdout pipe: %w", err)
 	}
 
-	stderr, err := m.cmd.StderrPipe()
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return fmt.Errorf("failed to get stderr pipe: %w", err)
 	}
 
-	// Start the process
-	if err := m.cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start agent process: %w", err)
+	// Start streaming logs in background with filtering
+	go m.StreamOutput(stdout, "[agent] ", m.filterAgentLogs)
+	go m.StreamOutput(stderr, "[agent] ", m.filterAgentLogs)
+
+	if err := m.StartProcess(cmd); err != nil {
+		return err
 	}
 
-	// Stream logs in background (filter out noise)
-	go m.streamLogs(stdout, "STDOUT")
-	go m.streamLogs(stderr, "STDERR")
-
-	// Wait a bit for agent to start
-	time.Sleep(2 * time.Second)
-
-	// Check if process is still running
-	if m.cmd.Process == nil {
-		return fmt.Errorf("agent process failed to start")
-	}
-
+	fmt.Printf("✅ Agent started successfully\n")
 	return nil
 }
 
-// streamLogs streams logs from the agent
-func (m *AgentManager) streamLogs(reader io.Reader, prefix string) {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := scanner.Text()
-		
-		// Filter to only show important agent activity
-		// Show: startup, probe processing, status updates, errors
-		// Skip: routine reconciliation cycles, fetching counts, prometheus messages
-		if containsAny(line, []string{
-			"Agent started with config",
-			"Processing probe",
-			"Successfully updated probe",
-			"Successfully processed probe",
-			"Failed to create Kubernetes",
-			"error", "ERROR", "Error:",
-			"Probe .* processed",
-		}) {
-			// Skip overly verbose source info in JSON logs
-			if strings.Contains(line, `"source":`) {
-				// Parse JSON and extract just time, level, and msg
-				var logEntry map[string]interface{}
-				if err := json.Unmarshal([]byte(line), &logEntry); err == nil {
-					if msg, ok := logEntry["msg"].(string); ok {
-						level := "INFO"
-						if l, ok := logEntry["level"].(string); ok {
-							level = l
-						}
-						fmt.Printf("[Agent %s] %s: %s\n", prefix, level, msg)
-						continue
-					}
-				}
-			}
-			fmt.Printf("[Agent %s] %s\n", prefix, line)
+// filterAgentLogs filters verbose agent output
+func (m *AgentManager) filterAgentLogs(line string) bool {
+	// Filter out known verbose messages
+	verbosePatterns := []string{
+		"unknown flag:",
+		"Error: unknown flag:",
+		"Error: unknown command",
+		"level=debug",
+	}
+
+	for _, pattern := range verbosePatterns {
+		if strings.Contains(line, pattern) {
+			return false
 		}
 	}
-}
 
-// containsAny checks if a string contains any of the given substrings
-func containsAny(s string, substrs []string) bool {
-	for _, substr := range substrs {
-		if strings.Contains(s, substr) {
+	// Only show important events
+	importantPatterns := []string{
+		"level=info",
+		"level=warn",
+		"level=error",
+		"Fetched",
+		"probe",
+		"Synced",
+		"Starting",
+		"Listening",
+	}
+
+	for _, pattern := range importantPatterns {
+		if strings.Contains(line, pattern) {
 			return true
 		}
 	}
+
 	return false
 }
-
-// Stop stops the agent
-func (m *AgentManager) Stop() error {
-	if !m.started {
-		return nil
-	}
-
-	// Cancel context to signal shutdown
-	m.cancel()
-
-	// Send SIGTERM to process group
-	if m.cmd != nil && m.cmd.Process != nil {
-		pgid, err := syscall.Getpgid(m.cmd.Process.Pid)
-		if err == nil {
-			_ = syscall.Kill(-pgid, syscall.SIGTERM)
-		}
-
-		// Wait for process to exit with timeout
-		done := make(chan error, 1)
-		go func() {
-			done <- m.cmd.Wait()
-		}()
-
-		select {
-		case <-done:
-			// Process exited
-		case <-time.After(5 * time.Second):
-			// Force kill if still running
-			if m.cmd.Process != nil {
-				_ = m.cmd.Process.Kill()
-			}
-		}
-	}
-
-	// Clean up config file
-	if m.configPath != "" {
-		_ = os.Remove(m.configPath)
-	}
-
-	m.started = false
-	close(m.stopChan)
-
-	return nil
-}
-
-// isPortAvailable checks if a port is available
-func isPortAvailable(port int) bool {
-	address := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		return false
-	}
-	listener.Close()
-	return true
-}
-

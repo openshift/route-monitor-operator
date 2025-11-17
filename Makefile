@@ -91,13 +91,13 @@ test-integration:
 #   cd route-monitor-operator && make test-e2e-full
 test-e2e-full:
 	@echo "Running full E2E integration tests..."
-	@API_PATH=""; \
-	AGENT_PATH=""; \
-	if [ -z "$$RHOBS_SYNTHETICS_API_PATH" ] && [ -d "../rhobs-synthetics-api" ]; then \
+	@API_PATH="$$RHOBS_SYNTHETICS_API_PATH"; \
+	AGENT_PATH="$$RHOBS_SYNTHETICS_AGENT_PATH"; \
+	if [ -z "$$API_PATH" ] && [ -d "../rhobs-synthetics-api" ]; then \
 		API_PATH="$$(cd ../rhobs-synthetics-api && pwd)"; \
 		echo "Auto-detected RHOBS Synthetics API at: $$API_PATH"; \
 	fi; \
-	if [ -z "$$RHOBS_SYNTHETICS_AGENT_PATH" ] && [ -d "../rhobs-synthetics-agent" ]; then \
+	if [ -z "$$AGENT_PATH" ] && [ -d "../rhobs-synthetics-agent" ]; then \
 		AGENT_PATH="$$(cd ../rhobs-synthetics-agent && pwd)"; \
 		echo "Auto-detected RHOBS Synthetics Agent at: $$AGENT_PATH"; \
 	fi; \

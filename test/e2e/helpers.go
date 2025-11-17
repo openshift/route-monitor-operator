@@ -22,6 +22,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// helpers.go - Helper functions and mock servers for E2E tests
+//
+// This file provides:
+//   - API client helpers (createProbe, getProbe, deleteProbe, updateProbeStatus)
+//   - Mock servers (Dynatrace, probe target endpoints)
+//   - Test utilities (log capture and validation)
+//   - Kubernetes resource setup (namespaces, secrets, VpcEndpoints)
+//
+// The updateProbeStatus function is particularly important - it mocks the
+// agent's behavior of updating probe status after processing, since the agent
+// cannot fully deploy resources without a real Kubernetes cluster.
+
 // testWriter forwards log output to t.Log and captures logs for validation
 type testWriter struct {
 	t        *testing.T
@@ -57,48 +69,30 @@ func (tw *testWriter) ContainsLog(substring string) bool {
 	return false
 }
 
-func (tw *testWriter) GetLogs() []string {
-	tw.logMutex.Lock()
-	defer tw.logMutex.Unlock()
+// createProbeViaAPI creates a probe directly through the API
+func createProbeViaAPI(baseURL, clusterID, probeURL string, private bool) (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
 
-	logs := make([]string, len(tw.logs))
-	copy(logs, tw.logs)
-	return logs
-}
-
-// Probe represents a probe configuration
-type Probe struct {
-	ID        string            `json:"id,omitempty"`
-	StaticURL string            `json:"static_url"`
-	Labels    map[string]string `json:"labels"`
-	Status    string            `json:"status,omitempty"`
-}
-
-// ProbeListResponse represents the response from listing probes
-type ProbeListResponse struct {
-	Probes []Probe `json:"probes"`
-}
-
-// createProbeViaAPI creates a probe by calling the API directly (simulates RMO behavior)
-func createProbeViaAPI(baseURL, clusterID, probeURL string, isPrivate bool) (string, error) {
-	createReq := map[string]interface{}{
+	probeData := map[string]interface{}{
 		"static_url": probeURL,
 		"labels": map[string]string{
-			"cluster-id":    clusterID,
-			"private":       fmt.Sprintf("%t", isPrivate),
-			"source":        "route-monitor-operator",
+			"cluster-id":   clusterID,
+			"private":      fmt.Sprintf("%t", private),
+			"app":          "rhobs-synthetics-probe",
+			"source":       "route-monitor-operator",
 			"resource_type": "hostedcontrolplane",
-			"probe_type":    "blackbox",
+			"probe_type":   "blackbox",
 		},
+		"provider": "aws",
+		"region":   "us-east-1",
 	}
 
-	reqBody, err := json.Marshal(createReq)
+	jsonData, err := json.Marshal(probeData)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("failed to marshal probe data: %w", err)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("POST", baseURL+"/probes", bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", baseURL+"/probes", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -110,48 +104,28 @@ func createProbeViaAPI(baseURL, clusterID, probeURL string, isPrivate bool) (str
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 
-	var probe Probe
-	if err := json.NewDecoder(resp.Body).Decode(&probe); err != nil {
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return probe.ID, nil
+	probeID, ok := result["id"].(string)
+	if !ok {
+		return "", fmt.Errorf("probe ID not found in response")
+	}
+
+	return probeID, nil
 }
 
-// getProbeByID fetches a single probe by ID from the API
-func getProbeByID(baseURL, probeID string) (*Probe, error) {
+// listProbes gets all probes with optional label selector
+func listProbes(baseURL, labelSelector string) ([]map[string]interface{}, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(baseURL + "/probes/" + probeID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("probe not found")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var probe Probe
-	if err := json.NewDecoder(resp.Body).Decode(&probe); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &probe, nil
-}
-
-// listProbes fetches all probes matching the label selector from the API
-func listProbes(baseURL, labelSelector string) ([]Probe, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
 	url := baseURL + "/probes"
 	if labelSelector != "" {
 		url += "?label_selector=" + labelSelector
@@ -168,15 +142,84 @@ func listProbes(baseURL, labelSelector string) ([]Probe, error) {
 		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 
-	var response ProbeListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	// Read the response body first to see what we got
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Try to decode as array of objects
+	var probes []map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &probes); err != nil {
+		// If it fails, maybe it's wrapped in an object - try to extract
+		var wrapper map[string]interface{}
+		if err2 := json.Unmarshal(bodyBytes, &wrapper); err2 == nil {
+			// Check if there's a "probes" or "data" field
+			if probesData, ok := wrapper["probes"].([]interface{}); ok {
+				// Convert to []map[string]interface{}
+				probes = make([]map[string]interface{}, len(probesData))
+				for i, p := range probesData {
+					if pm, ok := p.(map[string]interface{}); ok {
+						probes[i] = pm
+					}
+				}
+				return probes, nil
+			}
+			if dataField, ok := wrapper["data"].([]interface{}); ok {
+				// Convert to []map[string]interface{}
+				probes = make([]map[string]interface{}, len(dataField))
+				for i, p := range dataField {
+					if pm, ok := p.(map[string]interface{}); ok {
+						probes[i] = pm
+					}
+				}
+				return probes, nil
+			}
+		}
+		return nil, fmt.Errorf("failed to decode response (got %d bytes): %w\nBody: %s", len(bodyBytes), err, string(bodyBytes[:min(200, len(bodyBytes))]))
+	}
+
+	return probes, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+type Probe struct {
+	ID        string            `json:"id"`
+	StaticURL string            `json:"static_url"`
+	Status    string            `json:"status"`
+	Labels    map[string]string `json:"labels"`
+}
+
+// getProbeByID gets a specific probe by ID
+func getProbeByID(baseURL, probeID string) (*Probe, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(baseURL + "/probes/" + probeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var probe Probe
+	if err := json.NewDecoder(resp.Body).Decode(&probe); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Probes, nil
+	return &probe, nil
 }
 
-// deleteProbeViaAPI deletes a probe by calling the API directly
+// deleteProbeViaAPI deletes a probe via the API
 func deleteProbeViaAPI(baseURL, probeID string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("DELETE", baseURL+"/probes/"+probeID, nil)
@@ -198,6 +241,52 @@ func deleteProbeViaAPI(baseURL, probeID string) error {
 	return nil
 }
 
+// updateProbeStatus updates a probe's status via PATCH request
+//
+// This function mocks the agent's behavior for local testing.
+//
+// In a real environment with Kubernetes:
+//   1. Agent fetches probe from API (status: "pending")
+//   2. Agent deploys Prometheus + blackbox-exporter resources to K8s
+//   3. Agent updates probe status to "active" via API
+//
+// In this local test without Kubernetes:
+//   1. Agent fetches probe from API (status: "pending") ✅ Works
+//   2. Agent cannot deploy K8s resources ❌ No cluster
+//   3. Test calls this function to simulate step 3 ✅ Mock
+func updateProbeStatus(baseURL, probeID, status string) error {
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	patchData := map[string]interface{}{
+		"status": status,
+	}
+
+	jsonData, err := json.Marshal(patchData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch data: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, baseURL+"/probes/"+probeID, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create patch request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send patch request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("patch probe returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // setupRMODependencies creates the Kubernetes resources that RMO expects to exist
 func setupRMODependencies(t *testing.T, k8sClient client.Client, ctx context.Context, dynatraceURL string) {
 	// Create clusters namespace for HostedControlPlane resources
@@ -207,39 +296,27 @@ func setupRMODependencies(t *testing.T, k8sClient client.Client, ctx context.Con
 		},
 	}
 	if err := k8sClient.Create(ctx, clustersNs); err != nil && !strings.Contains(err.Error(), "already exists") {
-		t.Fatalf("Failed to create clusters namespace: %v", err)
+		t.Fatalf("Failed to create namespace: %v", err)
 	}
 
-	// Create kube-apiserver service
-	apiServerService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver",
-			Namespace: "clusters",
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{Port: 6443}},
-		},
-	}
-	if err := k8sClient.Create(ctx, apiServerService); err != nil && !strings.Contains(err.Error(), "already exists") {
-		t.Logf("Warning: Failed to create kube-apiserver service: %v", err)
-	}
-
-	// Create VpcEndpoint resource
-	// RMO expects VpcEndpoint named "private-" + suffix from HCP name
+	// Create VpcEndpoint resource (required for Private HCPs)
 	vpcEndpoint := &awsvpceapi.VpcEndpoint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "private-hcp",
 			Namespace: "clusters",
-			Labels: map[string]string{
-				"hypershift.openshift.io/cluster": "test-hcp",
-			},
 		},
+		Spec: awsvpceapi.VpcEndpointSpec{},
 		Status: awsvpceapi.VpcEndpointStatus{
-			Status: "available",
+			Status: "Ready",
 		},
 	}
 	if err := k8sClient.Create(ctx, vpcEndpoint); err != nil && !strings.Contains(err.Error(), "already exists") {
 		t.Logf("Warning: Failed to create VpcEndpoint: %v", err)
+	}
+	// Update status (status is a subresource)
+	vpcEndpoint.Status.Status = "Ready"
+	if err := k8sClient.Status().Update(ctx, vpcEndpoint); err != nil {
+		t.Logf("Warning: Failed to update VpcEndpoint status: %v", err)
 	}
 
 	// Create openshift-route-monitor-operator namespace
@@ -277,51 +354,24 @@ func startMockProbeTargetServer() *httptest.Server {
 			_, _ = w.Write([]byte(`{"status":"ok"}`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":"not found"}`))
 		}
 	}))
 }
 
-// waitForProbe waits for a probe to be created in the API
-func waitForProbe(baseURL, clusterID string, timeout time.Duration) (string, error) {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		probes, err := listProbes(baseURL, fmt.Sprintf("cluster-id=%s", clusterID))
-		if err == nil && len(probes) > 0 {
-			return probes[0].ID, nil
-		}
-		time.Sleep(2 * time.Second)
-	}
-	return "", fmt.Errorf("probe not found within timeout")
-}
-
-// startMockDynatraceServer starts a mock Dynatrace API server for testing
+// startMockDynatraceServer starts a mock Dynatrace server for testing
 func startMockDynatraceServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == "GET" && r.URL.Path == "/v1/synthetic/monitors/":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"monitors":[]}`))
+		// Mock all Dynatrace API endpoints
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 
-		case r.Method == "POST" && r.URL.Path == "/v1/synthetic/monitors":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"entityId":"SYNTHETIC_TEST-1234567890","name":"mock-monitor"}`))
-
-		case r.Method == "DELETE":
-			w.WriteHeader(http.StatusNoContent)
-
-		case r.Method == "GET" && r.URL.Path == "/v1/synthetic/locations":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"locations":[
-				{"name":"N. Virginia","entityId":"SYNTHETIC_LOCATION-PUBLIC-123","type":"PUBLIC","status":"ENABLED"},
-				{"name":"backplanei03xyz","entityId":"SYNTHETIC_LOCATION-PRIVATE-456","type":"PRIVATE","status":"ENABLED"},
-				{"name":"Oregon","entityId":"SYNTHETIC_LOCATION-PUBLIC-789","type":"PUBLIC","status":"ENABLED"}
-			]}`))
-
-		default:
-			w.WriteHeader(http.StatusOK)
+		// Return appropriate mock responses based on the path
+		if strings.Contains(r.URL.Path, "/synthetic/monitors") {
+			// Mock monitor creation response
+			_, _ = w.Write([]byte(`{"entityId":"SYNTHETIC_TEST-1234567890"}`))
+		} else {
+			// Generic success response
 			_, _ = w.Write([]byte(`{"success":true}`))
 		}
 	}))
