@@ -241,6 +241,57 @@ func deleteProbeViaAPI(baseURL, probeID string) error {
 	return nil
 }
 
+// waitForProbeStatus polls the API waiting for a probe to reach the expected status
+func waitForProbeStatus(baseURL, probeID, expectedStatus string, timeout time.Duration) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	timeoutChan := time.After(timeout)
+
+	for {
+		select {
+		case <-timeoutChan:
+			probe, _ := getProbeByID(baseURL, probeID)
+			currentStatus := "unknown"
+			if probe != nil {
+				currentStatus = probe.Status
+			}
+			return fmt.Errorf("timeout waiting for probe status '%s' (current: %s)", expectedStatus, currentStatus)
+		case <-ticker.C:
+			probe, err := getProbeByID(baseURL, probeID)
+			if err == nil && probe.Status == expectedStatus {
+				return nil
+			}
+		}
+	}
+}
+
+// waitForProbeDeletion polls the API waiting for a probe to be deleted (404 or terminating/deleted status)
+func waitForProbeDeletion(baseURL, probeID string, timeout time.Duration) error {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	timeoutChan := time.After(timeout)
+
+	for {
+		select {
+		case <-timeoutChan:
+			probe, _ := getProbeByID(baseURL, probeID)
+			if probe != nil {
+				return fmt.Errorf("timeout waiting for probe deletion (still exists with status: %s)", probe.Status)
+			}
+			return fmt.Errorf("timeout waiting for probe deletion")
+		case <-ticker.C:
+			probe, err := getProbeByID(baseURL, probeID)
+			// Probe is deleted if we get an error (404) or if status is terminating/deleted
+			if err != nil {
+				return nil // 404 or other error means deleted
+			}
+			if probe.Status == "terminating" || probe.Status == "deleted" {
+				return nil
+			}
+		}
+	}
+}
+
 // updateProbeStatus updates a probe's status via PATCH request
 //
 // This function mocks the agent's behavior for local testing.

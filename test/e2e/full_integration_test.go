@@ -264,37 +264,31 @@ func TestFullStackIntegration(t *testing.T) {
 		}
 
 		t.Log("✅ Agent started successfully")
-		t.Log("⏱️  Waiting for agent to fetch and process probes...")
+		t.Log("⏱️  Waiting for agent to fetch probe...")
 
-		// Wait longer to give agent time to:
-		// 1. Fetch probes from API
-		// 2. Process probes (create K8s resources or run in dry-run mode)
-		// 3. Update probe status to "active" via PATCH request
-		time.Sleep(10 * time.Second)
-
-		// Verify the agent fetched the probe
-		probes, err := listProbes(apiURL, "")
-		if err != nil {
-			t.Fatalf("Failed to list probes: %v", err)
-		}
-
-		if len(probes) == 0 {
-			t.Fatal("Expected at least one probe, got none")
-		}
-
-		foundProbe := false
-		var probeStatus string
-		for _, probe := range probes {
-			if probe["id"].(string) == testProbeID {
-				foundProbe = true
-				probeStatus = probe["status"].(string)
-				t.Logf("✅ Agent fetched probe: %s (status: %s)", probe["id"].(string), probe["status"].(string))
-				break
+		// Poll to verify the agent fetched the probe (agent should fetch it quickly)
+		// We just need to verify the probe exists in the list, not waiting for status change
+		var foundProbe bool
+		maxAttempts := 20
+		for i := 0; i < maxAttempts; i++ {
+			probes, err := listProbes(apiURL, "")
+			if err == nil && len(probes) > 0 {
+				for _, probe := range probes {
+					if probe["id"].(string) == testProbeID {
+						foundProbe = true
+						t.Logf("✅ Agent fetched probe: %s (status: %s)", probe["id"].(string), probe["status"].(string))
+						break
+					}
+				}
+				if foundProbe {
+					break
+				}
 			}
+			time.Sleep(500 * time.Millisecond)
 		}
 
 		if !foundProbe {
-			t.Errorf("❌ Agent did not fetch the test probe %s", testProbeID)
+			t.Errorf("❌ Agent did not fetch the test probe %s within %d seconds", testProbeID, maxAttempts/2)
 		} else {
 			t.Log("✅ Agent successfully fetched probe from API")
 		}
@@ -316,34 +310,22 @@ func TestFullStackIntegration(t *testing.T) {
 			t.Log("✅ Mocked agent processing complete")
 		}
 
-		// Check if probe status was updated to active
-		t.Log("📋 Validating probe status update...")
-		probe, err := getProbeByID(apiURL, testProbeID)
+		// Poll for probe status to be updated to active
+		t.Log("📋 Polling for probe status update to 'active'...")
+		err = waitForProbeStatus(apiURL, testProbeID, "active", 15*time.Second)
 		if err != nil {
-			t.Errorf("Failed to get probe after mock processing: %v", err)
-		}
-		probeStatus = probe.Status
-
-		if probeStatus == "active" {
-			t.Log("✅ Agent successfully processed probe and updated status to 'active'!")
-			t.Log("✅ Full E2E workflow verified: RMO → API → Agent → Status Update")
-		} else {
-			// Give agent more time to process and update status
-			t.Log("⏱️  Probe still 'pending', waiting additional time for agent to process...")
-			time.Sleep(5 * time.Second)
-			probe, err := getProbeByID(apiURL, testProbeID)
-			if err == nil && probe.Status == "active" {
-				t.Log("✅ Agent successfully processed probe and updated status to 'active' (after retry)")
-				t.Log("✅ Full E2E workflow verified: RMO → API → Agent → Status Update")
-			} else {
-				currentStatus := probeStatus
-				if err == nil {
-					currentStatus = probe.Status
-				}
-				t.Errorf("❌ Agent failed to update probe status to 'active' (current status: %s)", currentStatus)
-				t.Log("💡 This indicates the agent couldn't process the probe correctly")
-				t.Log("💡 Check agent logs above for errors or connection issues")
+			probe, _ := getProbeByID(apiURL, testProbeID)
+			currentStatus := "unknown"
+			if probe != nil {
+				currentStatus = probe.Status
 			}
+			t.Errorf("❌ %v", err)
+			t.Logf("💡 Current probe status: %s", currentStatus)
+			t.Log("💡 This indicates the mock processing failed or the agent couldn't update the status")
+			t.Log("💡 Check agent logs above for errors or connection issues")
+		} else {
+			t.Log("✅ Probe status successfully updated to 'active'!")
+			t.Log("✅ Full E2E workflow verified: RMO → API → Agent → Status Update")
 		}
 
 		t.Log("🛑 Shutting down agent...")
@@ -355,18 +337,18 @@ func TestFullStackIntegration(t *testing.T) {
 	})
 
 	t.Run("Cleanup_Probe", func(t *testing.T) {
+		t.Logf("🗑️  Deleting probe %s...", testProbeID)
 		err := deleteProbeViaAPI(apiURL, testProbeID)
 		if err != nil {
 			t.Fatalf("Failed to delete probe: %v", err)
 		}
 
-		t.Logf("✅ Successfully deleted probe %s", testProbeID)
-
-		probe, err := getProbeByID(apiURL, testProbeID)
-		if err == nil {
-			if probe.Status != "terminating" && probe.Status != "deleted" {
-				t.Logf("⚠️  Probe still exists with status: %s (may be in terminating state)", probe.Status)
-			}
+		t.Log("⏱️  Polling to verify probe deletion...")
+		err = waitForProbeDeletion(apiURL, testProbeID, 10*time.Second)
+		if err != nil {
+			t.Errorf("❌ %v", err)
+		} else {
+			t.Logf("✅ Probe %s successfully deleted", testProbeID)
 		}
 	})
 }
