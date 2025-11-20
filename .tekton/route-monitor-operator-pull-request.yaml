@@ -31,7 +31,8 @@ spec:
     value: build/Dockerfile
   - name: path-context
     value: .
-  taskRunTemplate: {}
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-route-monitor-operator
   workspaces:
   - name: git-auth
     secret:
