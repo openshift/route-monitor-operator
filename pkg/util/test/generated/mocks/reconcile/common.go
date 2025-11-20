@@ -19,6 +19,7 @@ import (
 type MockResourceComparerInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockResourceComparerInterfaceMockRecorder
+	isgomock struct{}
 }
 
 // MockResourceComparerInterfaceMockRecorder is the mock recorder for MockResourceComparerInterface.
