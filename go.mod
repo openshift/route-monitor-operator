@@ -2,11 +2,10 @@ module github.com/openshift/route-monitor-operator
 
 go 1.23.0
 
-toolchain go1.23.8
+toolchain go1.24.11
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/golang/mock v1.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/onsi/ginkgo v1.16.5
