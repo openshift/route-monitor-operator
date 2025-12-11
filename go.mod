@@ -2,7 +2,7 @@ module github.com/openshift/route-monitor-operator
 
 go 1.23.0
 
-toolchain go1.23.8
+toolchain go1.24.11
 
 require (
 	github.com/go-logr/logr v1.4.2
