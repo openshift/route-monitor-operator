@@ -129,13 +129,20 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", r.RHOBSConfig.ProbeAPIURL)
 			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane)
 			if err != nil {
-				log.Error(err, "failed to delete RHOBS probe")
+				log.Error(err, "failed to delete RHOBS probe - will retry", "cluster_id", hostedcontrolplane.Spec.ClusterID)
 				// Check if it's a non-200 error and requeue
 				if rhobs.IsNon200Error(err) {
 					return utilreconcile.RequeueAfter(rhobsAPIRetryTimeout), nil
 				}
+				// CRITICAL: Do not remove finalizer if RHOBS probe deletion fails
+				// This prevents orphaned probes from being left in the system
 				return utilreconcile.RequeueWith(err)
 			}
+			log.Info("Successfully deleted RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID)
+		} else {
+			// SREP-2832: Log warning if RHOBS API URL is not configured during deletion
+			// This indicates a configuration issue that could lead to orphaned probes
+			log.Info("RHOBS ProbeAPIURL not configured - skipping RHOBS probe deletion. If RHOBS monitoring is enabled, this may result in orphaned resources.", "cluster_id", hostedcontrolplane.Spec.ClusterID)
 		}
 
 		err := r.finalizeHostedControlPlane(ctx, log, hostedcontrolplane)
