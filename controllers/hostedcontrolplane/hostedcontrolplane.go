@@ -66,6 +66,10 @@ const (
 
 	// RHOBS API retry timeout for non-200 responses
 	rhobsAPIRetryTimeout = retryTimeoutMinutes * time.Minute
+
+	// RHOBS probe deletion timeout - after this duration, fail open to allow cluster deletion
+	// This prevents indefinite blocking while still allowing time for transient failures to resolve
+	rhobsProbeDeletionTimeout = 15 * time.Minute
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -127,15 +131,47 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		// Delete RHOBS probe if API URL is configured
 		if r.RHOBSConfig.ProbeAPIURL != "" {
 			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", r.RHOBSConfig.ProbeAPIURL)
+
+			// Calculate how long the cluster has been in deletion state
+			deletionElapsed := time.Since(hostedcontrolplane.DeletionTimestamp.Time)
+			log.V(2).Info("Probe deletion attempt", "cluster_id", hostedcontrolplane.Spec.ClusterID, "deletion_elapsed", deletionElapsed)
+
 			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane)
 			if err != nil {
-				log.Error(err, "failed to delete RHOBS probe")
-				// Check if it's a non-200 error and requeue
-				if rhobs.IsNon200Error(err) {
-					return utilreconcile.RequeueAfter(rhobsAPIRetryTimeout), nil
+				// HYBRID APPROACH (SREP-2832 + SREP-2966):
+				// - If within timeout window: retry (fail closed - prevents orphaned probes)
+				// - If past timeout: fail open (prevents indefinitely blocking cluster deletion)
+
+				if deletionElapsed < rhobsProbeDeletionTimeout {
+					// Still within retry window - fail closed to prevent orphaned probes
+					log.Error(err, "Failed to delete RHOBS probe, will retry",
+						"cluster_id", hostedcontrolplane.Spec.ClusterID,
+						"deletion_elapsed", deletionElapsed,
+						"timeout", rhobsProbeDeletionTimeout,
+						"behavior", "fail_closed")
+
+					// Check if it's a non-200 error and requeue with appropriate timeout
+					if rhobs.IsNon200Error(err) {
+						return utilreconcile.RequeueAfter(rhobsAPIRetryTimeout), nil
+					}
+					return utilreconcile.RequeueWith(err)
+				} else {
+					// Past timeout window - fail open to allow cluster deletion
+					log.Error(err, "Failed to delete RHOBS probe but deletion timeout exceeded, allowing cluster deletion to proceed",
+						"cluster_id", hostedcontrolplane.Spec.ClusterID,
+						"deletion_elapsed", deletionElapsed,
+						"timeout", rhobsProbeDeletionTimeout,
+						"behavior", "fail_open",
+						"note", "Orphaned probe may require manual cleanup via synthetics-api or will be cleaned up when API is restored")
+					// Continue with deletion (do not return error)
 				}
-				return utilreconcile.RequeueWith(err)
+			} else {
+				log.Info("Successfully deleted RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID)
 			}
+		} else {
+			// SREP-2832: Log warning if RHOBS API URL is not configured during deletion
+			// This indicates a configuration issue that could lead to orphaned probes
+			log.Info("RHOBS ProbeAPIURL not configured - skipping RHOBS probe deletion. If RHOBS monitoring is enabled, this may result in orphaned resources.", "cluster_id", hostedcontrolplane.Spec.ClusterID)
 		}
 
 		err := r.finalizeHostedControlPlane(ctx, log, hostedcontrolplane)
