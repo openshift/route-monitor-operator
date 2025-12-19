@@ -347,7 +347,15 @@ func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log
 	// Delete the probe (sets status to terminating)
 	err := client.DeleteProbe(ctx, clusterID)
 	if err != nil {
-		return fmt.Errorf("failed to delete RHOBS probe: %w", err)
+		// Log warning but don't fail reconciliation during deletion to avoid blocking HostedCluster deletion
+		// The monitoring infrastructure should fail open and not prevent core cluster operations
+		// Orphaned probes may require manual cleanup via synthetics-api
+		log.Info("Failed to delete RHOBS probe, continuing with HostedCluster deletion anyway",
+			"cluster_id", clusterID,
+			"error", err.Error(),
+			"note", "Orphaned probe may need manual cleanup via synthetics-api or probe will be cleaned up when API is restored")
+		// Return nil to allow HostedCluster deletion to proceed
+		return nil
 	}
 
 	log.Info("Successfully marked RHOBS probe for termination", "cluster_id", clusterID)
