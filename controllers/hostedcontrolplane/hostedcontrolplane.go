@@ -115,17 +115,31 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	//Create Dynatrace API client
 	dynatraceApiClient, err := r.NewDynatraceApiClient(ctx)
 	if err != nil {
-		log.Error(err, "failed to create dynatrace client")
-		return utilreconcile.RequeueWith(err)
+		// If RHOBS is configured, Dynatrace client creation failure is non-fatal
+		if r.RHOBSConfig.ProbeAPIURL != "" {
+			log.Info("Dynatrace client creation failed, continuing with RHOBS-only monitoring", "error", err.Error())
+			dynatraceApiClient = nil
+		} else {
+			log.Error(err, "failed to create dynatrace client")
+			return utilreconcile.RequeueWith(err)
+		}
 	}
 
 	// If the HostedControlPlane is marked for deletion, clean up
 	shouldDelete := finalizer.WasDeleteRequested(hostedcontrolplane)
 	if shouldDelete {
-		err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
-		if err != nil {
-			log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
-			return utilreconcile.RequeueWith(err)
+		// Only attempt Dynatrace deletion if client was successfully created
+		if dynatraceApiClient != nil {
+			err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
+			if err != nil {
+				// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
+				if r.RHOBSConfig.ProbeAPIURL != "" {
+					log.Info("Dynatrace HTTP Monitor deletion failed, continuing with RHOBS probe deletion", "error", err.Error())
+				} else {
+					log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
+					return utilreconcile.RequeueWith(err)
+				}
+			}
 		}
 
 		// Delete RHOBS probe if API URL is configured
@@ -224,11 +238,19 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
-	log.Info("Deploying HTTP Monitor Resources")
-	err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
-	if err != nil {
-		log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
-		return utilreconcile.RequeueWith(err)
+	// Only attempt Dynatrace deployment if client was successfully created
+	if dynatraceApiClient != nil {
+		log.Info("Deploying HTTP Monitor Resources")
+		err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
+		if err != nil {
+			// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
+			if r.RHOBSConfig.ProbeAPIURL != "" {
+				log.Info("Dynatrace HTTP Monitor deployment failed, continuing with RHOBS probe deployment", "error", err.Error())
+			} else {
+				log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
+				return utilreconcile.RequeueWith(err)
+			}
+		}
 	}
 
 	// Deploy RHOBS probe if API URL is configured
