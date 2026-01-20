@@ -17,21 +17,6 @@ parameters:
 - name: REPO_NAME
   value: route-monitor-operator
   required: true
-- name: PROBE_API_URL
-  value: ""
-  required: false
-- name: OIDC_CLIENT_ID
-  value: ""
-  required: false
-- name: OIDC_CLIENT_SECRET
-  value: ""
-  required: false
-- name: OIDC_ISSUER_URL
-  value: ""
-  required: false
-- name: ONLY_PUBLIC_CLUSTERS
-  value: ""
-  required: false
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -101,35 +86,8 @@ objects:
 
 ###############################################################################
 # Hypershift (MC-only) Configuration
+# NOTE: The route-monitor-operator-config SelectorSyncSet has been moved to
+# rmo-config-template.yaml to support per-region configuration. Each region
+# requires a different PROBE_API_URL pointing to its regional RHOBS cell.
+# See: SREP-3243
 ###############################################################################
-- apiVersion: hive.openshift.io/v1
-  kind: SelectorSyncSet
-  metadata:
-    labels:
-      managed.openshift.io/gitHash: ${IMAGE_TAG}
-      managed.openshift.io/gitRepoName: ${REPO_NAME}
-      managed.openshift.io/osd: 'true'
-    name: route-monitor-operator-config
-  spec:
-    clusterDeploymentSelector:
-      matchLabels:
-        api.openshift.com/managed: 'true'
-      matchExpressions:
-        - key: ext-hypershift.openshift.io/cluster-type
-          operator: In
-          values:
-            - "management-cluster"
-    resourceApplyMode: Sync
-    applyBehavior: CreateOrUpdate
-    resources:
-    - apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: ${REPO_NAME}-config
-        namespace: ${NAMESPACE}
-      data:
-        probe-api-url: ${PROBE_API_URL}
-        oidc-client-id: ${OIDC_CLIENT_ID}
-        oidc-client-secret: ${OIDC_CLIENT_SECRET}
-        oidc-issuer-url: ${OIDC_ISSUER_URL}
-        only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
