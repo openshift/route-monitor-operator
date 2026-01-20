@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: rmo-config-template
+
+###############################################################################
+# Per-region RMO configuration template
+#
+# This template deploys region-specific ConfigMaps to MCs via SelectorSyncSet.
+# Each regional RHOBS cell requires its own PROBE_API_URL.
+#
+# Selector labels used:
+# - ext-hypershift.openshift.io/cluster-type: management-cluster
+# - ext-hypershift.openshift.io/cluster-region: <region>
+# - ext-hypershift.openshift.io/cluster-sector: <sector> (matchExpressions In)
+#
+# For production traffic splitting in high-load regions (e.g., us-east-1 with
+# multiple RHOBS cells), see SREP-3225 for adding rhobs-cell labels to MCs.
+###############################################################################
+
+parameters:
+- name: REGION
+  required: true
+  description: "Region for label matching (e.g., us-west-2, us-east-1)"
+- name: SECTORS
+  required: true
+  description: "List of sectors to target (e.g., main, perf3)"
+- name: SUFFIX
+  required: true
+  description: "Unique suffix for SelectorSyncSet name (e.g., stage-us-west-2-main)"
+- name: NAMESPACE
+  value: openshift-route-monitor-operator
+- name: PROBE_API_URL
+  required: true
+  description: "RHOBS probes API URL for this region"
+- name: OIDC_CLIENT_ID
+  required: true
+- name: OIDC_CLIENT_SECRET
+  required: true
+- name: OIDC_ISSUER_URL
+  required: true
+- name: ONLY_PUBLIC_CLUSTERS
+  value: ""
+  required: false
+
+objects:
+- apiVersion: hive.openshift.io/v1
+  kind: SelectorSyncSet
+  metadata:
+    name: route-monitor-operator-config-${SUFFIX}
+  spec:
+    clusterDeploymentSelector:
+      matchLabels:
+        ext-hypershift.openshift.io/cluster-type: management-cluster
+        ext-hypershift.openshift.io/cluster-region: ${REGION}
+      matchExpressions:
+      - key: ext-hypershift.openshift.io/cluster-sector
+        operator: In
+        values: ${{SECTORS}}
+    resourceApplyMode: Sync
+    applyBehavior: CreateOrUpdate
+    resources:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: route-monitor-operator-config
+        namespace: ${NAMESPACE}
+      data:
+        probe-api-url: ${PROBE_API_URL}
+        oidc-client-id: ${OIDC_CLIENT_ID}
+        oidc-client-secret: ${OIDC_CLIENT_SECRET}
+        oidc-issuer-url: ${OIDC_ISSUER_URL}
+        only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
