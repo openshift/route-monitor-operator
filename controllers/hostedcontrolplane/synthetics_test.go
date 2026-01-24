@@ -11,6 +11,7 @@ import (
 
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	dynatrace "github.com/openshift/route-monitor-operator/pkg/dynatrace"
+	"github.com/openshift/route-monitor-operator/pkg/rhobs"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -574,6 +575,141 @@ func TestGetClusterRegion(t *testing.T) {
 			}
 			if (err != nil) != tt.expectError {
 				t.Errorf("Unexpected error status. Expected error: %v, got: %v", tt.expectError, err)
+			}
+		})
+	}
+}
+
+func TestCreateRHOBSClient(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      RHOBSConfig
+		expectOIDC  bool
+		description string
+	}{
+		{
+			name: "Creates client without OIDC when credentials are empty",
+			config: RHOBSConfig{
+				ProbeAPIURL:      "https://api.example.com/probes",
+				Tenant:           "test-tenant",
+				OIDCClientID:     "",
+				OIDCClientSecret: "",
+				OIDCIssuerURL:    "",
+			},
+			expectOIDC:  false,
+			description: "Client should be created without OIDC authentication",
+		},
+		{
+			name: "Creates client with OIDC when all credentials are provided",
+			config: RHOBSConfig{
+				ProbeAPIURL:      "https://api.example.com/probes",
+				Tenant:           "test-tenant",
+				OIDCClientID:     "client-id",
+				OIDCClientSecret: "client-secret",
+				OIDCIssuerURL:    "https://issuer.example.com",
+			},
+			expectOIDC:  true,
+			description: "Client should be created with OIDC authentication",
+		},
+		{
+			name: "Creates client without OIDC when only client ID is provided",
+			config: RHOBSConfig{
+				ProbeAPIURL:      "https://api.example.com/probes",
+				Tenant:           "test-tenant",
+				OIDCClientID:     "client-id",
+				OIDCClientSecret: "",
+				OIDCIssuerURL:    "",
+			},
+			expectOIDC:  false,
+			description: "Client should fall back to no OIDC when credentials are incomplete",
+		},
+		{
+			name: "Creates client without OIDC when only issuer URL is provided",
+			config: RHOBSConfig{
+				ProbeAPIURL:      "https://api.example.com/probes",
+				Tenant:           "test-tenant",
+				OIDCClientID:     "",
+				OIDCClientSecret: "",
+				OIDCIssuerURL:    "https://issuer.example.com",
+			},
+			expectOIDC:  false,
+			description: "Client should fall back to no OIDC when credentials are incomplete",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newTestReconciler(t)
+			log := log.FromContext(context.Background())
+
+			client := r.createRHOBSClient(log, tt.config)
+
+			if client == nil {
+				t.Errorf("createRHOBSClient returned nil client")
+			}
+		})
+	}
+}
+
+func TestIsPrivateProbe(t *testing.T) {
+	tests := []struct {
+		name     string
+		probe    *rhobs.ProbeResponse
+		expected bool
+	}{
+		{
+			name: "Probe with private=true label",
+			probe: &rhobs.ProbeResponse{
+				ID: "test-probe-1",
+				Labels: map[string]string{
+					"private": "true",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Probe with private=false label",
+			probe: &rhobs.ProbeResponse{
+				ID: "test-probe-2",
+				Labels: map[string]string{
+					"private": "false",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Probe without private label",
+			probe: &rhobs.ProbeResponse{
+				ID: "test-probe-3",
+				Labels: map[string]string{
+					"cluster-id": "test-cluster",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Probe with empty labels",
+			probe: &rhobs.ProbeResponse{
+				ID:     "test-probe-4",
+				Labels: map[string]string{},
+			},
+			expected: false,
+		},
+		{
+			name: "Probe with nil labels",
+			probe: &rhobs.ProbeResponse{
+				ID:     "test-probe-5",
+				Labels: nil,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPrivateProbe(tt.probe)
+			if result != tt.expected {
+				t.Errorf("isPrivateProbe() = %v, expected %v", result, tt.expected)
 			}
 		})
 	}
