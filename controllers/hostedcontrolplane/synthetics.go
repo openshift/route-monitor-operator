@@ -260,7 +260,7 @@ type RHOBSConfig struct {
 }
 
 // ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
-func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID
 	if clusterID == "" {
 		return fmt.Errorf("cluster ID is empty")
@@ -271,7 +271,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
 	// Skip private clusters if OnlyPublicClusters flag is set
-	if r.RHOBSConfig.OnlyPublicClusters && isPrivate {
+	if cfg.OnlyPublicClusters && isPrivate {
 		log.V(2).Info("Skipping probe creation for private cluster (only-public-clusters is enabled)", "cluster_id", clusterID)
 		return nil
 	}
@@ -283,8 +283,8 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	}
 	monitoringURL = fmt.Sprintf("https://%s/livez", monitoringURL)
 
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
+	// Create RHOBS client
+	client := r.createRHOBSClient(log, cfg)
 
 	existingProbe, err := client.GetProbe(ctx, clusterID)
 	if err != nil {
@@ -338,14 +338,14 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 //
 // This function attempts to mark the probe for deletion (sets status to terminating).
 // It returns an error if the deletion fails to enable retry logic in the caller.
-func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID
 	if clusterID == "" {
 		return fmt.Errorf("cluster ID is empty")
 	}
 
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
+	// Create RHOBS client
+	client := r.createRHOBSClient(log, cfg)
 
 	// Delete the probe (sets status to terminating)
 	err := client.DeleteProbe(ctx, clusterID)
@@ -358,20 +358,20 @@ func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log
 }
 
 // createRHOBSClient creates an RHOBS client with or without OIDC authentication based on configuration
-func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs.Client {
-	if r.RHOBSConfig.OIDCClientID != "" && r.RHOBSConfig.OIDCClientSecret != "" && r.RHOBSConfig.OIDCIssuerURL != "" {
+func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger, cfg RHOBSConfig) *rhobs.Client {
+	if cfg.OIDCClientID != "" && cfg.OIDCClientSecret != "" && cfg.OIDCIssuerURL != "" {
 		oidcConfig := rhobs.OIDCConfig{
-			ClientID:     r.RHOBSConfig.OIDCClientID,
-			ClientSecret: r.RHOBSConfig.OIDCClientSecret,
-			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
+			ClientID:     cfg.OIDCClientID,
+			ClientSecret: cfg.OIDCClientSecret,
+			IssuerURL:    cfg.OIDCIssuerURL,
 		}
 		log.V(2).Info("Creating RHOBS client with OIDC authentication")
 		// Use configurable tenant name in URL path, OIDC client ID is used for authentication headers
-		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, oidcConfig, log)
+		return rhobs.NewClientWithOIDC(cfg.ProbeAPIURL, cfg.Tenant, oidcConfig, log)
 	}
 
 	log.V(2).Info("Creating RHOBS client without authentication")
-	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, log)
+	return rhobs.NewClient(cfg.ProbeAPIURL, cfg.Tenant, log)
 }
 
 func isPrivateProbe(probe *rhobs.ProbeResponse) bool {

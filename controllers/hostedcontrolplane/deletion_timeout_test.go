@@ -18,8 +18,8 @@ import (
 // without requiring the full e2e infrastructure.
 //
 // This validates SREP-2832 + SREP-2966 timeout behavior:
-//  - Within 15 min: Fail closed (retry, block deletion)
-//  - After 15 min: Fail open (allow deletion despite probe cleanup failure)
+//   - Within 15 min: Fail closed (retry, block deletion)
+//   - After 15 min: Fail open (allow deletion despite probe cleanup failure)
 func TestDeletionTimeoutBehavior(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -67,7 +67,7 @@ func TestDeletionTimeoutBehavior(t *testing.T) {
 		}
 
 		// Call deleteRHOBSProbe directly - it will fail because API is not running
-		err := reconciler.deleteRHOBSProbe(ctx, log, hcp)
+		err := reconciler.deleteRHOBSProbe(ctx, log, hcp, reconciler.RHOBSConfig)
 
 		// Within timeout window, we expect an error (fail closed)
 		if err == nil {
@@ -153,7 +153,7 @@ func TestDeletionTimeoutBehavior(t *testing.T) {
 			},
 		}
 
-		err := reconciler.deleteRHOBSProbe(ctx, log, hcp)
+		err := reconciler.deleteRHOBSProbe(ctx, log, hcp, reconciler.RHOBSConfig)
 
 		if err == nil {
 			t.Error("Expected deleteRHOBSProbe to return error when API unavailable, but got nil")

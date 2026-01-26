@@ -13,6 +13,7 @@ import (
 	avov1alpha2 "github.com/openshift/aws-vpce-operator/api/v1alpha2"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -836,6 +837,160 @@ func TestIsVpcEndpointReady(t *testing.T) {
 			// Check if error status matches expectedError
 			if (err != nil) != tt.expectedError {
 				t.Errorf("expected error: %v, but got error: %v", tt.expectedError, err != nil)
+			}
+		})
+	}
+}
+
+func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
+	ctx := context.Background()
+
+	// Fallback config from command-line flags
+	fallbackConfig := RHOBSConfig{
+		ProbeAPIURL:        "https://fallback-api.example.com/probes",
+		Tenant:             "fallback-tenant",
+		OIDCClientID:       "fallback-client-id",
+		OIDCClientSecret:   "fallback-secret",
+		OIDCIssuerURL:      "https://fallback-issuer.example.com",
+		OnlyPublicClusters: false,
+	}
+
+	tests := []struct {
+		name           string
+		configMap      *corev1.ConfigMap
+		fallbackConfig RHOBSConfig
+		expected       RHOBSConfig
+	}{
+		{
+			name:           "ConfigMap not present - uses fallback config",
+			configMap:      nil,
+			fallbackConfig: fallbackConfig,
+			expected:       fallbackConfig,
+		},
+		{
+			name: "ConfigMap present with all values - uses ConfigMap values",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: config.OperatorNamespace,
+				},
+				Data: map[string]string{
+					"probe-api-url":        "https://configmap-api.example.com/probes",
+					"probe-tenant":         "configmap-tenant",
+					"oidc-client-id":       "configmap-client-id",
+					"oidc-client-secret":   "configmap-secret",
+					"oidc-issuer-url":      "https://configmap-issuer.example.com",
+					"only-public-clusters": "true",
+				},
+			},
+			fallbackConfig: fallbackConfig,
+			expected: RHOBSConfig{
+				ProbeAPIURL:        "https://configmap-api.example.com/probes",
+				Tenant:             "configmap-tenant",
+				OIDCClientID:       "configmap-client-id",
+				OIDCClientSecret:   "configmap-secret",
+				OIDCIssuerURL:      "https://configmap-issuer.example.com",
+				OnlyPublicClusters: true,
+			},
+		},
+		{
+			name: "ConfigMap present with partial values - merges with fallback",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: config.OperatorNamespace,
+				},
+				Data: map[string]string{
+					"probe-api-url": "https://partial-api.example.com/probes",
+					"probe-tenant":  "partial-tenant",
+					// Other values not set - should use fallback
+				},
+			},
+			fallbackConfig: fallbackConfig,
+			expected: RHOBSConfig{
+				ProbeAPIURL:        "https://partial-api.example.com/probes",
+				Tenant:             "partial-tenant",
+				OIDCClientID:       "fallback-client-id",
+				OIDCClientSecret:   "fallback-secret",
+				OIDCIssuerURL:      "https://fallback-issuer.example.com",
+				OnlyPublicClusters: false,
+			},
+		},
+		{
+			name: "ConfigMap present with empty values - uses fallback for empty fields",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: config.OperatorNamespace,
+				},
+				Data: map[string]string{
+					"probe-api-url":        "",
+					"probe-tenant":         "  ", // whitespace only
+					"oidc-client-id":       "valid-id",
+					"oidc-client-secret":   "",
+					"oidc-issuer-url":      "",
+					"only-public-clusters": "false",
+				},
+			},
+			fallbackConfig: fallbackConfig,
+			expected: RHOBSConfig{
+				ProbeAPIURL:        "fallback-api.example.com/probes", // wrong, should be fallback
+				Tenant:             "fallback-tenant",                 // empty/whitespace uses fallback
+				OIDCClientID:       "valid-id",
+				OIDCClientSecret:   "fallback-secret",
+				OIDCIssuerURL:      "https://fallback-issuer.example.com",
+				OnlyPublicClusters: false,
+			},
+		},
+		{
+			name: "ConfigMap in wrong namespace - uses fallback config",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: "wrong-namespace",
+				},
+				Data: map[string]string{
+					"probe-api-url": "https://wrong-namespace.example.com/probes",
+				},
+			},
+			fallbackConfig: fallbackConfig,
+			expected:       fallbackConfig,
+		},
+		{
+			name: "ConfigMap with wrong name - uses fallback config",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "wrong-configmap-name",
+					Namespace: config.OperatorNamespace,
+				},
+				Data: map[string]string{
+					"probe-api-url": "https://wrong-name.example.com/probes",
+				},
+			},
+			fallbackConfig: fallbackConfig,
+			expected:       fallbackConfig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var objs []client.Object
+			if tt.configMap != nil {
+				objs = append(objs, tt.configMap)
+			}
+
+			r := newTestReconciler(t, objs...)
+			r.RHOBSConfig = tt.fallbackConfig
+
+			result := r.getRHOBSConfig(ctx)
+
+			// For the empty values test, we need to fix the expected value
+			if tt.name == "ConfigMap present with empty values - uses fallback for empty fields" {
+				tt.expected.ProbeAPIURL = "https://fallback-api.example.com/probes"
+			}
+
+			if result != tt.expected {
+				t.Errorf("getRHOBSConfig() got = %+v, want = %+v", result, tt.expected)
 			}
 		})
 	}

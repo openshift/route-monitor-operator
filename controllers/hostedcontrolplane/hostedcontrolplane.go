@@ -19,6 +19,7 @@ package hostedcontrolplane
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -26,6 +27,8 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/config"
+	"github.com/openshift/route-monitor-operator/pkg/rhobs"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 
@@ -41,8 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	"github.com/openshift/route-monitor-operator/pkg/rhobs"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -70,6 +72,9 @@ const (
 	// RHOBS probe deletion timeout - after this duration, fail open to allow cluster deletion
 	// This prevents indefinite blocking while still allowing time for transient failures to resolve
 	rhobsProbeDeletionTimeout = 15 * time.Minute
+
+	// ConfigMap name for dynamic configuration (uses config.OperatorName + "-config")
+	configMapName = config.OperatorName + "-config"
 )
 
 var logger logr.Logger = ctrl.Log.WithName("controllers").WithName("HostedControlPlane")
@@ -90,6 +95,48 @@ func NewHostedControlPlaneReconciler(mgr manager.Manager, rhobsConfig RHOBSConfi
 	}
 }
 
+// getRHOBSConfig reads RHOBS configuration from the ConfigMap at reconcile time.
+// If the ConfigMap doesn't exist or has empty values, it falls back to the command-line
+// flags stored in r.RHOBSConfig.
+func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) RHOBSConfig {
+	configMap := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      configMapName,
+		Namespace: config.OperatorNamespace,
+	}, configMap)
+
+	if err != nil {
+		// ConfigMap not found or error - return fallback config from command-line flags
+		if !kerr.IsNotFound(err) {
+			logger.V(2).Info("Failed to read ConfigMap, using fallback config", "error", err.Error())
+		}
+		return r.RHOBSConfig
+	}
+
+	// Merge ConfigMap values with fallback defaults
+	cfg := r.RHOBSConfig
+	if v := strings.TrimSpace(configMap.Data["probe-api-url"]); v != "" {
+		cfg.ProbeAPIURL = v
+	}
+	if v := strings.TrimSpace(configMap.Data["probe-tenant"]); v != "" {
+		cfg.Tenant = v
+	}
+	if v := strings.TrimSpace(configMap.Data["oidc-client-id"]); v != "" {
+		cfg.OIDCClientID = v
+	}
+	if v := strings.TrimSpace(configMap.Data["oidc-client-secret"]); v != "" {
+		cfg.OIDCClientSecret = v
+	}
+	if v := strings.TrimSpace(configMap.Data["oidc-issuer-url"]); v != "" {
+		cfg.OIDCIssuerURL = v
+	}
+	if strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true" {
+		cfg.OnlyPublicClusters = true
+	}
+
+	return cfg
+}
+
 //+kubebuilder:rbac:groups=openshift.io,resources=hostedcontrolplanes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=openshift.io,resources=hostedcontrolplanes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=openshift.io,resources=hostedcontrolplanes/finalizers,verbs=update
@@ -99,6 +146,9 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	log := logger.WithName("Reconcile").WithValues("name", req.Name, "namespace", req.Namespace)
 	log.Info("Reconciling HostedControlPlanes")
 	defer log.Info("Finished reconciling HostedControlPlane")
+
+	// Get dynamic config from ConfigMap (with fallback to command-line flags)
+	rhobsConfig := r.getRHOBSConfig(ctx)
 
 	// Fetch the HostedControlPlane instance
 	hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{}
@@ -116,7 +166,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	dynatraceApiClient, err := r.NewDynatraceApiClient(ctx)
 	if err != nil {
 		// If RHOBS is configured, Dynatrace client creation failure is non-fatal
-		if r.RHOBSConfig.ProbeAPIURL != "" {
+		if rhobsConfig.ProbeAPIURL != "" {
 			log.Info("Dynatrace client creation failed, continuing with RHOBS-only monitoring", "error", err.Error())
 			dynatraceApiClient = nil
 		} else {
@@ -133,7 +183,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 			err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
 			if err != nil {
 				// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
-				if r.RHOBSConfig.ProbeAPIURL != "" {
+				if rhobsConfig.ProbeAPIURL != "" {
 					log.Info("Dynatrace HTTP Monitor deletion failed, continuing with RHOBS probe deletion", "error", err.Error())
 				} else {
 					log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
@@ -143,14 +193,14 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 
 		// Delete RHOBS probe if API URL is configured
-		if r.RHOBSConfig.ProbeAPIURL != "" {
-			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", r.RHOBSConfig.ProbeAPIURL)
+		if rhobsConfig.ProbeAPIURL != "" {
+			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", rhobsConfig.ProbeAPIURL)
 
 			// Calculate how long the cluster has been in deletion state
 			deletionElapsed := time.Since(hostedcontrolplane.DeletionTimestamp.Time)
 			log.V(2).Info("Probe deletion attempt", "cluster_id", hostedcontrolplane.Spec.ClusterID, "deletion_elapsed", deletionElapsed)
 
-			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane)
+			err = r.deleteRHOBSProbe(ctx, log, hostedcontrolplane, rhobsConfig)
 			if err != nil {
 				// HYBRID APPROACH (SREP-2832 + SREP-2966):
 				// - If within timeout window: retry (fail closed - prevents orphaned probes)
@@ -244,7 +294,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
 		if err != nil {
 			// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
-			if r.RHOBSConfig.ProbeAPIURL != "" {
+			if rhobsConfig.ProbeAPIURL != "" {
 				log.Info("Dynatrace HTTP Monitor deployment failed, continuing with RHOBS probe deployment", "error", err.Error())
 			} else {
 				log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
@@ -254,9 +304,9 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Deploy RHOBS probe if API URL is configured
-	if r.RHOBSConfig.ProbeAPIURL != "" {
+	if rhobsConfig.ProbeAPIURL != "" {
 		log.Info("Deploying RHOBS probe")
-		err = r.ensureRHOBSProbe(ctx, log, hostedcontrolplane)
+		err = r.ensureRHOBSProbe(ctx, log, hostedcontrolplane, rhobsConfig)
 		if err != nil {
 			log.Error(err, "failed to deploy RHOBS probe")
 			// Check if it's a non-200 error and requeue
@@ -450,11 +500,51 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		return fmt.Errorf("failed to build label selector predicate for routes: %w", err)
 	}
 
+	// Create handler that requeues all HCPs when ConfigMap changes
+	configMapHandler := handler.EnqueueRequestsFromMapFunc(
+		func(ctx context.Context, obj client.Object) []reconcile.Request {
+			cm, ok := obj.(*corev1.ConfigMap)
+			if !ok {
+				return nil
+			}
+			// Only react to our config ConfigMap
+			if cm.Name != configMapName || cm.Namespace != config.OperatorNamespace {
+				return nil
+			}
+
+			// List all HostedControlPlanes and requeue them
+			hcpList := &hypershiftv1beta1.HostedControlPlaneList{}
+			if err := r.List(ctx, hcpList); err != nil {
+				logger.Error(err, "failed to list HostedControlPlanes for ConfigMap change requeue")
+				return nil
+			}
+
+			requests := make([]reconcile.Request, 0, len(hcpList.Items))
+			for _, hcp := range hcpList.Items {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      hcp.Name,
+						Namespace: hcp.Namespace,
+					},
+				})
+			}
+			logger.Info("ConfigMap changed, requeuing HostedControlPlanes",
+				"configmap", cm.Name, "count", len(requests))
+			return requests
+		},
+	)
+
+	// Predicate to only watch specific ConfigMap
+	configMapPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		return obj.GetName() == configMapName && obj.GetNamespace() == config.OperatorNamespace
+	})
+
 	// The following:
 	// - Reconciles against all HostedControlPlane objects
 	// - Additionally watches against route & routemonitor objects with the 'watchResourceLabel' present.
 	//   When these objects are modified, the HCP specified in the objects' .metadata.OwnerReferences is
 	//   reconciled
+	// - Watches the operator ConfigMap to requeue all HCPs when configuration changes
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&hypershiftv1beta1.HostedControlPlane{}).
 		Watches(
@@ -466,6 +556,11 @@ func (r *HostedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			&v1alpha1.RouteMonitor{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hypershiftv1beta1.HostedControlPlane{}, handler.OnlyControllerOwner()),
 			builder.WithPredicates(selectorPredicate),
+		).
+		Watches(
+			&corev1.ConfigMap{},
+			configMapHandler,
+			builder.WithPredicates(configMapPredicate),
 		).
 		Complete(r)
 }
