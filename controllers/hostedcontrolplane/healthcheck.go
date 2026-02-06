@@ -64,6 +64,11 @@ const (
 // "routemonitor.managed.openshift.io/successful-healthchecks" can be added-to/edited-on the configmap with a large number (ie - 999) to bypass
 // this functionality
 func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	// Skip health check for test HCPs (e.g., osde2e tests without real kube-apiserver)
+	if _, osde2eTesting := hostedcontrolplane.Annotations["routemonitor.openshift.io/osde2e-testing"]; osde2eTesting {
+		return true, nil
+	}
+
 	if olderThan(hostedcontrolplane, hcpHealthCheckSkipAge) {
 		return true, nil
 	}
@@ -228,6 +233,11 @@ func olderThan(obj metav1.Object, age time.Duration) bool {
 
 // isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
 func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+	// Skip VPC endpoint check for test HCPs (e.g., osde2e tests without real VPC infrastructure)
+	if _, osde2eTesting := hostedcontrolplane.Annotations["routemonitor.openshift.io/osde2e-testing"]; osde2eTesting {
+		return true, nil
+	}
+
 	// Create an instance of the VpcEndpoint
 	vpcEndpoint := &avov1alpha2.VpcEndpoint{}
 
