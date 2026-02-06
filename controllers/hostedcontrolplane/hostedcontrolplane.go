@@ -322,6 +322,11 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
 func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+	// Skip internal monitoring for test HCPs (e.g., osde2e tests without real kube-apiserver infrastructure)
+	if _, osde2eTesting := hostedcontrolplane.Annotations["routemonitor.openshift.io/osde2e-testing"]; osde2eTesting {
+		return nil
+	}
+
 	// Create or update route object
 	expectedRoute := r.buildInternalMonitoringRoute(hostedcontrolplane)
 	err := r.Create(ctx, &expectedRoute)
