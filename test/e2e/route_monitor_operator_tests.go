@@ -425,26 +425,15 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 			environment = provider.Environment() // Returns "int", "stage", or "prod"
 		}
 
-		// Fetch OIDC credentials from environment variables
-		By("fetching OIDC credentials")
-
-		// Log which credential source is available for debugging
-		if os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_ID") != "" {
-			GinkgoLogr.Info("EXTERNAL_SECRET_ credentials detected")
-		} else {
-			GinkgoLogr.Info("No EXTERNAL_SECRET_ credentials found, test will fail")
-		}
-
 		// Get OIDC credentials from ConfigMap first, fall back to env vars if needed
 		// This checks ConfigMap first, then environment variables, then creates/updates ConfigMap
 		By("getting OIDC credentials from ConfigMap or environment variables")
-		creds, err := getOrCreateOIDCCredentials(ctx, k8s, environment)
+		oidcCredentials, err = getOrCreateOIDCCredentials(ctx, k8s, environment)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to fetch credentials")
-		oidcCredentials = creds // Store for use in listRHOBSProbes
 
 		// Set RHOBS API URL (from credentials or environment)
-		if creds.ProbeAPIURL != "" {
-			rhobsAPIURL = creds.ProbeAPIURL
+		if oidcCredentials.ProbeAPIURL != "" {
+			rhobsAPIURL = oidcCredentials.ProbeAPIURL
 		} else {
 			rhobsAPIURL = getRHOBSAPIURL(environment)
 		}
@@ -454,19 +443,12 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		pollingDuration = 3 * time.Minute
 		probeActivationTimeout = 5 * time.Minute
 
-		// Label the test cluster as a management cluster
-		By("labeling test cluster as management-cluster")
-		err = labelTestClusterAsManagementCluster(ctx, k8s)
-		if err != nil {
-			GinkgoLogr.Info("Warning: could not label test cluster as management cluster", "error", err)
-		}
-
 		GinkgoLogr.Info("RHOBS Synthetic Monitoring test suite initialized",
 			"environment", environment,
 			"probeAPIURL", rhobsAPIURL,
 			"tenant", rhobsTenant,
 			"testNamespace", testNamespace,
-			"oidcConfigured", creds.ClientID != "")
+			"oidcConfigured", oidcCredentials.ClientID != "")
 	})
 
 	// Phase 1 Test 1: Verify RHOBS monitoring configuration
@@ -789,7 +771,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 			hcpCheck := &hypershiftv1beta1.HostedControlPlane{}
 			err := k8s.Get(ctx, hcpName, namespace, hcpCheck)
-			if err != nil && isNotFoundError(err) {
+			if err != nil && k8serrors.IsNotFound(err) {
 				GinkgoLogr.Info("HostedControlPlane fully deleted", "name", hcpName)
 				return true, nil
 			}
@@ -946,18 +928,6 @@ func getRHOBSAPIURL(environment string) string {
 		// Default to stage
 		return "https://rhobs.us-east-1-0.api.stage.openshift.com/api/metrics/v1/hcp/probes"
 	}
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-
-func isAlreadyExistsError(err error) bool {
-	return k8serrors.IsAlreadyExists(err)
-}
-
-func isNotFoundError(err error) bool {
-	return k8serrors.IsNotFound(err)
 }
 
 func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, hcp *hypershiftv1beta1.HostedControlPlane) error {
@@ -1375,54 +1345,6 @@ func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCC
 	GinkgoLogr.Info("Creating RMO config ConfigMap with OIDC credentials", "namespace", "openshift-route-monitor-operator")
 	if err := k8s.Create(ctx, configMap); err != nil {
 		return fmt.Errorf("failed to create ConfigMap: %w", err)
-	}
-
-	return nil
-}
-
-// labelTestClusterAsManagementCluster labels the cluster the test is running on as a management cluster
-func labelTestClusterAsManagementCluster(ctx context.Context, k8s *openshift.Client) error {
-	GinkgoLogr.Info("Looking for ClusterDeployment to label as management-cluster")
-
-	// List all ClusterDeployments to find the one for this cluster
-	cdList := &unstructured.UnstructuredList{}
-	cdList.SetAPIVersion("hive.openshift.io/v1")
-	cdList.SetKind("ClusterDeploymentList")
-
-	err := k8s.List(ctx, cdList)
-	if err != nil {
-		return fmt.Errorf("failed to list ClusterDeployments: %w", err)
-	}
-
-	if len(cdList.Items) == 0 {
-		return fmt.Errorf("no ClusterDeployments found in cluster")
-	}
-
-	// Label all ClusterDeployments we find (typically there should only be one for the test cluster)
-	for idx := range cdList.Items {
-		cd := &cdList.Items[idx]
-
-		// Add the management-cluster label
-		labels := cd.GetLabels()
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		labels["ext-hypershift.openshift.io/cluster-type"] = "management-cluster"
-		cd.SetLabels(labels)
-
-		// Update the ClusterDeployment
-		err = k8s.Update(ctx, cd)
-		if err != nil {
-			GinkgoLogr.Info("Warning: failed to update ClusterDeployment",
-				"name", cd.GetName(),
-				"namespace", cd.GetNamespace(),
-				"error", err)
-			continue
-		}
-
-		GinkgoLogr.Info("Successfully labeled ClusterDeployment as management-cluster",
-			"name", cd.GetName(),
-			"namespace", cd.GetNamespace())
 	}
 
 	return nil
