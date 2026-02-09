@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
@@ -61,7 +62,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(
+	crmetrics.Registry.MustRegister(
 		apiRequestDuration,
 		apiRequestsTotal,
 		oidcTokenRefreshTotal,
