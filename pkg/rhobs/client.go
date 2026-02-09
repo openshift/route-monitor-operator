@@ -163,18 +163,23 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "method", "POST", "url", url, "static_url", req.StaticURL, "cluster_id", req.Labels["cluster-id"], "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "POST", "url", url, "operation", "create-probe")
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(httpReq)
+	requestDuration := time.Since(start)
 	if err != nil {
+		RecordAPIRequest("create_probe", requestDuration, false)
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		RecordAPIRequest("create_probe", requestDuration, false)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	c.logger.Info("Received RHOBS API response", "method", "POST", "url", url, "status_code", resp.StatusCode, "operation", "create-probe")
+	RecordAPIRequest("create_probe", requestDuration, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict)
 
 	if resp.StatusCode == http.StatusConflict {
 		// Probe already exists for this URL, which is fine - treat as success
@@ -228,18 +233,23 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "method", "GET", "url", httpReq.URL.String(), "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "GET", "url", httpReq.URL.String(), "operation", "get-probe")
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(httpReq)
+	requestDuration := time.Since(start)
 	if err != nil {
+		RecordAPIRequest("get_probe", requestDuration, false)
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		RecordAPIRequest("get_probe", requestDuration, false)
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	c.logger.Info("Received RHOBS API response", "method", "GET", "url", httpReq.URL.String(), "status_code", resp.StatusCode, "operation", "get-probe")
+	RecordAPIRequest("get_probe", requestDuration, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil // Probe doesn't exist
@@ -335,14 +345,18 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	c.logger.Info("Terminating RHOBS probe", "method", "PATCH", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "PATCH", "url", url, "operation", "delete-probe")
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(httpReq)
+	requestDuration := time.Since(start)
 	if err != nil {
+		RecordAPIRequest("delete_probe", requestDuration, false)
 		c.logger.Error(err, "Failed to send HTTP request", "cluster_id", clusterID, "url", url)
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	c.logger.Info("Received RHOBS API response", "method", "PATCH", "url", url, "status_code", resp.StatusCode, "operation", "delete-probe")
+	RecordAPIRequest("delete_probe", requestDuration, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound)
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Probe already doesn't exist, consider this success
@@ -415,20 +429,27 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 
 	c.logger.V(debugLogLevel).Info("Requesting OIDC access token", "issuer_url", c.oidcConfig.IssuerURL, "token_url", tokenURL)
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
+	refreshDuration := time.Since(start)
 	if err != nil {
+		RecordOIDCTokenRefresh(refreshDuration, false)
 		return "", fmt.Errorf("failed to request access token: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		RecordOIDCTokenRefresh(refreshDuration, false)
 		return "", fmt.Errorf("failed to read token response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		RecordOIDCTokenRefresh(refreshDuration, false)
 		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
+
+	RecordOIDCTokenRefresh(refreshDuration, true)
 
 	var tokenResp tokenResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
