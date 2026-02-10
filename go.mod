@@ -14,7 +14,7 @@ require (
 	github.com/openshift/api v0.0.0-20250409155250-8fcc4e71758a
 	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364
 	github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c
-	github.com/openshift/osde2e v0.0.0-20260202205050-a418c410e9bc
+	github.com/openshift/osde2e v0.0.0-20260209164730-1a4541c8e2b1
 	github.com/openshift/osde2e-common v0.0.0-20260126213857-862206787cf9
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.0
 	github.com/prometheus/common v0.67.5

@@ -1317,10 +1317,11 @@ func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCC
 			Namespace: "openshift-route-monitor-operator",
 		},
 		Data: map[string]string{
-			"probe-api-url":      creds.ProbeAPIURL,
-			"oidc-client-id":     creds.ClientID,
-			"oidc-client-secret": creds.ClientSecret,
-			"oidc-issuer-url":    creds.IssuerURL,
+			"probe-api-url":              creds.ProbeAPIURL,
+			"oidc-client-id":             creds.ClientID,
+			"oidc-client-secret":         creds.ClientSecret,
+			"oidc-issuer-url":            creds.IssuerURL,
+			"skip-infrastructure-tests":  "true",
 		},
 	}
 
