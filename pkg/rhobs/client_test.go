@@ -1061,13 +1061,13 @@ func TestFullURLSupport(t *testing.T) {
 	}{
 		{
 			name:        "full URL with /probes endpoint",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
 		},
 		{
 			name:        "base URL without path",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/test-tenant/probes",
 		},
 	}
 
@@ -1091,8 +1091,8 @@ func TestFullURLSupport(t *testing.T) {
 
 			// Replace the example domain with test server for the full URL test
 			baseURL := tt.baseURL
-			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
-				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			if strings.Contains(baseURL, "us-west-2.rhobs.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://us-west-2.rhobs.api.integration.openshift.com", server.URL, 1)
 			} else {
 				baseURL = server.URL
 			}
@@ -1114,7 +1114,7 @@ func TestFullURLSupport(t *testing.T) {
 			}
 
 			// Verify the URL used
-			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://us-west-2.rhobs.api.integration.openshift.com")
 			if !strings.HasSuffix(actualURL, expectedPath) {
 				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
 			}
@@ -1132,15 +1132,15 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 	}{
 		{
 			name:        "full URL with /probes endpoint for specific probe",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes/probe-123",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes/probe-123",
 		},
 		{
 			name:        "base URL without path for specific probe",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/probe-123",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/probe-123",
 		},
 	}
 
@@ -1171,8 +1171,8 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 
 			// Replace the example domain with test server for the full URL test
 			baseURL := tt.baseURL
-			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
-				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			if strings.Contains(baseURL, "us-west-2.rhobs.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://us-west-2.rhobs.api.integration.openshift.com", server.URL, 1)
 			} else {
 				baseURL = server.URL
 			}
@@ -1186,7 +1186,7 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 			}
 
 			// Verify the URL used
-			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://us-west-2.rhobs.api.integration.openshift.com")
 			if !strings.HasSuffix(actualURL, expectedPath) {
 				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
 			}
