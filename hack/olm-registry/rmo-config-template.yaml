@@ -16,6 +16,10 @@ metadata:
 #
 # For production traffic splitting in high-load regions (e.g., us-east-1 with
 # multiple RHOBS cells), see SREP-3225 for adding rhobs-cell labels to MCs.
+#
+# Configuration Parameters:
+# - DYNATRACE_ENABLED: Controls Dynatrace synthetic monitoring (default: "true")
+#   Set to "false" to disable Dynatrace for specific sectors/regions
 ###############################################################################
 
 parameters:

@@ -259,9 +259,11 @@ type RHOBSConfig struct {
 	OnlyPublicClusters bool
 }
 
-// DynatraceConfig holds Dynatrace feature flag configuration
+// DynatraceConfig holds Dynatrace feature flag configuration.
+// Dynatrace monitoring is enabled by default and can be disabled per-sector/region
+// by setting "dynatrace-enabled: false" in the ConfigMap.
 type DynatraceConfig struct {
-	Enabled bool // Feature flag
+	Enabled bool // Feature flag - defaults to true
 }
 
 // ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
