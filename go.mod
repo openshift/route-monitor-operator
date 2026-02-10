@@ -17,6 +17,7 @@ require (
 	github.com/openshift/osde2e v0.0.0-20260209164730-1a4541c8e2b1
 	github.com/openshift/osde2e-common v0.0.0-20260126213857-862206787cf9
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.64.0
+	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.5
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
 	go.uber.org/mock v0.4.0
@@ -80,6 +81,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
@@ -95,7 +97,6 @@ require (
 	github.com/openshift-online/ocm-sdk-go v0.1.486 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
