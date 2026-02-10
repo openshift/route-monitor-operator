@@ -18,8 +18,8 @@ metadata:
 # multiple RHOBS cells), see SREP-3225 for adding rhobs-cell labels to MCs.
 #
 # Configuration Parameters:
-# - DYNATRACE_ENABLED: Controls Dynatrace synthetic monitoring (default: "true")
-#   Set to "false" to disable Dynatrace for specific sectors/regions
+# - DYNATRACE_ENABLED: Controls Dynatrace synthetic monitoring (default: "false")
+#   Set to "true" to enable Dynatrace for specific sectors/regions
 ###############################################################################
 
 parameters:
@@ -47,7 +47,7 @@ parameters:
   value: ""
   required: false                                                                                                                                                           
 - name: DYNATRACE_ENABLED                                                                                                                                                                
-  value: "true"                                                                                                                                                                         
+  value: "false"                                                                                                                                                                         
   required: false                                                                                                                                                                        
   description: "Enable Dynatrace synthetic monitoring for this sector"      
 

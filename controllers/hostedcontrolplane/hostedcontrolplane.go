@@ -111,7 +111,7 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 		if !kerr.IsNotFound(err) {
 			logger.V(2).Info("Failed to read ConfigMap, using fallback config", "error", err.Error())
 		}
-		return r.RHOBSConfig, DynatraceConfig{Enabled: true}
+		return r.RHOBSConfig, DynatraceConfig{Enabled: false}
 	}
 
 	// Merge ConfigMap values with fallback defaults
@@ -135,10 +135,10 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 		cfg.OnlyPublicClusters = true
 	}
 
-	// Read Dynatrace configuration - defaults to enabled
-	dynatraceConfig := DynatraceConfig{Enabled: true}
-	if strings.TrimSpace(configMap.Data["dynatrace-enabled"]) == "false" {
-		dynatraceConfig.Enabled = false
+	// Read Dynatrace configuration - defaults to disabled
+	dynatraceConfig := DynatraceConfig{Enabled: false}
+	if strings.TrimSpace(configMap.Data["dynatrace-enabled"]) == "true" {
+		dynatraceConfig.Enabled = true
 	}
 
 	return cfg, dynatraceConfig

@@ -867,7 +867,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 			configMap:         nil,
 			fallbackConfig:    fallbackConfig,
 			expectedRHOBS:     fallbackConfig,
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Default is enabled
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Default is disabled
 		},
 		{
 			name: "ConfigMap present with all values - uses ConfigMap values",
@@ -919,7 +919,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 				OIDCIssuerURL:      "https://fallback-issuer.example.com",
 				OnlyPublicClusters: false,
 			},
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Default is enabled when not specified
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Default is disabled when not specified
 		},
 		{
 			name: "ConfigMap present with empty values - uses fallback for empty fields",
@@ -947,7 +947,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 				OIDCIssuerURL:      "https://fallback-issuer.example.com",
 				OnlyPublicClusters: false,
 			},
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Empty defaults to enabled
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Empty defaults to disabled
 		},
 		{
 			name: "ConfigMap in wrong namespace - uses fallback config",
@@ -962,7 +962,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 			},
 			fallbackConfig:    fallbackConfig,
 			expectedRHOBS:     fallbackConfig,
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Default is enabled
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Default is disabled
 		},
 		{
 			name: "ConfigMap with wrong name - uses fallback config",
@@ -977,7 +977,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 			},
 			fallbackConfig:    fallbackConfig,
 			expectedRHOBS:     fallbackConfig,
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Default is enabled
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Default is disabled
 		},
 		{
 			name: "ConfigMap with Dynatrace enabled",
@@ -1010,7 +1010,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 			expectedDynatrace: DynatraceConfig{Enabled: false},
 		},
 		{
-			name: "ConfigMap with Dynatrace set to invalid value - defaults to enabled",
+			name: "ConfigMap with Dynatrace set to invalid value - defaults to disabled",
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapName,
@@ -1022,7 +1022,7 @@ func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 			},
 			fallbackConfig:    fallbackConfig,
 			expectedRHOBS:     fallbackConfig,
-			expectedDynatrace: DynatraceConfig{Enabled: true}, // Invalid value defaults to enabled
+			expectedDynatrace: DynatraceConfig{Enabled: false}, // Invalid value defaults to disabled
 		},
 	}
 

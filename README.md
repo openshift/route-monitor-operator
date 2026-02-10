@@ -64,17 +64,17 @@ For HostedCluster monitoring, the operator supports dynamic configuration via th
 - `oidc-client-secret`: OIDC client secret for RHOBS authentication
 - `oidc-issuer-url`: OIDC issuer URL for RHOBS authentication
 - `only-public-clusters`: Set to "true" to only monitor public clusters
-- `dynatrace-enabled`: Enable/disable Dynatrace synthetic monitoring (default: "true")
+- `dynatrace-enabled`: Enable/disable Dynatrace synthetic monitoring (default: "false")
 
 **Note:** ConfigMap values override command-line flags when present.
 
 ### Dynatrace Synthetic Monitoring
 
-Dynatrace monitoring is **enabled by default**. To disable Dynatrace for specific sectors or regions:
+Dynatrace monitoring is **disabled by default**. To enable Dynatrace for specific sectors or regions:
 
 ```yaml
 data:
-  dynatrace-enabled: "false"
+  dynatrace-enabled: "true"
 ```
 
 This allows per-region/per-sector control of Dynatrace monitoring via the config template.
