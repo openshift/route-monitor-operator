@@ -230,8 +230,8 @@ github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364 h1:wrR
 github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364/go.mod h1:+/t18O2NwRYEzWbi76OImNMivJXi6bbFVG3ODGeQjMk=
 github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c h1:NBH3no8kaW7Hem/mf/0lIfZZEIeaNTwo7XfTqUm2cJc=
 github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c/go.mod h1:K1e56UPfFQaO8BYXbVS1TbNqb6rmPo+fc6Jxjv+w0Xo=
-github.com/openshift/osde2e v0.0.0-20260202205050-a418c410e9bc h1:W6qCZPI/2f64vRbDbUH0wrVzXTcjV5UBBTrIfD/giO8=
-github.com/openshift/osde2e v0.0.0-20260202205050-a418c410e9bc/go.mod h1:VW4cnPpR92sfzwuhzPWatXYAo7/ZgyjYhCDPPONjUfk=
+github.com/openshift/osde2e v0.0.0-20260209164730-1a4541c8e2b1 h1:2tqxJRv06Psmb1r9CYHEhjK0FW/uZmH6ZorQn9wJHT4=
+github.com/openshift/osde2e v0.0.0-20260209164730-1a4541c8e2b1/go.mod h1:VW4cnPpR92sfzwuhzPWatXYAo7/ZgyjYhCDPPONjUfk=
 github.com/openshift/osde2e-common v0.0.0-20260126213857-862206787cf9 h1:oUYQpPED774xWW41aRfrhvPSEcIN3FR6XeePOVqcljk=
 github.com/openshift/osde2e-common v0.0.0-20260126213857-862206787cf9/go.mod h1:nMeOffePy+qdcCXuwTw5YcMMn/cTfjYQf7KRLjhKweo=
 github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
