@@ -259,6 +259,11 @@ type RHOBSConfig struct {
 	OnlyPublicClusters bool
 }
 
+// DynatraceConfig holds Dynatrace feature flag configuration
+type DynatraceConfig struct {
+	Enabled bool // Feature flag
+}
+
 // ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
 func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID

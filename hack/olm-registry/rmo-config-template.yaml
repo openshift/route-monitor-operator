@@ -41,7 +41,11 @@ parameters:
   required: true
 - name: ONLY_PUBLIC_CLUSTERS
   value: ""
-  required: false
+  required: false                                                                                                                                                           
+- name: DYNATRACE_ENABLED                                                                                                                                                                
+  value: "true"                                                                                                                                                                         
+  required: false                                                                                                                                                                        
+  description: "Enable Dynatrace synthetic monitoring for this sector"      
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -71,3 +75,4 @@ objects:
         oidc-client-secret: ${OIDC_CLIENT_SECRET}
         oidc-issuer-url: ${OIDC_ISSUER_URL}
         only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
+        dynatrace-enabled: ${DYNATRACE_ENABLED}
