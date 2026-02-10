@@ -916,15 +916,15 @@ func getEnvOrDefault(key, defaultValue string) string {
 func getRHOBSAPIURL(environment string) string {
 	switch environment {
 	case "int": // osde2e uses "int" for integration
-		return "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes"
+		return "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes"
 	case "stage":
-		return "https://rhobs.us-east-1-0.api.stage.openshift.com/api/metrics/v1/hcp/probes"
+		return "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
 	case "prod":
 		// Production RHOBS not yet available - return empty string
 		return ""
 	default:
 		// Default to stage
-		return "https://rhobs.us-east-1-0.api.stage.openshift.com/api/metrics/v1/hcp/probes"
+		return "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
 	}
 }
 
@@ -1304,7 +1304,7 @@ Please set the following environment variables:
   export EXTERNAL_SECRET_OIDC_ISSUER_URL="your-issuer-url"
 
 Optional (will auto-detect based on environment if not set):
-  export PROBE_API_URL="https://rhobs.us-east-1-0.api.stage.openshift.com/api/metrics/v1/hcp/probes"
+  export PROBE_API_URL="https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
 
 Note: In osde2e/CI, the EXTERNAL_SECRET_* variables are automatically loaded from app-interface (SDCICD-1739).`)
 }
