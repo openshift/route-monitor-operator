@@ -230,6 +230,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 						"timeout", rhobsProbeDeletionTimeout,
 						"behavior", "fail_open",
 						"note", "Orphaned probe may require manual cleanup via synthetics-api or will be cleaned up when API is restored")
+					rhobs.RecordProbeDeletionTimeout()
 					// Continue with deletion (do not return error)
 				}
 			} else {

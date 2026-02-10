@@ -49,9 +49,13 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
 	"github.com/openshift/route-monitor-operator/controllers/hostedcontrolplane"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
+	"github.com/openshift/route-monitor-operator/pkg/rhobs"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	// +kubebuilder:scaffold:imports
 )
+
+// version is set at build time via -ldflags
+var version = "unknown"
 
 var (
 	scheme   = runtime.NewScheme()
@@ -305,6 +309,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	rhobs.SetInfo(version)
 	setupLog.V(2).Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
