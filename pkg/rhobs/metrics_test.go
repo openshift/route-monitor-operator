@@ -105,7 +105,7 @@ func TestSetInfo(t *testing.T) {
 }
 
 func TestMetricsRegistration(t *testing.T) {
-	// Verify all metrics are registered with the default registry
+	// Verify all metrics have valid descriptions
 	metrics := []prometheus.Collector{
 		apiRequestDuration,
 		apiRequestsTotal,
