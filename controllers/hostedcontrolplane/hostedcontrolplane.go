@@ -134,8 +134,8 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 	if strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true" {
 		cfg.OnlyPublicClusters = true
 	}
-	if strings.TrimSpace(configMap.Data["skip-infrastructure-tests"]) == "true" {
-		cfg.SkipInfrastructureTests = true
+	if strings.TrimSpace(configMap.Data["skip-infrastructure-health-check"]) == "true" {
+		cfg.SkipInfrastructureHealthCheck = true
 	}
 
 	// Read Dynatrace configuration - defaults to disabled
@@ -341,7 +341,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
 func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	// Skip internal monitoring for test environments (e.g., osde2e tests without real kube-apiserver infrastructure)
-	if cfg.SkipInfrastructureTests {
+	if cfg.SkipInfrastructureHealthCheck {
 		return nil
 	}
 
