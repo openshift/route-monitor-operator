@@ -44,7 +44,7 @@ spec:
             - --oidc-client-secret=$(OIDC_CLIENT_SECRET)
             - --oidc-issuer-url=$(OIDC_ISSUER_URL)
             - --only-public-clusters=$(ONLY_PUBLIC_CLUSTERS)
-            - --skip-infrastructure-tests=$(SKIP_INFRASTRUCTURE_TESTS)
+            - --skip-infrastructure-health-check=$(SKIP_INFRASTRUCTURE_HEALTH_CHECK)
           command:
             - /manager
           env:
@@ -66,7 +66,7 @@ spec:
               value: ""
             - name: ONLY_PUBLIC_CLUSTERS
               value: "false"
-            - name: SKIP_INFRASTRUCTURE_TESTS
+            - name: SKIP_INFRASTRUCTURE_HEALTH_CHECK
               value: "false"
           image: route-monitor-operator:latest
           livenessProbe:

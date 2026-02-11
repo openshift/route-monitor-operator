@@ -1232,13 +1232,13 @@ Please set the following environment variables or set them in the route-monitor-
   export EXTERNAL_SECRET_OIDC_ISSUER_URL="your-issuer-url"
   export PROBE_API_URL="your-rhobs-api-url"
 
-Note: In osde2e/CI, these variables (including SKIP_INFRASTRUCTURE_TESTS) are automatically loaded from app-interface (SDCICD-1739).`)
+Note: In osde2e/CI, these variables (including SKIP_INFRASTRUCTURE_HEALTH_CHECK) are automatically loaded from app-interface (SDCICD-1739).`)
 }
 
 // createRMOConfigMap creates the RMO config ConfigMap with OIDC credentials
 func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCCredentials) error {
-	// Read skip-infrastructure-tests from environment, default to "false"
-	skipInfraTests := getEnvOrDefault("SKIP_INFRASTRUCTURE_TESTS", "false")
+	// Read skip-infrastructure-health-check from environment, default to "false"
+	skipInfraHealthCheck := getEnvOrDefault("SKIP_INFRASTRUCTURE_HEALTH_CHECK", "false")
 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1246,11 +1246,11 @@ func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCC
 			Namespace: "openshift-route-monitor-operator",
 		},
 		Data: map[string]string{
-			"probe-api-url":             creds.ProbeAPIURL,
-			"oidc-client-id":            creds.ClientID,
-			"oidc-client-secret":        creds.ClientSecret,
-			"oidc-issuer-url":           creds.IssuerURL,
-			"skip-infrastructure-tests": skipInfraTests,
+			"probe-api-url":                     creds.ProbeAPIURL,
+			"oidc-client-id":                    creds.ClientID,
+			"oidc-client-secret":                creds.ClientSecret,
+			"oidc-issuer-url":                   creds.IssuerURL,
+			"skip-infrastructure-health-check": skipInfraHealthCheck,
 		},
 	}
 
