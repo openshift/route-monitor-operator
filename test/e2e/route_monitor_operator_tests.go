@@ -429,12 +429,9 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		oidcCredentials, err = getOrCreateOIDCCredentials(ctx, k8s, environment)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to fetch credentials")
 
-		// Set RHOBS API URL (from credentials or environment)
-		if oidcCredentials.ProbeAPIURL != "" {
-			rhobsAPIURL = oidcCredentials.ProbeAPIURL
-		} else {
-			rhobsAPIURL = getRHOBSAPIURL(environment)
-		}
+		// Set RHOBS API URL from credentials (which comes from PROBE_API_URL env var)
+		rhobsAPIURL = oidcCredentials.ProbeAPIURL
+		Expect(rhobsAPIURL).ShouldNot(BeEmpty(), "PROBE_API_URL must be set (via app-interface in CI/CD or manually for local testing)")
 
 		rhobsTenant = getEnvOrDefault("RHOBS_TENANT", "hcp")
 		testNamespace = getEnvOrDefault("HCP_TEST_NAMESPACE", "clusters")
@@ -913,21 +910,6 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getRHOBSAPIURL(environment string) string {
-	switch environment {
-	case "int": // osde2e uses "int" for integration
-		return "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes"
-	case "stage":
-		return "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
-	case "prod":
-		// Production RHOBS not yet available - return empty string
-		return ""
-	default:
-		// Default to stage
-		return "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
-	}
-}
-
 func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, hcp *hypershiftv1beta1.HostedControlPlane) error {
 	// Update the status to simulate HyperShift controller behavior
 	// RMO only processes HCPs with Available=true status
@@ -1298,15 +1280,13 @@ func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentia
 	// No credentials found
 	return nil, fmt.Errorf(`no OIDC credentials found in environment variables
 
-Please set the following environment variables:
+Please set the following environment variables or set them in the route-monitor-operator-config ConfigMap:
   export EXTERNAL_SECRET_OIDC_CLIENT_ID="your-client-id"
   export EXTERNAL_SECRET_OIDC_CLIENT_SECRET="your-client-secret"
   export EXTERNAL_SECRET_OIDC_ISSUER_URL="your-issuer-url"
+  export PROBE_API_URL="your-rhobs-api-url"
 
-Optional (will auto-detect based on environment if not set):
-  export PROBE_API_URL="https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
-
-Note: In osde2e/CI, the EXTERNAL_SECRET_* variables are automatically loaded from app-interface (SDCICD-1739).`)
+Note: In osde2e/CI, these variables (including SKIP_INFRASTRUCTURE_TESTS) are automatically loaded from app-interface (SDCICD-1739).`)
 }
 
 // createRMOConfigMap creates the RMO config ConfigMap with OIDC credentials
@@ -1320,11 +1300,11 @@ func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCC
 			Namespace: "openshift-route-monitor-operator",
 		},
 		Data: map[string]string{
-			"probe-api-url":              creds.ProbeAPIURL,
-			"oidc-client-id":             creds.ClientID,
-			"oidc-client-secret":         creds.ClientSecret,
-			"oidc-issuer-url":            creds.IssuerURL,
-			"skip-infrastructure-tests":  skipInfraTests,
+			"probe-api-url":             creds.ProbeAPIURL,
+			"oidc-client-id":            creds.ClientID,
+			"oidc-client-secret":        creds.ClientSecret,
+			"oidc-issuer-url":           creds.IssuerURL,
+			"skip-infrastructure-tests": skipInfraTests,
 		},
 	}
 
