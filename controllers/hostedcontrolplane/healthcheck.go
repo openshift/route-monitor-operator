@@ -65,7 +65,7 @@ const (
 // this functionality
 func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) (bool, error) {
 	// Skip health check for test environments (e.g., osde2e tests without real kube-apiserver)
-	if cfg.SkipInfrastructureTests {
+	if cfg.SkipInfrastructureHealthCheck {
 		return true, nil
 	}
 
@@ -234,7 +234,7 @@ func olderThan(obj metav1.Object, age time.Duration) bool {
 // isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
 func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) (bool, error) {
 	// Skip VPC endpoint check for test environments (e.g., osde2e tests without real VPC infrastructure)
-	if cfg.SkipInfrastructureTests {
+	if cfg.SkipInfrastructureHealthCheck {
 		return true, nil
 	}
 

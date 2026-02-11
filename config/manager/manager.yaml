@@ -48,7 +48,7 @@ spec:
             - --oidc-client-secret=$(OIDC_CLIENT_SECRET)
             - --oidc-issuer-url=$(OIDC_ISSUER_URL)
             - --only-public-clusters=$(ONLY_PUBLIC_CLUSTERS)
-            - --skip-infrastructure-tests=$(SKIP_INFRASTRUCTURE_TESTS)
+            - --skip-infrastructure-health-check=$(SKIP_INFRASTRUCTURE_HEALTH_CHECK)
           env:
             - name: LOG_LEVEL
               # level 1 is debug, so when we want to raise the level we can
@@ -71,7 +71,7 @@ spec:
               value: ""  # Default to empty - can be overridden in app-interface
             - name: ONLY_PUBLIC_CLUSTERS
               value: "false"  # Default to false - can be overridden in app-interface
-            - name: SKIP_INFRASTRUCTURE_TESTS
+            - name: SKIP_INFRASTRUCTURE_HEALTH_CHECK
               value: "false"  # Default to false - can be overridden in app-interface
           image: controller:latest
           name: manager

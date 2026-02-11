@@ -42,7 +42,7 @@ parameters:
 - name: ONLY_PUBLIC_CLUSTERS
   value: ""
   required: false
-- name: SKIP_INFRASTRUCTURE_TESTS
+- name: SKIP_INFRASTRUCTURE_HEALTH_CHECK
   value: "false"
   required: false
   description: "Skip infrastructure health checks for test environments"
@@ -75,4 +75,4 @@ objects:
         oidc-client-secret: ${OIDC_CLIENT_SECRET}
         oidc-issuer-url: ${OIDC_ISSUER_URL}
         only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
-        skip-infrastructure-tests: ${SKIP_INFRASTRUCTURE_TESTS}
+        skip-infrastructure-health-check: ${SKIP_INFRASTRUCTURE_HEALTH_CHECK}

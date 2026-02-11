@@ -98,7 +98,7 @@ func main() {
 	var oidcClientSecret string
 	var oidcIssuerURL string
 	var onlyPublicClusters bool
-	var skipInfrastructureTests bool
+	var skipInfrastructureHealthCheck bool
 
 	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
@@ -108,7 +108,7 @@ func main() {
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", "", "OIDC client secret for RHOBS API authentication. When empty, no OIDC authentication is used.")
 	flag.StringVar(&oidcIssuerURL, "oidc-issuer-url", "", "OIDC issuer URL for RHOBS API authentication. When empty, no OIDC authentication is used.")
 	flag.BoolVar(&onlyPublicClusters, "only-public-clusters", false, "When true, only create RHOBS probes for public (non-private) HostedClusters. Defaults to false (process all clusters).")
-	flag.BoolVar(&skipInfrastructureTests, "skip-infrastructure-tests", false, "When true, skip infrastructure health checks (HCP ready, VPC endpoint ready) for test environments. Defaults to false.")
+	flag.BoolVar(&skipInfrastructureHealthCheck, "skip-infrastructure-health-check", false, "When true, skip infrastructure health checks (HCP ready, VPC endpoint ready) for test environments. Defaults to false.")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -173,12 +173,12 @@ func main() {
 			flagParams = append(flagParams, "only-public-clusters")
 		}
 
-		if configData.SkipInfrastructureTests {
-			setupLog.V(1).Info("Using skip-infrastructure-tests from ConfigMap", "skipInfrastructureTests", configData.SkipInfrastructureTests)
-			skipInfrastructureTests = configData.SkipInfrastructureTests
-			configMapParams = append(configMapParams, "skip-infrastructure-tests")
+		if configData.SkipInfrastructureHealthCheck {
+			setupLog.V(1).Info("Using skip-infrastructure-health-check from ConfigMap", "skipInfrastructureHealthCheck", configData.SkipInfrastructureHealthCheck)
+			skipInfrastructureHealthCheck = configData.SkipInfrastructureHealthCheck
+			configMapParams = append(configMapParams, "skip-infrastructure-health-check")
 		} else {
-			flagParams = append(flagParams, "skip-infrastructure-tests")
+			flagParams = append(flagParams, "skip-infrastructure-health-check")
 		}
 
 		// Summarize configuration sources
@@ -283,13 +283,13 @@ func main() {
 
 	if enableHCP {
 		rhobsConfig := hostedcontrolplane.RHOBSConfig{
-			ProbeAPIURL:             probeAPIURL,
-			Tenant:                  probeTenant,
-			OIDCClientID:            oidcClientID,
-			OIDCClientSecret:        oidcClientSecret,
-			OIDCIssuerURL:           oidcIssuerURL,
-			OnlyPublicClusters:      onlyPublicClusters,
-			SkipInfrastructureTests: skipInfrastructureTests,
+			ProbeAPIURL:                  probeAPIURL,
+			Tenant:                       probeTenant,
+			OIDCClientID:                 oidcClientID,
+			OIDCClientSecret:             oidcClientSecret,
+			OIDCIssuerURL:                oidcIssuerURL,
+			OnlyPublicClusters:           onlyPublicClusters,
+			SkipInfrastructureHealthCheck: skipInfrastructureHealthCheck,
 		}
 		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, rhobsConfig)
 		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
@@ -342,13 +342,13 @@ func shouldEnableHCP() (bool, error) {
 
 // OperatorConfig holds configuration values from ConfigMap
 type OperatorConfig struct {
-	ProbeAPIURL             string
-	ProbeTenant             string
-	OIDCClientID            string
-	OIDCClientSecret        string
-	OIDCIssuerURL           string
-	OnlyPublicClusters      bool
-	SkipInfrastructureTests bool
+	ProbeAPIURL                  string
+	ProbeTenant                  string
+	OIDCClientID                 string
+	OIDCClientSecret             string
+	OIDCIssuerURL                string
+	OnlyPublicClusters           bool
+	SkipInfrastructureHealthCheck bool
 }
 
 // getConfigFromConfigMap reads configuration from the route-monitor-operator-config ConfigMap
@@ -380,13 +380,13 @@ func getConfigFromConfigMap() (*OperatorConfig, error) {
 
 	// Extract configuration values, trimming whitespace
 	cfg := &OperatorConfig{
-		ProbeAPIURL:             strings.TrimSpace(configMap.Data["probe-api-url"]),
-		ProbeTenant:             strings.TrimSpace(configMap.Data["probe-tenant"]),
-		OIDCClientID:            strings.TrimSpace(configMap.Data["oidc-client-id"]),
-		OIDCClientSecret:        strings.TrimSpace(configMap.Data["oidc-client-secret"]),
-		OIDCIssuerURL:           strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
-		OnlyPublicClusters:      strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true",
-		SkipInfrastructureTests: strings.TrimSpace(configMap.Data["skip-infrastructure-tests"]) == "true",
+		ProbeAPIURL:                  strings.TrimSpace(configMap.Data["probe-api-url"]),
+		ProbeTenant:                  strings.TrimSpace(configMap.Data["probe-tenant"]),
+		OIDCClientID:                 strings.TrimSpace(configMap.Data["oidc-client-id"]),
+		OIDCClientSecret:             strings.TrimSpace(configMap.Data["oidc-client-secret"]),
+		OIDCIssuerURL:                strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
+		OnlyPublicClusters:           strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true",
+		SkipInfrastructureHealthCheck: strings.TrimSpace(configMap.Data["skip-infrastructure-health-check"]) == "true",
 	}
 
 	// Log detailed information about what was found in the ConfigMap
@@ -429,10 +429,10 @@ func getConfigFromConfigMap() (*OperatorConfig, error) {
 		missingParams = append(missingParams, "only-public-clusters")
 	}
 
-	if configMap.Data["skip-infrastructure-tests"] != "" {
-		foundParams = append(foundParams, "skip-infrastructure-tests")
+	if configMap.Data["skip-infrastructure-health-check"] != "" {
+		foundParams = append(foundParams, "skip-infrastructure-health-check")
 	} else {
-		missingParams = append(missingParams, "skip-infrastructure-tests")
+		missingParams = append(missingParams, "skip-infrastructure-health-check")
 	}
 
 	setupLog.Info("ConfigMap found and processed",
