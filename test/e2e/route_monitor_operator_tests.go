@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,65 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// Local minimal ClusterDeployment type for testing
-// We define this locally to avoid pulling in the full hive dependency
-type ClusterDeployment struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              ClusterDeploymentSpec `json:"spec,omitempty"`
-}
-
-// DeepCopyObject implements runtime.Object interface
-func (cd *ClusterDeployment) DeepCopyObject() runtime.Object {
-	if cd == nil {
-		return nil
-	}
-	out := new(ClusterDeployment)
-	cd.DeepCopyInto(out)
-	return out
-}
-
-// DeepCopyInto copies all properties of this object into another object of the same type
-func (cd *ClusterDeployment) DeepCopyInto(out *ClusterDeployment) {
-	*out = *cd
-	out.TypeMeta = cd.TypeMeta
-	cd.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	out.Spec = cd.Spec
-}
-
-type ClusterDeploymentSpec struct {
-	ClusterName string `json:"clusterName"`
-	BaseDomain  string `json:"baseDomain"`
-}
-
 const (
 	// Embedded CRD definitions - no external dependencies required
-	clusterDeploymentCRD = `
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: clusterdeployments.hive.openshift.io
-spec:
-  group: hive.openshift.io
-  names:
-    kind: ClusterDeployment
-    listKind: ClusterDeploymentList
-    plural: clusterdeployments
-    shortNames:
-    - cd
-    singular: clusterdeployment
-  scope: Namespaced
-  versions:
-  - name: v1
-    served: true
-    storage: true
-    schema:
-      openAPIV3Schema:
-        type: object
-        x-kubernetes-preserve-unknown-fields: true
-    subresources:
-      status: {}
-`
 
 	hostedControlPlaneCRD = `
 apiVersion: apiextensions.k8s.io/v1
@@ -1101,10 +1043,6 @@ func ensureCRDsInstalled(ctx context.Context, k8s *openshift.Client) error {
 		{
 			name:    "vpcendpoints.avo.openshift.io",
 			yamlDef: vpcEndpointCRD,
-		},
-		{
-			name:    "clusterdeployments.hive.openshift.io",
-			yamlDef: clusterDeploymentCRD,
 		},
 	}
 
