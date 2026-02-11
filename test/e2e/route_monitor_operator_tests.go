@@ -414,14 +414,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		Expect(awsvpceapi.AddToScheme(k8s.GetScheme())).Should(Succeed(), "unable to register AWS VPCE scheme")
 
 		// Determine environment from osde2e provider
-		var environment string
-		provider, err := providers.ClusterProvider()
-		if err != nil {
-			GinkgoLogr.Error(err, "Failed to get cluster provider, falling back to stage")
-			environment = "stage"
-		} else {
-			environment = provider.Environment() // Returns "int", "stage", or "prod"
-		}
+		environment := getEnvironment()
 
 		// Get OIDC credentials from ConfigMap first, fall back to env vars if needed
 		// This checks ConfigMap first, then environment variables, then creates/updates ConfigMap
@@ -908,6 +901,21 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvironment determines the current environment (int, stage, prod) from osde2e provider
+// Falls back to "stage" if provider cannot be determined
+func getEnvironment() string {
+	provider, err := providers.ClusterProvider()
+	if err != nil {
+		GinkgoLogr.Error(err, "Failed to get cluster provider, falling back to stage")
+		return "stage"
+	}
+	if provider == nil {
+		GinkgoLogr.Info("Cluster provider is nil, falling back to stage")
+		return "stage"
+	}
+	return provider.Environment() // Returns "int", "stage", or "prod"
 }
 
 func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, hcp *hypershiftv1beta1.HostedControlPlane) error {
