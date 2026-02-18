@@ -53,6 +53,32 @@ Currently the blackbox exporter deployment is only using the default config file
 
 ## Configuration
 
+### Dynamic Configuration (ConfigMap)
+
+For HostedCluster monitoring, the operator supports dynamic configuration via the `route-monitor-operator-config` ConfigMap in the `openshift-route-monitor-operator` namespace. This ConfigMap can be deployed per-region/per-sector using the template at `hack/olm-registry/rmo-config-template.yaml`.
+
+**Supported ConfigMap fields:**
+- `probe-api-url`: RHOBS synthetics API URL
+- `probe-tenant`: RHOBS tenant name (default: "hcp")
+- `oidc-client-id`: OIDC client ID for RHOBS authentication
+- `oidc-client-secret`: OIDC client secret for RHOBS authentication
+- `oidc-issuer-url`: OIDC issuer URL for RHOBS authentication
+- `only-public-clusters`: Set to "true" to only monitor public clusters
+- `dynatrace-enabled`: Enable/disable Dynatrace synthetic monitoring (default: "false")
+
+**Note:** ConfigMap values override command-line flags when present.
+
+### Dynatrace Synthetic Monitoring
+
+Dynatrace monitoring is **disabled by default**. To enable Dynatrace for specific sectors or regions:
+
+```yaml
+data:
+  dynatrace-enabled: "true"
+```
+
+This allows per-region/per-sector control of Dynatrace monitoring via the config template.
+
 ### Probe API URL (Experimental)
 
 For RHOBS synthetics integration with HostedCluster monitoring, configure the probe API URL:
