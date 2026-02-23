@@ -334,6 +334,13 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 	)
 
 	BeforeAll(func(ctx context.Context) {
+		// Emergency skip switch - allows disabling RHOBS API tests through app-interface
+		// In the case of an emergency outage in the rhobs API caused by an RMO misconfiguration
+		// set SKIP_RHOBS_SYNTHETICS_TESTS: "true" to in the  app-interface job and rhobs API tests will be skipped.
+		if os.Getenv("SKIP_RHOBS_SYNTHETICS_TESTS") == "true" {
+			Skip("RHOBS Synthetic Monitoring tests skipped via SKIP_RHOBS_SYNTHETICS_TESTS environment variable")
+		}
+
 		log.SetLogger(GinkgoLogr)
 		var err error
 		k8s, err = openshift.New(GinkgoLogr)
@@ -1246,10 +1253,10 @@ func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCC
 			Namespace: "openshift-route-monitor-operator",
 		},
 		Data: map[string]string{
-			"probe-api-url":                     creds.ProbeAPIURL,
-			"oidc-client-id":                    creds.ClientID,
-			"oidc-client-secret":                creds.ClientSecret,
-			"oidc-issuer-url":                   creds.IssuerURL,
+			"probe-api-url":                    creds.ProbeAPIURL,
+			"oidc-client-id":                   creds.ClientID,
+			"oidc-client-secret":               creds.ClientSecret,
+			"oidc-issuer-url":                  creds.IssuerURL,
 			"skip-infrastructure-health-check": skipInfraHealthCheck,
 		},
 	}
