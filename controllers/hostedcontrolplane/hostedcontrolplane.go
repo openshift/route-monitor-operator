@@ -133,6 +133,9 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) RHOBS
 	if strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true" {
 		cfg.OnlyPublicClusters = true
 	}
+	if strings.TrimSpace(configMap.Data["skip-infrastructure-health-check"]) == "true" {
+		cfg.SkipInfrastructureHealthCheck = true
+	}
 
 	return cfg
 }
@@ -261,7 +264,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// Ensure cluster is ready to be monitored before deploying any probing objects
-	hcpReady, err := r.hcpReady(ctx, hostedcontrolplane)
+	hcpReady, err := r.hcpReady(ctx, hostedcontrolplane, rhobsConfig)
 	if err != nil {
 		log.Error(err, "HCP readiness check failed")
 		return utilreconcile.RequeueWith(fmt.Errorf("HCP readiness check failed: %v", err))
@@ -271,7 +274,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
 	}
 
-	vpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane)
+	vpcEndpointReady, err := r.isVpcEndpointReady(ctx, hostedcontrolplane, rhobsConfig)
 	if err != nil {
 		log.Error(err, "VPC Endpoint check failed")
 		return utilreconcile.RequeueWith(err)
@@ -283,7 +286,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Cluster ready - deploy kube-apiserver monitoring objects
 	log.Info("Deploying internal monitoring objects")
-	err = r.deployInternalMonitoringObjects(ctx, log, hostedcontrolplane)
+	err = r.deployInternalMonitoringObjects(ctx, log, hostedcontrolplane, rhobsConfig)
 	if err != nil {
 		log.Error(err, "failed to deploy internal monitoring components")
 		return utilreconcile.RequeueWith(err)
@@ -322,7 +325,12 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
-func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
+	// Skip internal monitoring for test environments (e.g., osde2e tests without real kube-apiserver infrastructure)
+	if cfg.SkipInfrastructureHealthCheck {
+		return nil
+	}
+
 	// Create or update route object
 	expectedRoute := r.buildInternalMonitoringRoute(hostedcontrolplane)
 	err := r.Create(ctx, &expectedRoute)
