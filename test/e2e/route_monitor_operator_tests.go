@@ -322,13 +322,12 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 })
 var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 	var (
-		k8s                    *openshift.Client
-		rhobsAPIURL            string
-		rhobsTenant            string
-		testNamespace          string
-		pollingDuration        time.Duration
-		probeActivationTimeout time.Duration
-		oidcCredentials        *OIDCCredentials
+		k8s             *openshift.Client
+		rhobsAPIURL     string
+		rhobsTenant     string
+		testNamespace   string
+		pollingDuration time.Duration
+		oidcCredentials *OIDCCredentials
 	)
 
 	const (
@@ -353,13 +352,6 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		err = ensureCRDsInstalled(ctx, k8s)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to ensure CRDs are installed")
 
-		// Restart RMO to pick up CRDs (in case RMO was deployed before test ran)
-		By("restarting RMO to ensure HostedControlPlane controller is running")
-		err = restartRMODeployment(ctx, k8s)
-		if err != nil {
-			GinkgoLogr.Info("Warning: could not restart RMO deployment", "error", err)
-		}
-
 		// Register HyperShift and AWS VPCE schemes
 		Expect(hypershiftv1beta1.AddToScheme(k8s.GetScheme())).Should(Succeed(), "unable to register HyperShift scheme")
 		Expect(awsvpceapi.AddToScheme(k8s.GetScheme())).Should(Succeed(), "unable to register AWS VPCE scheme")
@@ -373,14 +365,26 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		oidcCredentials, err = getOrCreateOIDCCredentials(ctx, k8s, environment)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to fetch credentials")
 
+		// Restart RMO to pick up CRDs and ConfigMap (in case RMO was deployed before test ran)
+		By("restarting RMO to ensure HostedControlPlane controller and ConfigMap are loaded")
+		err = restartRMODeployment(ctx, k8s)
+		if err != nil {
+			GinkgoLogr.Info("Warning: could not restart RMO deployment", "error", err)
+		}
+
 		// Set RHOBS API URL from credentials (which comes from PROBE_API_URL env var)
 		rhobsAPIURL = oidcCredentials.ProbeAPIURL
 		Expect(rhobsAPIURL).ShouldNot(BeEmpty(), "PROBE_API_URL must be set (via app-interface in CI/CD or manually for local testing)")
 
-		rhobsTenant = getEnvOrDefault("RHOBS_TENANT", "hcp")
-		testNamespace = getEnvOrDefault("HCP_TEST_NAMESPACE", "clusters")
+		rhobsTenant = os.Getenv("RHOBS_TENANT")
+		if rhobsTenant == "" {
+			rhobsTenant = "hcp"
+		}
+		testNamespace = os.Getenv("HCP_TEST_NAMESPACE")
+		if testNamespace == "" {
+			testNamespace = "clusters"
+		}
 		pollingDuration = 3 * time.Minute
-		probeActivationTimeout = 5 * time.Minute
 
 		GinkgoLogr.Info("RHOBS Synthetic Monitoring test suite initialized",
 			"environment", environment,
@@ -426,18 +430,12 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		namespace := fmt.Sprintf("%s-%s-%s", testNamespace, clusterID, hcpName)
 
 		By(fmt.Sprintf("creating MC-style namespace: %s", namespace))
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
-		err := k8s.Create(ctx, ns)
+		_, err := createNamespaceWithCleanup(ctx, k8s, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create namespace")
 
 		By(fmt.Sprintf("creating public HostedControlPlane with cluster ID: %s", clusterID))
 		hcp := createMCStyleHCP(clusterID, hcpName, namespace, hypershiftv1beta1.Public)
-
-		err = k8s.Create(ctx, hcp)
+		err = createHCPWithCleanup(ctx, k8s, hcp, clusterID, rhobsAPIURL, oidcCredentials)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create HostedControlPlane")
 
 		By("setting HostedControlPlane status to Available")
@@ -483,57 +481,6 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		Expect(staticURL).Should(ContainSubstring(hostname), "probe URL should contain HCP hostname")
 		Expect(labels["cluster-id"]).Should(Equal(clusterID), "probe should have correct cluster-id label")
 		Expect(labels["private"]).Should(Equal("false"), "probe should be marked as public")
-
-		// Optional: Wait for probe to become active
-		By("optionally waiting for probe to become active")
-		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, probeActivationTimeout, false, func(ctx context.Context) (bool, error) {
-			p, err := getRHOBSProbe(rhobsAPIURL, probeID)
-			if err != nil {
-				return false, nil
-			}
-			status, ok := p["status"].(string)
-			if ok && status == "active" {
-				GinkgoLogr.Info("Probe activated successfully", "probeID", probeID)
-				return true, nil
-			}
-			GinkgoLogr.Info("Waiting for probe activation...", "currentStatus", status)
-			return false, nil
-		})
-		if err != nil {
-			GinkgoLogr.Info("Warning: probe did not reach active status within timeout (may be expected)", "error", err)
-		}
-
-		// Cleanup
-		DeferCleanup(func(ctx context.Context) {
-			By("cleaning up test HostedControlPlane")
-			err := k8s.Delete(ctx, hcp)
-			if err != nil {
-				GinkgoLogr.Info("Warning: failed to delete HCP", "error", err)
-			}
-
-			By("verifying probe is deleted from RHOBS API")
-			err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
-				probes, err := listRHOBSProbes(rhobsAPIURL, fmt.Sprintf("cluster-id=%s", clusterID), oidcCredentials)
-				if err != nil {
-					return false, nil
-				}
-				if len(probes) == 0 {
-					GinkgoLogr.Info("Probe successfully deleted", "clusterID", clusterID)
-					return true, nil
-				}
-				GinkgoLogr.Info("Waiting for probe deletion...", "remainingProbes", len(probes))
-				return false, nil
-			})
-			if err != nil {
-				GinkgoLogr.Info("Warning: probe may not have been cleaned up", "clusterID", clusterID)
-			}
-
-			By("cleaning up test namespace")
-			err = k8s.Delete(ctx, ns)
-			if err != nil {
-				GinkgoLogr.Info("Warning: failed to delete namespace", "error", err)
-			}
-		})
 	})
 
 	// Phase 1 Test 3: Create probe for private HostedControlPlane
@@ -544,18 +491,12 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		namespace := fmt.Sprintf("%s-%s-%s", testNamespace, clusterID, hcpName)
 
 		By(fmt.Sprintf("creating MC-style namespace: %s", namespace))
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
-		err := k8s.Create(ctx, ns)
+		_, err := createNamespaceWithCleanup(ctx, k8s, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create namespace")
 
 		By(fmt.Sprintf("creating private HostedControlPlane with cluster ID: %s", clusterID))
 		hcp := createMCStyleHCP(clusterID, hcpName, namespace, hypershiftv1beta1.Private)
-
-		err = k8s.Create(ctx, hcp)
+		err = createHCPWithCleanup(ctx, k8s, hcp, clusterID, rhobsAPIURL, oidcCredentials)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create HostedControlPlane")
 
 		By("setting HostedControlPlane status to Available")
@@ -595,37 +536,6 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 
 		Expect(labels["cluster-id"]).Should(Equal(clusterID), "probe should have correct cluster-id label")
 		Expect(labels["private"]).Should(Equal("true"), "probe should be marked as private")
-
-		// Cleanup
-		DeferCleanup(func(ctx context.Context) {
-			By("cleaning up test resources")
-			err := k8s.Delete(ctx, hcp)
-			if err != nil {
-				GinkgoLogr.Info("Warning: failed to delete HCP", "error", err)
-			}
-
-			By("verifying probe is deleted from RHOBS API")
-			err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
-				probes, err := listRHOBSProbes(rhobsAPIURL, fmt.Sprintf("cluster-id=%s", clusterID), oidcCredentials)
-				if err != nil {
-					return false, nil
-				}
-				if len(probes) == 0 {
-					GinkgoLogr.Info("Probe successfully deleted", "clusterID", clusterID)
-					return true, nil
-				}
-				return false, nil
-			})
-			if err != nil {
-				GinkgoLogr.Info("Warning: probe may not have been cleaned up", "clusterID", clusterID)
-			}
-
-			By("cleaning up test namespace")
-			err = k8s.Delete(ctx, ns)
-			if err != nil {
-				GinkgoLogr.Info("Warning: failed to delete namespace", "error", err)
-			}
-		})
 	})
 
 	// Phase 1 Test 4: Probe deletion on HCP deletion (SREP-2832)
@@ -636,12 +546,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		namespace := fmt.Sprintf("%s-%s-%s", testNamespace, clusterID, hcpName)
 
 		By(fmt.Sprintf("creating MC-style namespace: %s", namespace))
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
-		err := k8s.Create(ctx, ns)
+		_, err := createNamespaceWithCleanup(ctx, k8s, namespace)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create namespace")
 
 		By(fmt.Sprintf("creating HostedControlPlane for deletion test with cluster ID: %s", clusterID))
@@ -649,6 +554,17 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 
 		err = k8s.Create(ctx, hcp)
 		Expect(err).ShouldNot(HaveOccurred(), "failed to create HostedControlPlane")
+
+		// Register HCP cleanup for failure scenarios (test deletes it manually on success)
+		DeferCleanup(func(ctx context.Context) {
+			// Only clean up if HCP still exists (test may have deleted it)
+			hcpCheck := &hypershiftv1beta1.HostedControlPlane{}
+			err := k8s.Get(ctx, hcpName, namespace, hcpCheck)
+			if err == nil {
+				By(fmt.Sprintf("cleaning up HostedControlPlane after test failure: %s", hcpName))
+				_ = k8s.Delete(ctx, hcp)
+			}
+		})
 
 		By("setting HostedControlPlane status to Available")
 		err = setHostedControlPlaneAvailable(ctx, k8s, hcp)
@@ -720,13 +636,6 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 			return false, nil
 		})
 		Expect(err).ShouldNot(HaveOccurred(), "HostedControlPlane was not deleted - finalizer may be stuck (SREP-2966)")
-
-		// Cleanup namespace after test
-		By("cleaning up test namespace")
-		err = k8s.Delete(ctx, ns)
-		if err != nil {
-			GinkgoLogr.Info("Warning: failed to delete namespace", "error", err)
-		}
 	})
 })
 
@@ -778,7 +687,7 @@ func listRHOBSProbes(baseURL, labelSelector string, creds *OIDCCredentials) ([]m
 
 	reqURL := baseURL
 	if labelSelector != "" {
-		reqURL += "?label_selector=" + labelSelector
+		reqURL += "?label_selector=" + url.QueryEscape(labelSelector)
 	}
 
 	req, err := http.NewRequest("GET", reqURL, nil)
@@ -825,33 +734,67 @@ func listRHOBSProbes(baseURL, labelSelector string, creds *OIDCCredentials) ([]m
 	return probes, nil
 }
 
-func getRHOBSProbe(baseURL, probeID string) (map[string]interface{}, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get(baseURL + "/" + probeID)
+// createNamespaceWithCleanup creates a namespace and registers cleanup via DeferCleanup
+func createNamespaceWithCleanup(ctx context.Context, k8s *openshift.Client, namespace string) (*corev1.Namespace, error) {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}
+
+	err := k8s.Create(ctx, ns)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get probe: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("RHOBS API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, err
 	}
 
-	var probe map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&probe); err != nil {
-		return nil, fmt.Errorf("failed to decode probe response: %w", err)
-	}
+	// Register cleanup immediately
+	DeferCleanup(func(ctx context.Context) {
+		By(fmt.Sprintf("cleaning up test namespace: %s", namespace))
+		err := k8s.Delete(ctx, ns)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			GinkgoLogr.Info("Warning: failed to delete namespace", "namespace", namespace, "error", err)
+		}
+	})
 
-	return probe, nil
+	return ns, nil
 }
 
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+// createHCPWithCleanup creates an HCP and registers cleanup (including probe cleanup from RHOBS API)
+func createHCPWithCleanup(ctx context.Context, k8s *openshift.Client, hcp *hypershiftv1beta1.HostedControlPlane, clusterID, rhobsAPIURL string, oidcCredentials *OIDCCredentials) error {
+	err := k8s.Create(ctx, hcp)
+	if err != nil {
+		return err
 	}
-	return defaultValue
+
+	// Register cleanup immediately
+	DeferCleanup(func(ctx context.Context) {
+		By(fmt.Sprintf("cleaning up test HostedControlPlane: %s", hcp.Name))
+		err := k8s.Delete(ctx, hcp)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			GinkgoLogr.Info("Warning: failed to delete HCP", "hcp", hcp.Name, "error", err)
+		}
+
+		// Also verify probe cleanup from RHOBS API
+		By(fmt.Sprintf("verifying probe cleanup for cluster: %s", clusterID))
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
+			probes, err := listRHOBSProbes(rhobsAPIURL, fmt.Sprintf("cluster-id=%s", clusterID), oidcCredentials)
+			if err != nil {
+				return false, nil
+			}
+			if len(probes) == 0 {
+				GinkgoLogr.Info("Probe successfully deleted", "clusterID", clusterID)
+				return true, nil
+			}
+			GinkgoLogr.Info("Waiting for probe deletion...", "remainingProbes", len(probes))
+			return false, nil
+		})
+		if err != nil {
+			GinkgoLogr.Info("Warning: probe may not have been cleaned up", "clusterID", clusterID)
+		}
+	})
+
+	return nil
 }
 
 // getEnvironment determines the current environment (int, stage, prod) from osde2e provider
@@ -1223,12 +1166,19 @@ func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentia
 	// In CI/CD, these are auto-loaded by osde2e from app-interface (see SDCICD-1739)
 	// For local testing, export these same variables
 	if clientID := os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_ID"); clientID != "" {
+		clientSecret := os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_SECRET")
+		issuerURL := os.Getenv("EXTERNAL_SECRET_OIDC_ISSUER_URL")
+		probeAPIURL := os.Getenv("PROBE_API_URL")
+		if clientSecret == "" || issuerURL == "" || probeAPIURL == "" {
+			return nil, fmt.Errorf("EXTERNAL_SECRET_OIDC_CLIENT_ID is set but one or more required env vars are missing: EXTERNAL_SECRET_OIDC_CLIENT_SECRET=%t, EXTERNAL_SECRET_OIDC_ISSUER_URL=%t, PROBE_API_URL=%t",
+				clientSecret != "", issuerURL != "", probeAPIURL != "")
+		}
 		GinkgoLogr.Info("Using OIDC credentials from EXTERNAL_SECRET_ environment variables")
 		return &OIDCCredentials{
 			ClientID:     clientID,
-			ClientSecret: os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_SECRET"),
-			IssuerURL:    os.Getenv("EXTERNAL_SECRET_OIDC_ISSUER_URL"),
-			ProbeAPIURL:  os.Getenv("PROBE_API_URL"),
+			ClientSecret: clientSecret,
+			IssuerURL:    issuerURL,
+			ProbeAPIURL:  probeAPIURL,
 		}, nil
 	}
 
@@ -1247,7 +1197,10 @@ Note: In osde2e/CI, these variables (including SKIP_INFRASTRUCTURE_HEALTH_CHECK)
 // createRMOConfigMap creates the RMO config ConfigMap with OIDC credentials
 func createRMOConfigMap(ctx context.Context, k8s *openshift.Client, creds *OIDCCredentials) error {
 	// Read skip-infrastructure-health-check from environment, default to "false"
-	skipInfraHealthCheck := getEnvOrDefault("SKIP_INFRASTRUCTURE_HEALTH_CHECK", "false")
+	skipInfraHealthCheck := os.Getenv("SKIP_INFRASTRUCTURE_HEALTH_CHECK")
+	if skipInfraHealthCheck == "" {
+		skipInfraHealthCheck = "false"
+	}
 
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

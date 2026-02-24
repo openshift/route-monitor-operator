@@ -538,7 +538,7 @@ Required CRDs are not installed on the test cluster.
 **Solution:** The test should install CRDs automatically in `BeforeAll`. If this fails:
 - Check test logs for CRD installation errors
 - Verify cluster has permissions to create CRDs
-- The CRD definitions are embedded in `route_monitor_operator_tests.go` (lines 46-96)
+- The CRD definitions are embedded in `route_monitor_operator_tests.go`
 
 #### Tests can't reach RHOBS API
 
