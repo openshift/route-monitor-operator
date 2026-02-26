@@ -44,6 +44,11 @@ objects:
       template:
         spec:
           restartPolicy: Never
+          volumes:
+          - name: route-monitor-operator-sc
+            secret:
+              secretName: route-monitor-operator-sc
+              optional: true
           containers:
             - name: osde2e
               image: quay.io/redhat-services-prod/osde2e-cicada-tenant/osde2e:latest
@@ -56,6 +61,12 @@ objects:
                 - --skip-must-gather
                 - --configs
                 - ${OSDE2E_CONFIGS}
+                - --secret-locations
+                - "/etc/external-secrets"
+              volumeMounts:
+              - name: route-monitor-operator-sc
+                readOnly: true
+                mountPath: "/etc/external-secrets"
               resources:
                 requests:
                   cpu: "300m"
@@ -93,3 +104,4 @@ objects:
                   value: ${USE_EXISTING_CLUSTER}
                 - name: CAD_PAGERDUTY_ROUTING_KEY
                   value: ${CAD_PAGERDUTY_ROUTING_KEY}
+ 
