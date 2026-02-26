@@ -71,3 +71,45 @@ objects:
         oidc-client-secret: ${OIDC_CLIENT_SECRET}
         oidc-issuer-url: ${OIDC_ISSUER_URL}
         only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
+    # Label the RMO namespace so the RHOBS MonitoringStack discovers
+    # ServiceMonitors in it and scrapes RMO metrics for the HCP tenant.
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: ${NAMESPACE}
+        labels:
+          hypershift.openshift.io/monitoring: "true"
+    # Service exposing the controller-manager metrics endpoint (port 8080).
+    # Required because OLM does not create one for this operator.
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        name: route-monitor-operator-metrics
+        namespace: ${NAMESPACE}
+        labels:
+          app.kubernetes.io/component: route-monitor-operator
+      spec:
+        selector:
+          control-plane: controller-manager
+        ports:
+        - name: metrics
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+    # ServiceMonitor for the RHOBS MonitoringStack (monitoring.rhobs API group).
+    # Enables RMO metrics to be scraped and remote-written to the HCP tenant.
+    - apiVersion: monitoring.rhobs/v1
+      kind: ServiceMonitor
+      metadata:
+        name: route-monitor-operator-rhobs
+        namespace: ${NAMESPACE}
+        labels:
+          app.kubernetes.io/component: route-monitor-operator
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/component: route-monitor-operator
+        endpoints:
+        - port: metrics
+          path: /metrics
+          interval: 60s
