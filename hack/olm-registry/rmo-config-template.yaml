@@ -10,9 +10,10 @@ metadata:
 # Each regional RHOBS cell requires its own PROBE_API_URL.
 #
 # Selector labels used:
+# - api.openshift.com/managed: "true"
 # - ext-hypershift.openshift.io/cluster-type: management-cluster
-# - ext-hypershift.openshift.io/cluster-region: <region>
 # - ext-hypershift.openshift.io/cluster-sector: <sector> (matchExpressions In)
+# - api.openshift.com/fedramp: NotIn true
 #
 # For production traffic splitting in high-load regions (e.g., us-east-1 with
 # multiple RHOBS cells), see SREP-3225 for adding rhobs-cell labels to MCs.
@@ -24,8 +25,8 @@ metadata:
 
 parameters:
 - name: REGION
-  required: true
-  description: "Region for label matching (e.g., us-west-2, us-east-1)"
+  required: false
+  description: "Unused. Kept for compatibility with callers that pass this parameter."
 - name: SECTORS
   required: true
   description: "List of sectors to target (e.g., main, perf3)"
@@ -59,9 +60,16 @@ objects:
   spec:
     clusterDeploymentSelector:
       matchLabels:
-        ext-hypershift.openshift.io/cluster-type: management-cluster
-        ext-hypershift.openshift.io/cluster-region: ${REGION}
+        api.openshift.com/managed: "true"
       matchExpressions:
+      - key: api.openshift.com/fedramp
+        operator: NotIn
+        values:
+        - "true"
+      - key: ext-hypershift.openshift.io/cluster-type
+        operator: In
+        values:
+        - management-cluster
       - key: ext-hypershift.openshift.io/cluster-sector
         operator: In
         values: ${{SECTORS}}
@@ -80,3 +88,45 @@ objects:
         oidc-issuer-url: ${OIDC_ISSUER_URL}
         only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
         dynatrace-enabled: ${DYNATRACE_ENABLED}
+    # Label the RMO namespace so the RHOBS MonitoringStack discovers
+    # ServiceMonitors in it and scrapes RMO metrics for the HCP tenant.
+    - apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: ${NAMESPACE}
+        labels:
+          hypershift.openshift.io/monitoring: "true"
+    # Service exposing the controller-manager metrics endpoint (port 8080).
+    # Required because OLM does not create one for this operator.
+    - apiVersion: v1
+      kind: Service
+      metadata:
+        name: route-monitor-operator-metrics
+        namespace: ${NAMESPACE}
+        labels:
+          app.kubernetes.io/component: route-monitor-operator
+      spec:
+        selector:
+          control-plane: controller-manager
+        ports:
+        - name: metrics
+          port: 8080
+          targetPort: 8080
+          protocol: TCP
+    # ServiceMonitor for the RHOBS MonitoringStack (monitoring.rhobs API group).
+    # Enables RMO metrics to be scraped and remote-written to the HCP tenant.
+    - apiVersion: monitoring.rhobs/v1
+      kind: ServiceMonitor
+      metadata:
+        name: route-monitor-operator-rhobs
+        namespace: ${NAMESPACE}
+        labels:
+          app.kubernetes.io/component: route-monitor-operator
+      spec:
+        selector:
+          matchLabels:
+            app.kubernetes.io/component: route-monitor-operator
+        endpoints:
+        - port: metrics
+          path: /metrics
+          interval: 60s

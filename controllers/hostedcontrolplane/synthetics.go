@@ -327,9 +327,14 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		}
 	}
 
-	// Create probe request using the convenience function
-	// Note: Additional labels like management-cluster-id can be added in the future
-	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
+	// Get cluster region for probe assignment
+	clusterRegion, err := getClusterRegion(hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster region: %w", err)
+	}
+
+	// Create probe request with region label for regional filtering
+	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, clusterRegion, isPrivate)
 
 	// Create the probe
 	probe, err := client.CreateProbe(ctx, probeReq)

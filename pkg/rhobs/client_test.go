@@ -1231,9 +1231,10 @@ func TestNewProbeRequest(t *testing.T) {
 func TestNewClusterProbeRequest(t *testing.T) {
 	clusterID := "test-cluster-123"
 	monitoringURL := "https://api.test-cluster.example.com/livez"
+	region := "us-east-1"
 	isPrivate := true
 
-	req := NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
+	req := NewClusterProbeRequest(clusterID, monitoringURL, region, isPrivate)
 
 	if req.StaticURL != monitoringURL {
 		t.Errorf("Expected StaticURL %s, got %s", monitoringURL, req.StaticURL)
@@ -1247,8 +1248,12 @@ func TestNewClusterProbeRequest(t *testing.T) {
 		t.Errorf("Expected private 'true', got %s", req.Labels["private"])
 	}
 
+	if req.Labels["region"] != region {
+		t.Errorf("Expected region %s, got %s", region, req.Labels["region"])
+	}
+
 	// Test with private=false
-	req2 := NewClusterProbeRequest(clusterID, monitoringURL, false)
+	req2 := NewClusterProbeRequest(clusterID, monitoringURL, region, false)
 	if req2.Labels["private"] != "false" {
 		t.Errorf("Expected private 'false', got %s", req2.Labels["private"])
 	}
