@@ -17,6 +17,10 @@ metadata:
 #
 # For production traffic splitting in high-load regions (e.g., us-east-1 with
 # multiple RHOBS cells), see SREP-3225 for adding rhobs-cell labels to MCs.
+#
+# Configuration Parameters:
+# - DYNATRACE_ENABLED: Controls Dynatrace synthetic monitoring (default: "false")
+#   Set to "true" to enable Dynatrace for specific sectors/regions
 ###############################################################################
 
 parameters:
@@ -42,7 +46,11 @@ parameters:
   required: true
 - name: ONLY_PUBLIC_CLUSTERS
   value: ""
-  required: false
+  required: false                                                                                                                                                           
+- name: DYNATRACE_ENABLED                                                                                                                                                                
+  value: "false"                                                                                                                                                                         
+  required: false                                                                                                                                                                        
+  description: "Enable Dynatrace synthetic monitoring for this sector"      
 
 objects:
 - apiVersion: hive.openshift.io/v1
@@ -79,6 +87,7 @@ objects:
         oidc-client-secret: ${OIDC_CLIENT_SECRET}
         oidc-issuer-url: ${OIDC_ISSUER_URL}
         only-public-clusters: ${ONLY_PUBLIC_CLUSTERS}
+        dynatrace-enabled: ${DYNATRACE_ENABLED}
     # Label the RMO namespace so the RHOBS MonitoringStack discovers
     # ServiceMonitors in it and scrapes RMO metrics for the HCP tenant.
     - apiVersion: v1
