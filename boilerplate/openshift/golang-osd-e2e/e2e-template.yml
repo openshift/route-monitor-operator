@@ -44,6 +44,11 @@ objects:
       template:
         spec:
           restartPolicy: Never
+          volumes:
+          - name: ${OPERATOR_NAME}-sc
+            secret:
+              secretName: ${OPERATOR_NAME}-sc
+              optional: true
           containers:
             - name: osde2e
               image: quay.io/redhat-services-prod/osde2e-cicada-tenant/osde2e:latest
@@ -56,6 +61,12 @@ objects:
                 - --skip-must-gather
                 - --configs
                 - ${OSDE2E_CONFIGS}
+                - --secret-locations
+                - "/etc/external-secrets"
+              volumeMounts:
+              - name: ${OPERATOR_NAME}-sc
+                readOnly: true
+                mountPath: "/etc/external-secrets"
               resources:
                 requests:
                   cpu: "300m"
