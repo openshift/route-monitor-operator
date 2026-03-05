@@ -4,106 +4,106 @@ kind: Template
 metadata:
   name: osde2e-focused-tests
 parameters:
-- name: OSDE2E_CONFIGS
-  required: true
-- name: TEST_IMAGE
-  required: true
-- name: OCM_CCS
-  required: false
-- name: CLOUD_PROVIDER_REGION
-  required: false
-- name: JOBID
-  generate: expression
-  from: "[0-9a-z]{7}"
-- name: IMAGE_TAG
-  value: ''
-  required: true
-- name: LOG_BUCKET
-  value: 'osde2e-logs'
-- name: USE_EXISTING_CLUSTER
-  value: 'TRUE'
-- name: SLACK_NOTIFY
-  required: false
+  - name: OSDE2E_CONFIGS
+    required: true
+  - name: TEST_IMAGE
+    required: true
+  - name: OCM_CCS
+    required: false
+  - name: CLOUD_PROVIDER_REGION
+    required: false
+  - name: JOBID
+    generate: expression
+    from: "[0-9a-z]{7}"
+  - name: IMAGE_TAG
+    value: ''
+    required: true
+  - name: LOG_BUCKET
+    value: 'osde2e-logs'
+  - name: USE_EXISTING_CLUSTER
+    value: 'TRUE'
+  - name: SLACK_NOTIFY
+    required: false
 objects:
-- apiVersion: batch/v1
-  kind: Job
-  metadata:
-    name: osde2e-${OPERATOR_NAME}-${IMAGE_TAG}-${JOBID}
-  spec:
-    backoffLimit: 0
-    template:
-      spec:
-        restartPolicy: Never
-        volumes:
-        - name: ${OPERATOR_NAME}-sc
-          secret:
-            secretName: ${OPERATOR_NAME}-sc
-            optional: true
-        - name: osde2e-ocm-sc
-          secret:
-            secretName: osde2e-ocm-credentials
-        - name: osde2e-aws-sc
-          secret:
-            secretName: osde2e-aws-credentials
-            optional: true
-        - name: osde2e-gcp-sc
-          secret:
-            secretName: osde2e-gcp-credentials
-            optional: true
-        containers:
-        - name: osde2e
-          image: quay.io/redhat-services-prod/osde2e-cicada-tenant/osde2e:latest
-          command:
-          - /osde2e
-          args:
-          - test
-          - --only-health-check-nodes
-          - --skip-destroy-cluster
-          - --skip-must-gather
-          - --log-analysis-enable
-          - --configs
-          - ${OSDE2E_CONFIGS}
-          - --secret-locations
-          - "/etc/external-secrets,/etc/osde2e-ocm-sc,/etc/osde2e-aws-sc,/etc/osde2e-gcp-sc"
-          volumeMounts:
-          - name: ${OPERATOR_NAME}-sc
-            readOnly: true
-            mountPath: "/etc/external-secrets"
-          - name: osde2e-ocm-sc
-            readOnly: true
-            mountPath: "/etc/osde2e-ocm-sc"
-          - name: osde2e-aws-sc
-            readOnly: true
-            mountPath: "/etc/osde2e-aws-sc"
-          - name: osde2e-gcp-sc
-            readOnly: true
-            mountPath: "/etc/osde2e-gcp-sc"
-          resources:
-            requests:
-              cpu: "300m"
-              memory: "600Mi"
-            limits:
-              cpu: "1"
-              memory: "1200Mi"
-          securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-          - name: TEST_SUITES_YAML
-            value: |-
-              - image: ${TEST_IMAGE}:${IMAGE_TAG}
-                slackChannel: ${SLACK_CHANNEL}
-          - name: OCM_CCS
-            value: ${OCM_CCS}
-          - name: CLOUD_PROVIDER_REGION
-            value: ${CLOUD_PROVIDER_REGION}
-          - name: LOG_BUCKET
-            value: ${LOG_BUCKET}
-          - name: USE_EXISTING_CLUSTER
-            value: ${USE_EXISTING_CLUSTER}
-          - name: SLACK_NOTIFY
-            value: ${SLACK_NOTIFY}
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: osde2e-${OPERATOR_NAME}-${IMAGE_TAG}-${JOBID}
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          volumes:
+            - name: ${OPERATOR_NAME}-sc
+              secret:
+                secretName: ${OPERATOR_NAME}-sc
+                optional: true
+            - name: osde2e-ocm-sc
+              secret:
+                secretName: osde2e-ocm-credentials
+            - name: osde2e-aws-sc
+              secret:
+                secretName: osde2e-aws-credentials
+                optional: true
+            - name: osde2e-gcp-sc
+              secret:
+                secretName: osde2e-gcp-credentials
+                optional: true
+          containers:
+            - name: osde2e
+              image: quay.io/redhat-services-prod/osde2e-cicada-tenant/osde2e:latest
+              command:
+                - /osde2e
+              args:
+                - test
+                - --only-health-check-nodes
+                - --skip-destroy-cluster
+                - --skip-must-gather
+                - --log-analysis-enable
+                - --configs
+                - ${OSDE2E_CONFIGS}
+                - --secret-locations
+                - "/etc/external-secrets,/etc/osde2e-ocm-sc,/etc/osde2e-aws-sc,/etc/osde2e-gcp-sc"
+              volumeMounts:
+                - name: ${OPERATOR_NAME}-sc
+                  readOnly: true
+                  mountPath: "/etc/external-secrets"
+                - name: osde2e-ocm-sc
+                  readOnly: true
+                  mountPath: "/etc/osde2e-ocm-sc"
+                - name: osde2e-aws-sc
+                  readOnly: true
+                  mountPath: "/etc/osde2e-aws-sc"
+                - name: osde2e-gcp-sc
+                  readOnly: true
+                  mountPath: "/etc/osde2e-gcp-sc"
+              resources:
+                requests:
+                  cpu: "300m"
+                  memory: "600Mi"
+                limits:
+                  cpu: "1"
+                  memory: "1200Mi"
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ "ALL" ]
+                seccompProfile:
+                  type: RuntimeDefault
+              env:
+                - name: TEST_SUITES_YAML
+                  value: |-
+                    - image: ${TEST_IMAGE}:${IMAGE_TAG}
+                      slackChannel: ${SLACK_CHANNEL}
+                - name: OCM_CCS
+                  value: ${OCM_CCS}
+                - name: CLOUD_PROVIDER_REGION
+                  value: ${CLOUD_PROVIDER_REGION}
+                - name: LOG_BUCKET
+                  value: ${LOG_BUCKET}
+                - name: USE_EXISTING_CLUSTER
+                  value: ${USE_EXISTING_CLUSTER}
+                - name: SLACK_NOTIFY
+                  value: ${SLACK_NOTIFY}
