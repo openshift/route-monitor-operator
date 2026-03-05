@@ -277,6 +277,22 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
 		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
+	// Check if cluster is in limited support -- delete probe if it exists and skip creation
+	if hostedcontrolplane.Labels["api.openshift.com/limited-support"] == "true" {
+		client := r.createRHOBSClient(log, cfg)
+		existingProbe, err := client.GetProbe(ctx, clusterID)
+		if err != nil {
+			return fmt.Errorf("failed to check existing probe: %w", err)
+		}
+		if existingProbe != nil {
+			log.Info("Cluster is in limited support, deleting probe", "cluster_id", clusterID, "probe_id", existingProbe.ID)
+			if err := client.DeleteProbe(ctx, clusterID); err != nil {
+				return fmt.Errorf("failed to delete probe for limited support cluster: %w", err)
+			}
+		}
+		return nil
+	}
+
 	// Skip private clusters if OnlyPublicClusters flag is set
 	if cfg.OnlyPublicClusters && isPrivate {
 		log.V(2).Info("Skipping probe creation for private cluster (only-public-clusters is enabled)", "cluster_id", clusterID)
@@ -312,13 +328,20 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		} else {
 			// Probe exists - validate that it's configured correctly according to the hostedcontrolplane object
 			log.V(2).Info("RHOBS probe already exists", "cluster_id", clusterID, "probe_id", existingProbe.ID, "status", existingProbe.Status)
-			if isPrivateProbe(existingProbe) == isPrivate {
-				// Probe already configured correctly, return
+
+			// Check if labels match expected values
+			clusterRegion, err := getClusterRegion(hostedcontrolplane)
+			if err != nil {
+				return fmt.Errorf("failed to get cluster region: %w", err)
+			}
+			labelsMatch := isPrivateProbe(existingProbe) == isPrivate &&
+				existingProbe.Labels["region"] == clusterRegion
+			if labelsMatch {
 				return nil
 			}
 
-			// Probe configuration incorrect or out-of-date: delete and recreate
-			log.Info("RHOBS probe 'private' label does not match hostedcontrolplane configuration, possibly due to API publishing strategy change in OCM. Deleting RHOBS probe in order to recreate in the correct cell", "probe", existingProbe)
+			// Probe labels are stale or incorrect: delete and recreate
+			log.Info("RHOBS probe labels do not match expected configuration, recreating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
 			err = client.DeleteProbe(ctx, clusterID)
 			if err != nil {
 				return fmt.Errorf("failed to delete RHOBS probe: %w", err)
