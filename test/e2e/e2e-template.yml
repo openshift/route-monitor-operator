@@ -24,6 +24,8 @@ parameters:
     value: 'TRUE'
   - name: SLACK_NOTIFY
     required: false
+  - name: SLACK_CHANNEL
+    required: false
 objects:
   - apiVersion: batch/v1
     kind: Job
