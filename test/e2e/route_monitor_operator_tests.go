@@ -7,6 +7,7 @@ package osde2etests
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -45,6 +46,8 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		log.SetLogger(GinkgoLogr)
 		var err error
 		k8s, err = openshift.New(GinkgoLogr)
+		// checking handover of pipeline params
+		GinkgoLogr.Info(fmt.Sprintf("PROBE_API_URL from env: %s: ", os.Getenv("PROBE_API_URL")))
 		Expect(err).ShouldNot(HaveOccurred(), "unable to setup k8s client")
 		dynamicClient, err := dynamic.NewForConfig(k8s.GetConfig())
 		Expect(err).ShouldNot(HaveOccurred(), "failed creating the dynamic client: %w", err)
