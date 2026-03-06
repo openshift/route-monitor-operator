@@ -334,7 +334,9 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 			if err != nil {
 				return fmt.Errorf("failed to get cluster region: %w", err)
 			}
-			labelsMatch := isPrivateProbe(existingProbe) == isPrivate &&
+			_, hasPrivateLabel := existingProbe.Labels["private"]
+			labelsMatch := hasPrivateLabel &&
+				isPrivateProbe(existingProbe) == isPrivate &&
 				existingProbe.Labels["region"] == clusterRegion
 			if labelsMatch {
 				return nil

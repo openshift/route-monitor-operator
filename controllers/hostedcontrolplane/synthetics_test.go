@@ -2,6 +2,7 @@ package hostedcontrolplane
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -646,6 +647,307 @@ func TestCreateRHOBSClient(t *testing.T) {
 
 			if client == nil {
 				t.Errorf("createRHOBSClient returned nil client")
+			}
+		})
+	}
+}
+
+// mockRHOBSServer creates an httptest server that responds to RHOBS probe API calls.
+// getResponse controls what GET /probes returns; if nil, returns empty list.
+// deleteErr controls whether PATCH (delete) returns an error.
+// requestLog tracks which HTTP methods were called.
+func mockRHOBSServer(t *testing.T, getResponse *rhobs.ProbeResponse, getErr bool, deleteErr bool, requestLog *[]string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*requestLog = append(*requestLog, r.Method+" "+r.URL.Path)
+
+		switch r.Method {
+		case http.MethodGet:
+			if getErr {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"mock get error"}`))
+				return
+			}
+			if getResponse == nil {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"probes":[]}`))
+				return
+			}
+			resp, _ := json.Marshal(rhobs.ProbesListResponse{Probes: []rhobs.ProbeResponse{*getResponse}})
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(resp)
+
+		case http.MethodPatch:
+			if deleteErr {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"mock delete error"}`))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+
+		case http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			resp, _ := json.Marshal(rhobs.ProbeResponse{ID: "new-probe", Labels: map[string]string{}, Status: "active"})
+			_, _ = w.Write(resp)
+
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+}
+
+// newHCP creates a HostedControlPlane for testing with the given clusterID, region, labels, and endpoint access.
+func newHCP(clusterID, region string, labels map[string]string, endpointAccess hypershiftv1beta1.AWSEndpointAccessType) *hypershiftv1beta1.HostedControlPlane {
+	return &hypershiftv1beta1.HostedControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
+		Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+			ClusterID: clusterID,
+			Services: []hypershiftv1beta1.ServicePublishingStrategyMapping{
+				{
+					Service: "APIServer",
+					ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+						Route: &hypershiftv1beta1.RoutePublishingStrategy{
+							Hostname: "api.example.com",
+						},
+					},
+				},
+			},
+			Platform: hypershiftv1beta1.PlatformSpec{
+				AWS: &hypershiftv1beta1.AWSPlatformSpec{
+					Region:         region,
+					EndpointAccess: endpointAccess,
+				},
+			},
+		},
+	}
+}
+
+func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
+	tests := []struct {
+		name         string
+		getResponse  *rhobs.ProbeResponse
+		getErr       bool
+		deleteErr    bool
+		expectErr    bool
+		errContains  string
+		expectDelete bool
+	}{
+		{
+			name:         "no existing probe, returns nil",
+			getResponse:  nil,
+			expectErr:    false,
+			expectDelete: false,
+		},
+		{
+			name: "existing probe, deletes it",
+			getResponse: &rhobs.ProbeResponse{
+				ID:     "probe-123",
+				Labels: map[string]string{"cluster-id": "test-cluster"},
+				Status: "active",
+			},
+			expectErr:    false,
+			expectDelete: true,
+		},
+		{
+			name:        "GetProbe fails, returns error",
+			getErr:      true,
+			expectErr:   true,
+			errContains: "failed to check existing probe",
+		},
+		{
+			name: "DeleteProbe fails, returns error",
+			getResponse: &rhobs.ProbeResponse{
+				ID:     "probe-123",
+				Labels: map[string]string{"cluster-id": "test-cluster"},
+				Status: "active",
+			},
+			deleteErr:    true,
+			expectErr:    true,
+			errContains:  "failed to delete probe for limited support cluster",
+			expectDelete: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requestLog []string
+			server := mockRHOBSServer(t, tt.getResponse, tt.getErr, tt.deleteErr, &requestLog)
+			defer server.Close()
+
+			r := newTestReconciler(t)
+			ctx := context.Background()
+			logger := log.FromContext(ctx)
+
+			hcp := newHCP("test-cluster", "us-east-1",
+				map[string]string{"api.openshift.com/limited-support": "true"},
+				hypershiftv1beta1.PublicAndPrivate,
+			)
+
+			cfg := RHOBSConfig{
+				ProbeAPIURL: server.URL + "/probes",
+				Tenant:      "test-tenant",
+			}
+
+			err := r.ensureRHOBSProbe(ctx, logger, hcp, cfg)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("expected error containing %q, got %q", tt.errContains, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			hasPatch := false
+			for _, entry := range requestLog {
+				if strings.HasPrefix(entry, "PATCH") {
+					hasPatch = true
+				}
+			}
+			if tt.expectDelete && !hasPatch {
+				t.Error("expected DeleteProbe (PATCH) to be called, but no PATCH request was made")
+			}
+			if !tt.expectDelete && hasPatch {
+				t.Error("expected no DeleteProbe call, but PATCH request was made")
+			}
+		})
+	}
+}
+
+func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
+	tests := []struct {
+		name           string
+		probeLabels    map[string]string
+		isPrivate      bool
+		clusterRegion  string
+		expectRecreate bool
+	}{
+		{
+			name: "all labels match, no recreate",
+			probeLabels: map[string]string{
+				"cluster-id": "test-cluster",
+				"private":    "false",
+				"region":     "us-east-1",
+			},
+			isPrivate:      false,
+			clusterRegion:  "us-east-1",
+			expectRecreate: false,
+		},
+		{
+			name: "private labels match (private cluster)",
+			probeLabels: map[string]string{
+				"cluster-id": "test-cluster",
+				"private":    "true",
+				"region":     "us-west-2",
+			},
+			isPrivate:      true,
+			clusterRegion:  "us-west-2",
+			expectRecreate: false,
+		},
+		{
+			name: "missing private label triggers recreate",
+			probeLabels: map[string]string{
+				"cluster-id": "test-cluster",
+				"region":     "us-east-1",
+			},
+			isPrivate:      false,
+			clusterRegion:  "us-east-1",
+			expectRecreate: true,
+		},
+		{
+			name: "wrong private value triggers recreate",
+			probeLabels: map[string]string{
+				"cluster-id": "test-cluster",
+				"private":    "true",
+				"region":     "us-east-1",
+			},
+			isPrivate:      false,
+			clusterRegion:  "us-east-1",
+			expectRecreate: true,
+		},
+		{
+			name: "wrong region triggers recreate",
+			probeLabels: map[string]string{
+				"cluster-id": "test-cluster",
+				"private":    "false",
+				"region":     "eu-west-1",
+			},
+			isPrivate:      false,
+			clusterRegion:  "us-east-1",
+			expectRecreate: true,
+		},
+		{
+			name:           "empty labels triggers recreate",
+			probeLabels:    map[string]string{"cluster-id": "test-cluster"},
+			isPrivate:      false,
+			clusterRegion:  "us-east-1",
+			expectRecreate: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			existingProbe := &rhobs.ProbeResponse{
+				ID:     "probe-123",
+				Labels: tt.probeLabels,
+				Status: "active",
+			}
+			var requestLog []string
+			server := mockRHOBSServer(t, existingProbe, false, false, &requestLog)
+			defer server.Close()
+
+			r := newTestReconciler(t)
+			ctx := context.Background()
+			logger := log.FromContext(ctx)
+
+			endpointAccess := hypershiftv1beta1.PublicAndPrivate
+			if tt.isPrivate {
+				endpointAccess = hypershiftv1beta1.Private
+			}
+			hcp := newHCP("test-cluster", tt.clusterRegion, nil, endpointAccess)
+
+			cfg := RHOBSConfig{
+				ProbeAPIURL: server.URL + "/probes",
+				Tenant:      "test-tenant",
+			}
+
+			err := r.ensureRHOBSProbe(ctx, logger, hcp, cfg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			hasPost := false
+			hasPatch := false
+			for _, entry := range requestLog {
+				if strings.HasPrefix(entry, "POST") {
+					hasPost = true
+				}
+				if strings.HasPrefix(entry, "PATCH") {
+					hasPatch = true
+				}
+			}
+
+			if tt.expectRecreate {
+				if !hasPatch {
+					t.Error("expected probe to be deleted (PATCH) for recreate, but no PATCH was made")
+				}
+				if !hasPost {
+					t.Error("expected probe to be created (POST) for recreate, but no POST was made")
+				}
+			} else {
+				if hasPatch {
+					t.Error("expected no recreate, but PATCH was made")
+				}
+				if hasPost {
+					t.Error("expected no recreate, but POST was made")
+				}
 			}
 		})
 	}
