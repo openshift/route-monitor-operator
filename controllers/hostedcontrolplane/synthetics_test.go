@@ -661,6 +661,11 @@ func mockRHOBSServer(t *testing.T, getResponse *rhobs.ProbeResponse, getErr bool
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		*requestLog = append(*requestLog, r.Method+" "+r.URL.Path)
 
+		if !strings.HasPrefix(r.URL.Path, "/probes") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
 		switch r.Method {
 		case http.MethodGet:
 			if getErr {
@@ -806,9 +811,13 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 			}
 
 			hasPatch := false
+			hasPost := false
 			for _, entry := range requestLog {
 				if strings.HasPrefix(entry, "PATCH") {
 					hasPatch = true
+				}
+				if strings.HasPrefix(entry, "POST") {
+					hasPost = true
 				}
 			}
 			if tt.expectDelete && !hasPatch {
@@ -816,6 +825,9 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 			}
 			if !tt.expectDelete && hasPatch {
 				t.Error("expected no DeleteProbe call, but PATCH request was made")
+			}
+			if hasPost {
+				t.Error("expected limited-support flow to skip probe creation, but POST request was made")
 			}
 		})
 	}
