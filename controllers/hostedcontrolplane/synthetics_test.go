@@ -835,22 +835,22 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 
 func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 	tests := []struct {
-		name           string
-		probeLabels    map[string]string
-		isPrivate      bool
-		clusterRegion  string
-		expectRecreate bool
+		name              string
+		probeLabels       map[string]string
+		isPrivate         bool
+		clusterRegion     string
+		expectLabelUpdate bool
 	}{
 		{
-			name: "all labels match, no recreate",
+			name: "all labels match, no update",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "false",
 				"region":     "us-east-1",
 			},
-			isPrivate:      false,
-			clusterRegion:  "us-east-1",
-			expectRecreate: false,
+			isPrivate:         false,
+			clusterRegion:     "us-east-1",
+			expectLabelUpdate: false,
 		},
 		{
 			name: "private labels match (private cluster)",
@@ -859,48 +859,48 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "true",
 				"region":     "us-west-2",
 			},
-			isPrivate:      true,
-			clusterRegion:  "us-west-2",
-			expectRecreate: false,
+			isPrivate:         true,
+			clusterRegion:     "us-west-2",
+			expectLabelUpdate: false,
 		},
 		{
-			name: "missing private label triggers recreate",
+			name: "missing private label triggers label update",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"region":     "us-east-1",
 			},
-			isPrivate:      false,
-			clusterRegion:  "us-east-1",
-			expectRecreate: true,
+			isPrivate:         false,
+			clusterRegion:     "us-east-1",
+			expectLabelUpdate: true,
 		},
 		{
-			name: "wrong private value triggers recreate",
+			name: "wrong private value triggers label update",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "true",
 				"region":     "us-east-1",
 			},
-			isPrivate:      false,
-			clusterRegion:  "us-east-1",
-			expectRecreate: true,
+			isPrivate:         false,
+			clusterRegion:     "us-east-1",
+			expectLabelUpdate: true,
 		},
 		{
-			name: "wrong region triggers recreate",
+			name: "wrong region triggers label update",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "false",
 				"region":     "eu-west-1",
 			},
-			isPrivate:      false,
-			clusterRegion:  "us-east-1",
-			expectRecreate: true,
+			isPrivate:         false,
+			clusterRegion:     "us-east-1",
+			expectLabelUpdate: true,
 		},
 		{
-			name:           "empty labels triggers recreate",
-			probeLabels:    map[string]string{"cluster-id": "test-cluster"},
-			isPrivate:      false,
-			clusterRegion:  "us-east-1",
-			expectRecreate: true,
+			name:              "empty labels triggers label update",
+			probeLabels:       map[string]string{"cluster-id": "test-cluster"},
+			isPrivate:         false,
+			clusterRegion:     "us-east-1",
+			expectLabelUpdate: true,
 		},
 	}
 
@@ -946,19 +946,19 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				}
 			}
 
-			if tt.expectRecreate {
+			if tt.expectLabelUpdate {
 				if !hasPatch {
-					t.Error("expected probe to be deleted (PATCH) for recreate, but no PATCH was made")
+					t.Error("expected probe labels to be updated (PATCH), but no PATCH was made")
 				}
-				if !hasPost {
-					t.Error("expected probe to be created (POST) for recreate, but no POST was made")
+				if hasPost {
+					t.Error("expected label update only (no POST), but POST was made")
 				}
 			} else {
 				if hasPatch {
-					t.Error("expected no recreate, but PATCH was made")
+					t.Error("expected no label update, but PATCH was made")
 				}
 				if hasPost {
-					t.Error("expected no recreate, but POST was made")
+					t.Error("expected no changes, but POST was made")
 				}
 			}
 		})

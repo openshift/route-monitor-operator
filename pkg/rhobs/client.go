@@ -275,9 +275,56 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	return nil, nil // Probe not found
 }
 
-// ProbePatchRequest represents the payload for updating a probe status
+// ProbePatchRequest represents the payload for updating a probe
 type ProbePatchRequest struct {
-	Status string `json:"status"`
+	Status string             `json:"status,omitempty"`
+	Labels *map[string]string `json:"labels,omitempty"`
+}
+
+// UpdateProbeLabels updates the labels on an existing probe via PATCH
+func (c *Client) UpdateProbeLabels(ctx context.Context, probeID string, labels map[string]string) error {
+	url := c.buildProbeURL(probeID)
+
+	patchReq := ProbePatchRequest{
+		Labels: &labels,
+	}
+
+	payload, err := json.Marshal(patchReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, httpMethodPatch, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", contentTypeJSON)
+	c.addRHOBSHeaders(httpReq)
+	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		return fmt.Errorf("failed to add auth headers: %w", err)
+	}
+
+	c.logger.Info("Updating RHOBS probe labels", "method", "PATCH", "url", url, "probe_id", probeID)
+
+	start := time.Now()
+	apiSuccess := false
+	defer func() { RecordAPIRequest("update_probe_labels", time.Since(start), apiSuccess) }()
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	apiSuccess = resp.StatusCode == http.StatusOK
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("%s %d: %s", apiErrorPrefix, resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully updated probe labels", "probe_id", probeID)
+	return nil
 }
 
 // DeleteProbe marks a probe for termination by cluster ID using PATCH method

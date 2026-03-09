@@ -342,13 +342,18 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 				return nil
 			}
 
-			// Probe labels are stale or incorrect: delete and recreate
-			log.Info("RHOBS probe labels do not match expected configuration, recreating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
-			err = client.DeleteProbe(ctx, clusterID)
-			if err != nil {
-				return fmt.Errorf("failed to delete RHOBS probe: %w", err)
+			// Probe labels are stale or incorrect: update labels in place via PATCH
+			log.Info("RHOBS probe labels do not match expected configuration, updating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
+			updatedLabels := map[string]string{
+				"cluster-id": clusterID,
+				"private":    fmt.Sprintf("%t", isPrivate),
+				"region":     clusterRegion,
 			}
-			// Continue to create new probe below
+			err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
+			if err != nil {
+				return fmt.Errorf("failed to update RHOBS probe labels: %w", err)
+			}
+			return nil
 		}
 	}
 
