@@ -342,7 +342,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 			if labelsMatch {
 				// Update heartbeat timestamp so synthetics-api knows the probe is still managed
 				labels := existingProbe.Labels
-				labels["last-reconciled"] = time.Now().UTC().Format(time.RFC3339)
+				labels["last-reconciled"] = time.Now().UTC().Format("20060102T150405Z")
 				if err := client.UpdateProbeLabels(ctx, existingProbe.ID, labels); err != nil {
 					log.V(2).Info("Failed to update probe heartbeat, will retry next cycle", "error", err)
 				}
@@ -355,7 +355,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 				"cluster-id":      clusterID,
 				"private":         fmt.Sprintf("%t", isPrivate),
 				"region":          clusterRegion,
-				"last-reconciled": time.Now().UTC().Format(time.RFC3339),
+				"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
 			}
 			err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
 			if err != nil {
