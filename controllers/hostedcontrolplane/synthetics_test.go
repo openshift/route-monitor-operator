@@ -981,8 +981,8 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 							t.Error("PATCH body missing last-reconciled label")
 							continue
 						}
-						if _, err := time.Parse(time.RFC3339, ts); err != nil {
-							t.Errorf("last-reconciled label is not a valid RFC3339 timestamp: %q", ts)
+						if _, err := time.Parse("20060102T150405Z", ts); err != nil {
+							t.Errorf("last-reconciled label is not a valid timestamp: %q", ts)
 						}
 					}
 				}

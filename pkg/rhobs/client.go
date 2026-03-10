@@ -71,7 +71,7 @@ func NewClusterProbeRequest(clusterID, monitoringURL, region string, isPrivate b
 		"cluster-id":      clusterID,
 		"private":         fmt.Sprintf("%t", isPrivate),
 		"region":          region,
-		"last-reconciled": time.Now().UTC().Format(time.RFC3339),
+		"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
 	}
 	return NewProbeRequest(monitoringURL, labels)
 }

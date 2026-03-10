@@ -1253,12 +1253,12 @@ func TestNewClusterProbeRequest(t *testing.T) {
 		t.Errorf("Expected region %s, got %s", region, req.Labels["region"])
 	}
 
-	// Verify last-reconciled label is set and is a valid RFC3339 timestamp
+	// Verify last-reconciled label is set and is a valid timestamp
 	lastReconciled, hasLastReconciled := req.Labels["last-reconciled"]
 	if !hasLastReconciled {
 		t.Error("Expected last-reconciled label to be set")
 	} else {
-		_, err := time.Parse(time.RFC3339, lastReconciled)
+		_, err := time.Parse("20060102T150405Z", lastReconciled)
 		if err != nil {
 			t.Errorf("Expected last-reconciled to be valid RFC3339 timestamp, got %s: %v", lastReconciled, err)
 		}
