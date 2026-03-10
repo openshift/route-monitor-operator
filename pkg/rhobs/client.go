@@ -68,9 +68,10 @@ func NewProbeRequest(staticURL string, labels map[string]string) ProbeRequest {
 // This is a convenience function for the current use case but can be extended
 func NewClusterProbeRequest(clusterID, monitoringURL, region string, isPrivate bool) ProbeRequest {
 	labels := map[string]string{
-		"cluster-id": clusterID,
-		"private":    fmt.Sprintf("%t", isPrivate),
-		"region":     region,
+		"cluster-id":      clusterID,
+		"private":         fmt.Sprintf("%t", isPrivate),
+		"region":          region,
+		"last-reconciled": time.Now().UTC().Format(time.RFC3339),
 	}
 	return NewProbeRequest(monitoringURL, labels)
 }
