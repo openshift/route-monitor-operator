@@ -33,11 +33,11 @@ parameters:
 - name: SUFFIX
   required: true
   description: "Unique suffix for SelectorSyncSet name (e.g., stage-us-west-2-main)"
+- name: PROBE_API_URL
+  description: "Probe API URL. Can be a static URL or use the MC's rhobs-cell label via Hive template expression"
+  value: '{{ fromCDLabel "ext-hypershift.openshift.io/rhobs-cell" }}/api/metrics/v1/hcp/probes'
 - name: NAMESPACE
   value: openshift-route-monitor-operator
-- name: PROBE_API_URL
-  required: true
-  description: "RHOBS probes API URL for this region"
 - name: OIDC_CLIENT_ID
   required: true
 - name: OIDC_CLIENT_SECRET
@@ -75,6 +75,7 @@ objects:
         values: ${{SECTORS}}
     resourceApplyMode: Sync
     applyBehavior: CreateOrUpdate
+    enableResourceTemplates: true
     resources:
     - apiVersion: v1
       kind: ConfigMap
