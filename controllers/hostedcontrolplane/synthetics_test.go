@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 
 	"testing"
 
@@ -659,7 +661,9 @@ func TestCreateRHOBSClient(t *testing.T) {
 func mockRHOBSServer(t *testing.T, getResponse *rhobs.ProbeResponse, getErr bool, deleteErr bool, requestLog *[]string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*requestLog = append(*requestLog, r.Method+" "+r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		*requestLog = append(*requestLog, r.Method+" "+r.URL.Path+" "+string(body))
 
 		if !strings.HasPrefix(r.URL.Path, "/probes") {
 			w.WriteHeader(http.StatusNotFound)
@@ -842,7 +846,7 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 		expectLabelUpdate bool
 	}{
 		{
-			name: "all labels match, no update",
+			name: "all labels match, heartbeat update only",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "false",
@@ -850,10 +854,10 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 			},
 			isPrivate:         false,
 			clusterRegion:     "us-east-1",
-			expectLabelUpdate: false,
+			expectLabelUpdate: true,
 		},
 		{
-			name: "private labels match (private cluster)",
+			name: "private labels match, heartbeat update only",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "true",
@@ -861,7 +865,7 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 			},
 			isPrivate:         true,
 			clusterRegion:     "us-west-2",
-			expectLabelUpdate: false,
+			expectLabelUpdate: true,
 		},
 		{
 			name: "missing private label triggers label update",
@@ -952,6 +956,35 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				}
 				if hasPost {
 					t.Error("expected label update only (no POST), but POST was made")
+				}
+				// Verify the PATCH body contains a valid last-reconciled timestamp
+				for _, entry := range requestLog {
+					if strings.HasPrefix(entry, "PATCH") {
+						parts := strings.SplitN(entry, " ", 3)
+						if len(parts) < 3 {
+							t.Error("PATCH request log entry missing body")
+							continue
+						}
+						var patch struct {
+							Labels *map[string]string `json:"labels"`
+						}
+						if err := json.Unmarshal([]byte(parts[2]), &patch); err != nil {
+							t.Errorf("failed to unmarshal PATCH body: %v", err)
+							continue
+						}
+						if patch.Labels == nil {
+							t.Error("PATCH body missing labels field")
+							continue
+						}
+						ts, ok := (*patch.Labels)["last-reconciled"]
+						if !ok {
+							t.Error("PATCH body missing last-reconciled label")
+							continue
+						}
+						if _, err := time.Parse(time.RFC3339, ts); err != nil {
+							t.Errorf("last-reconciled label is not a valid RFC3339 timestamp: %q", ts)
+						}
+					}
 				}
 			} else {
 				if hasPatch {

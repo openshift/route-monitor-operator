@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -339,15 +340,22 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 				isPrivateProbe(existingProbe) == isPrivate &&
 				existingProbe.Labels["region"] == clusterRegion
 			if labelsMatch {
+				// Update heartbeat timestamp so synthetics-api knows the probe is still managed
+				labels := existingProbe.Labels
+				labels["last-reconciled"] = time.Now().UTC().Format(time.RFC3339)
+				if err := client.UpdateProbeLabels(ctx, existingProbe.ID, labels); err != nil {
+					log.V(2).Info("Failed to update probe heartbeat, will retry next cycle", "error", err)
+				}
 				return nil
 			}
 
 			// Probe labels are stale or incorrect: update labels in place via PATCH
 			log.Info("RHOBS probe labels do not match expected configuration, updating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
 			updatedLabels := map[string]string{
-				"cluster-id": clusterID,
-				"private":    fmt.Sprintf("%t", isPrivate),
-				"region":     clusterRegion,
+				"cluster-id":      clusterID,
+				"private":         fmt.Sprintf("%t", isPrivate),
+				"region":          clusterRegion,
+				"last-reconciled": time.Now().UTC().Format(time.RFC3339),
 			}
 			err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
 			if err != nil {

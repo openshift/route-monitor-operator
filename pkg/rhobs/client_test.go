@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr/testr"
 )
@@ -1250,6 +1251,17 @@ func TestNewClusterProbeRequest(t *testing.T) {
 
 	if req.Labels["region"] != region {
 		t.Errorf("Expected region %s, got %s", region, req.Labels["region"])
+	}
+
+	// Verify last-reconciled label is set and is a valid RFC3339 timestamp
+	lastReconciled, hasLastReconciled := req.Labels["last-reconciled"]
+	if !hasLastReconciled {
+		t.Error("Expected last-reconciled label to be set")
+	} else {
+		_, err := time.Parse(time.RFC3339, lastReconciled)
+		if err != nil {
+			t.Errorf("Expected last-reconciled to be valid RFC3339 timestamp, got %s: %v", lastReconciled, err)
+		}
 	}
 
 	// Test with private=false
