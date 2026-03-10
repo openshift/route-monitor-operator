@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 
 	compare "github.com/hashicorp/go-version"
@@ -81,4 +82,24 @@ func ClusterHasPrivateNLB(kclient client.Client) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// ValidURL ensures that the provided URL contains an HTTP or HTTPS scheme and a host.
+// An empty string is considered an invalid URL. Only HTTP and HTTPS schemes are allowed.
+func ValidURL(raw string) bool {
+	if raw == "" {
+		return false
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+
+	// Only allow http and https schemes
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	return parsed.Host != ""
 }

@@ -50,6 +50,7 @@ import (
 	"github.com/openshift/route-monitor-operator/controllers/hostedcontrolplane"
 	"github.com/openshift/route-monitor-operator/controllers/routemonitor"
 	"github.com/openshift/route-monitor-operator/pkg/rhobs"
+	"github.com/openshift/route-monitor-operator/pkg/util"
 	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -184,7 +185,7 @@ func main() {
 	}
 
 	// Validate probe API URL format (if provided)
-	if probeAPIURL != "" && !strings.HasPrefix(probeAPIURL, "http://") && !strings.HasPrefix(probeAPIURL, "https://") {
+	if probeAPIURL != "" && !util.ValidURL(probeAPIURL) {
 		setupLog.Error(nil, "probe-api-url must be a fully qualified URL starting with 'http://' or 'https://'", "probeAPIURL", probeAPIURL)
 		os.Exit(1)
 	}
