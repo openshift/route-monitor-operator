@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -139,6 +140,17 @@ func newMockRHOBSServer() *httptest.Server {
 	}))
 }
 
+// isTransientError returns true for errors that may resolve on retry (rate limiting,
+// timeouts, server overload). Permanent errors (RBAC, bad GVR, schema mismatch)
+// return false so polling fails fast with a clear error message.
+func isTransientError(err error) bool {
+	return k8serrors.IsTooManyRequests(err) ||
+		k8serrors.IsTimeout(err) ||
+		k8serrors.IsServerTimeout(err) ||
+		k8serrors.IsServiceUnavailable(err) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
 var _ = Describe("Route Monitor Operator", Ordered, func() {
 	var (
 		k8s                   *openshift.Client
@@ -236,7 +248,13 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		var phase kubev1.PodPhase
 		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			err := k8s.Get(ctx, pod.Name, pod.Namespace, pod)
-			Expect(err).ShouldNot(HaveOccurred(), "Unable to get the testing pod")
+			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching pod, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
+			}
 			if pod != nil {
 				phase = pod.Status.Phase
 				if phase == kubev1.PodRunning || phase == kubev1.PodFailed {
@@ -313,17 +331,25 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			_, err = serviceMonitorsClient.Get(ctx, routeMonitorName, metav1.GetOptions{})
 			if k8serrors.IsNotFound(err) {
-				return false, err // Continue polling if resource is not found
+				return false, nil // Continue polling if resource is not yet created
 			}
 			if err != nil {
-				return false, err // Return error to stop polling if other errors occur
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching ServiceMonitor, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
 			}
 
 			_, err = prometheusRulesClient.Get(ctx, routeMonitorName, metav1.GetOptions{})
 			if k8serrors.IsNotFound(err) {
-				return false, err
+				return false, nil
 			}
 			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching PrometheusRule, will retry", "error", err)
+					return false, nil
+				}
 				return false, err
 			}
 			return true, nil
@@ -341,7 +367,11 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				return true, nil // RouteMonitor is deleted
 			}
 			if err != nil {
-				return false, err // Return error to stop retrying
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error checking RouteMonitor deletion, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
 			}
 			return false, nil // RouteMonitor still exists, continue polling
 		})
@@ -405,7 +435,13 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		var phase kubev1.PodPhase
 		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			err := k8s.Get(ctx, pod.Name, pod.Namespace, pod)
-			Expect(err).ShouldNot(HaveOccurred(), "Unable to get update test pod")
+			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching pod, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
+			}
 			if pod != nil {
 				phase = pod.Status.Phase
 				if phase == kubev1.PodRunning || phase == kubev1.PodFailed {
@@ -495,6 +531,10 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				return false, nil
 			}
 			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching ServiceMonitor, will retry", "error", err)
+					return false, nil
+				}
 				return false, err
 			}
 			_, err = prometheusRulesClient.Get(ctx, updateTestName, metav1.GetOptions{})
@@ -502,6 +542,10 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				return false, nil
 			}
 			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching PrometheusRule, will retry", "error", err)
+					return false, nil
+				}
 				return false, err
 			}
 			return true, nil
@@ -519,6 +563,10 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			promRule, err := prometheusRulesClient.Get(ctx, updateTestName, metav1.GetOptions{})
 			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching PrometheusRule, will retry", "error", err)
+					return false, nil
+				}
 				return false, err
 			}
 			// Marshal the unstructured object to JSON and check for the new SLO value
@@ -550,6 +598,10 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				return true, nil
 			}
 			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error checking RouteMonitor deletion, will retry", "error", err)
+					return false, nil
+				}
 				return false, err
 			}
 			return false, nil
