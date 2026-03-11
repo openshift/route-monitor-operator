@@ -330,6 +330,14 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 			// Probe exists - validate that it's configured correctly according to the hostedcontrolplane object
 			log.V(2).Info("RHOBS probe already exists", "cluster_id", clusterID, "probe_id", existingProbe.ID, "status", existingProbe.Status)
 
+			// Always update heartbeat first so the probe doesn't get GC'd
+			// even if the subsequent label update fails
+			heartbeatLabels := map[string]string{"last-reconciled": time.Now().UTC().Format("20060102T150405Z")}
+			heartbeatErr := client.UpdateProbeLabels(ctx, existingProbe.ID, heartbeatLabels)
+			if heartbeatErr != nil {
+				log.Info("Failed to update probe heartbeat", "cluster_id", clusterID, "probe_id", existingProbe.ID, "error", heartbeatErr)
+			}
+
 			// Check if labels match expected values
 			clusterRegion, err := getClusterRegion(hostedcontrolplane)
 			if err != nil {
@@ -340,11 +348,9 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 				isPrivateProbe(existingProbe) == isPrivate &&
 				existingProbe.Labels["region"] == clusterRegion
 			if labelsMatch {
-				// Update heartbeat timestamp so synthetics-api knows the probe is still managed
-				labels := existingProbe.Labels
-				labels["last-reconciled"] = time.Now().UTC().Format("20060102T150405Z")
-				if err := client.UpdateProbeLabels(ctx, existingProbe.ID, labels); err != nil {
-					log.V(2).Info("Failed to update probe heartbeat, will retry next cycle", "error", err)
+				// Requeue if heartbeat failed so it gets retried
+				if heartbeatErr != nil {
+					return fmt.Errorf("probe labels match but heartbeat update failed: %w", heartbeatErr)
 				}
 				return nil
 			}
