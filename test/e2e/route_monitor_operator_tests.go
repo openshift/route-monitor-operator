@@ -114,8 +114,6 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		log.SetLogger(GinkgoLogr)
 		var err error
 		k8s, err = openshift.New(GinkgoLogr)
-		// checking handover of pipeline params
-		GinkgoLogr.Info(fmt.Sprintf("PROBE_API_URL from env: %s: ", os.Getenv("PROBE_API_URL")))
 		Expect(err).ShouldNot(HaveOccurred(), "unable to setup k8s client")
 		dynamicClient, err := dynamic.NewForConfig(k8s.GetConfig())
 		Expect(err).ShouldNot(HaveOccurred(), "failed creating the dynamic client: %w", err)
@@ -1159,39 +1157,29 @@ func getOIDCCredentialsFromConfigMap(ctx context.Context, k8s *openshift.Client)
 	}, nil
 }
 
-// getOIDCCredentials fetches RMO credentials from environment variables
-// Uses EXTERNAL_SECRET_ env vars (same for both local testing and CI/CD via SDCICD-1739)
+
 func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentials, error) {
-	// Check EXTERNAL_SECRET_ environment variables (used for both local and osde2e/CI)
-	// In CI/CD, these are auto-loaded by osde2e from app-interface (see SDCICD-1739)
-	// For local testing, export these same variables
-	if clientID := os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_ID"); clientID != "" {
-		clientSecret := os.Getenv("EXTERNAL_SECRET_OIDC_CLIENT_SECRET")
-		issuerURL := os.Getenv("EXTERNAL_SECRET_OIDC_ISSUER_URL")
-		probeAPIURL := os.Getenv("PROBE_API_URL")
-		if clientSecret == "" || issuerURL == "" || probeAPIURL == "" {
-			return nil, fmt.Errorf("EXTERNAL_SECRET_OIDC_CLIENT_ID is set but one or more required env vars are missing: EXTERNAL_SECRET_OIDC_CLIENT_SECRET=%t, EXTERNAL_SECRET_OIDC_ISSUER_URL=%t, PROBE_API_URL=%t",
-				clientSecret != "", issuerURL != "", probeAPIURL != "")
-		}
-		GinkgoLogr.Info("Using OIDC credentials from EXTERNAL_SECRET_ environment variables")
-		return &OIDCCredentials{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			IssuerURL:    issuerURL,
-			ProbeAPIURL:  probeAPIURL,
-		}, nil
+	// Read credentials from environment variables (must match rmo_secret.yml for CI/CD compatibility)
+	clientID := os.Getenv("OIDC_CLIENT_ID")
+	clientSecret := os.Getenv("OIDC_CLIENT_SECRET")
+	issuerURL := os.Getenv("OIDC_ISSUER_URL")
+	probeAPIURL := os.Getenv("PROBE_API_URL")
+
+	// Validate all required credentials are present
+	if clientID == "" || clientSecret == "" || issuerURL == "" || probeAPIURL == "" {
+		return nil, fmt.Errorf("missing required OIDC credentials - ensure OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL, and PROBE_API_URL environment variables are set")
 	}
 
-	// No credentials found
-	return nil, fmt.Errorf(`no OIDC credentials found in environment variables
+	GinkgoLogr.Info("Using OIDC credentials from environment variables",
+		"clientID", clientID,
+		"probeAPIURL", probeAPIURL)
 
-Please set the following environment variables or set them in the route-monitor-operator-config ConfigMap:
-  export EXTERNAL_SECRET_OIDC_CLIENT_ID="your-client-id"
-  export EXTERNAL_SECRET_OIDC_CLIENT_SECRET="your-client-secret"
-  export EXTERNAL_SECRET_OIDC_ISSUER_URL="your-issuer-url"
-  export PROBE_API_URL="your-rhobs-api-url"
-
-Note: In osde2e/CI, these variables (including SKIP_INFRASTRUCTURE_HEALTH_CHECK) are automatically loaded from app-interface (SDCICD-1739).`)
+	return &OIDCCredentials{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		IssuerURL:    issuerURL,
+		ProbeAPIURL:  probeAPIURL,
+	}, nil
 }
 
 // createRMOConfigMap creates the RMO config ConfigMap with OIDC credentials

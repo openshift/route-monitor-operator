@@ -51,6 +51,10 @@ parameters:
   value: "false"
   required: false
   description: "Skip infrastructure health checks for test environments"
+- name: DYNATRACE_ENABLED
+  value: "false"
+  required: false
+  description: "Enable Dynatrace synthetic monitoring for this sector"
 
 objects:
 - apiVersion: hive.openshift.io/v1

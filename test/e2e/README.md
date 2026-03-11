@@ -346,12 +346,12 @@ These tests run automatically in the CI/CD pipeline on real OpenShift clusters m
 
 1. **Cluster Provisioning:** osde2e framework creates or uses existing test cluster (`USE_EXISTING_CLUSTER=TRUE`)
 
-2. **Secret Injection:** Environment variables **automatically loaded from Vault**:
-   - `EXTERNAL_SECRET_OIDC_CLIENT_ID`
-   - `EXTERNAL_SECRET_OIDC_CLIENT_SECRET`
-   - `EXTERNAL_SECRET_OIDC_ISSUER_URL`
-   - `PROBE_API_URL`
-   - `SKIP_INFRASTRUCTURE_HEALTH_CHECK`
+2. **Secret Injection:** Kubernetes secret `route-monitor-operator-sc` **automatically created from Vault** and mounted at `/etc/external-secrets/`:
+   - `oidc-client-id`
+   - `oidc-client-secret`
+   - `oidc-issuer-url`
+   - `probe-api-url`
+   - `skip-infrastructure-health-check`
 
 3. **CRD Installation:** Test installs required CRDs (HostedControlPlane, VpcEndpoint) in `BeforeAll`
 
@@ -368,15 +368,19 @@ These tests run automatically in the CI/CD pipeline on real OpenShift clusters m
 
 ### Vault Secret Paths
 
-Secrets are stored in Vault and automatically injected by osde2e:
+Secrets are stored in Vault and automatically mounted by osde2e as Kubernetes secret `route-monitor-operator-sc`:
 
 - **Integration:** `osd-sre/integration/route-monitor-operator-credentials`
 - **Staging:** `osd-sre/staging/route-monitor-operator-credentials`
 
-**Required Fields:**
-- `OIDC_CLIENT_ID`
-- `OIDC_CLIENT_SECRET`
-- `OIDC_ISSUER_URL`
+**Required Vault Fields:**
+- `oidc-client-id`
+- `oidc-client-secret`
+- `oidc-issuer-url`
+- `probe-api-url`
+- `skip-infrastructure-health-check`
+
+These vault fields are automatically mapped to Kubernetes secret keys and mounted at `/etc/external-secrets/` in the test container.
 
 ### Pipeline Triggers
 
@@ -386,46 +390,114 @@ Secrets are stored in Vault and automatically injected by osde2e:
 
 **Test Image:** `quay.io/redhat-services-prod/openshift/route-monitor-operator-e2e`
 
-### Running osde2e Tests Manually
+### Running osde2e Tests Locally
+
+You can run osde2e tests against a real cluster using the osde2e framework locally. This is useful for rapid iteration without pushing to CI/CD.
 
 **Prerequisites:**
-1. Access to a real OpenShift cluster (integration or staging)
-2. RMO deployed on the cluster
-3. RHOBS credentials configured
+1. osde2e binary built locally (in a sibling directory)
+2. Access to a real OpenShift cluster (integration or staging)
+3. RMO deployed on the cluster
+4. OCM token for cluster access
 
-**Option 1: Using Ginkgo**
+**Setup:**
+
 ```bash
-# Install ginkgo
-go install github.com/onsi/ginkgo/v2/ginkgo@latest
-
-# Get cluster kubeconfig
-ocm get /api/clusters_mgmt/v1/clusters/<cluster-id>/credentials | jq -r .kubeconfig > /tmp/kubeconfig
-
-# Run all tests
-DISABLE_JUNIT_REPORT=true \
-KUBECONFIG=/tmp/kubeconfig \
-ginkgo --tags=osde2e -v test/e2e
+# Clone and build osde2e if you haven't already
+cd /path/to/repos
+git clone https://github.com/openshift/osde2e.git
+cd osde2e
+make build
 ```
 
-**Option 2: Running specific test suites**
-```bash
-# Only basic installation tests
-ginkgo --tags=osde2e -v --focus="Route Monitor Operator" test/e2e
+**Building and pushing your test image:**
 
-# Only RHOBS synthetic monitoring tests
-ginkgo --tags=osde2e -v --focus="RHOBS Synthetic Monitoring" test/e2e
+When testing local changes, you need to build and push your own test image to Quay:
+
+```bash
+# Build the e2e test image
+cd /path/to/route-monitor-operator
+make docker-build-e2e
+
+# Tag it for your Quay repository
+podman tag localhost/rmo-e2e:latest quay.io/your-org/rmo-test:your-tag
+
+# Push to Quay (make sure you're logged in: podman login quay.io)
+podman push quay.io/your-org/rmo-test:your-tag
 ```
 
-### Environment Variables (CI/CD)
+**Using the local config file:**
 
-| Variable | Required | Source | Description |
-|----------|----------|--------|-------------|
-| `EXTERNAL_SECRET_OIDC_CLIENT_ID` | Yes | Vault (auto-loaded) | OIDC client ID for RHOBS API auth |
-| `EXTERNAL_SECRET_OIDC_CLIENT_SECRET` | Yes | Vault (auto-loaded) | OIDC client secret |
-| `EXTERNAL_SECRET_OIDC_ISSUER_URL` | Yes | Vault (auto-loaded) | OIDC issuer URL |
-| `PROBE_API_URL` | Yes | app-interface config | RHOBS API endpoint URL |
-| `SKIP_INFRASTRUCTURE_HEALTH_CHECK` | No | `"true"` | Skip infra checks for test HCPs |
-| `KUBECONFIG` | Yes | Manual/OCM | Path to cluster credentials |
+Create an osde2e config file (e.g., `osde2e-local-rmo.yaml`):
+
+```yaml
+# Local osde2e configuration for Route Monitor Operator testing
+tests:
+  # Specify your test image (built and pushed in previous step)
+  testSuites:
+    - image: quay.io/your-org/rmo-test:your-tag
+
+  # Only run the ad-hoc test images (your RMO tests), skip all other osde2e tests
+  ginkgoLabelFilter: AdHocTestImages
+
+# Credentials injected as environment variables via PassthruSecrets
+# Variable names must match test/e2e/rmo_secret.yml for CI/CD compatibility
+nonOSDe2eSecrets:
+  OIDC_CLIENT_ID: "your-client-id"
+  OIDC_CLIENT_SECRET: "your-client-secret"
+  OIDC_ISSUER_URL: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+  PROBE_API_URL: "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
+  SKIP_INFRASTRUCTURE_HEALTH_CHECK: "true"
+```
+
+**Run tests:**
+
+```bash
+# Get your OCM token
+ocm token
+
+# Run osde2e tests against existing cluster
+cd /path/to/osde2e
+./out/osde2e test \
+  --cluster-id <your-cluster-id> \
+  --environment stage \
+  --skip-destroy-cluster \
+  --skip-must-gather \
+  --skip-health-check \
+  --custom-config /path/to/osde2e-local-rmo.yaml
+```
+
+**How it works:**
+- osde2e creates a test pod from your pre-built Quay image
+- `nonOSDe2eSecrets` are injected as environment variables into the test pod
+- Your test code reads these environment variables directly (uppercase names matching `test/e2e/rmo_secret.yml`)
+- Only RMO tests run (filtered by `ginkgoLabelFilter: AdHocTestImages`)
+
+### Secret Configuration (CI/CD)
+
+Secrets are mounted from Kubernetes secret `route-monitor-operator-sc` at `/etc/external-secrets/`:
+
+| Secret Key | Required | Source | Description |
+|------------|----------|--------|-------------|
+| `oidc-client-id` | Yes | Vault secret | OIDC client ID for RHOBS API auth |
+| `oidc-client-secret` | Yes | Vault secret | OIDC client secret |
+| `oidc-issuer-url` | Yes | Vault secret | OIDC issuer URL |
+| `probe-api-url` | Yes | Vault secret | RHOBS API endpoint URL |
+| `skip-infrastructure-health-check` | No | `"true"` | Skip infra checks for test HCPs |
+
+**Environment Variables (osde2e PassthruSecrets):**
+
+When running via osde2e with the `nonOSDe2eSecrets` config, credentials are injected as environment variables. Variable names must match `test/e2e/rmo_secret.yml` for CI/CD compatibility:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OIDC_CLIENT_ID` | Yes | OIDC client ID for RHOBS API auth |
+| `OIDC_CLIENT_SECRET` | Yes | OIDC client secret |
+| `OIDC_ISSUER_URL` | Yes | OIDC issuer URL |
+| `PROBE_API_URL` | Yes | RHOBS API endpoint URL |
+| `SKIP_INFRASTRUCTURE_HEALTH_CHECK` | No | Skip infra checks for test HCPs |
+
+**Note:** These variable names match the CI/CD secret template (`test/e2e/rmo_secret.yml`). Shell environment variables exported in your terminal will NOT be passed through to the test container - you must use the osde2e config file.
 
 ### CI/CD Test Architecture
 
@@ -517,7 +589,8 @@ The test gets stuck waiting for something.
 
 The test cannot authenticate with RHOBS API.
 
-**Solution:** Verify secrets exist in Vault and are properly configured in app-interface:
+**For CI/CD:**
+Verify secrets exist in Vault and are properly configured in app-interface:
 ```bash
 # Check integration credentials
 vault kv get osd-sre/integration/route-monitor-operator-credentials
@@ -527,9 +600,26 @@ vault kv get osd-sre/staging/route-monitor-operator-credentials
 ```
 
 Ensure these secrets have the required fields:
-- `OIDC_CLIENT_ID`
-- `OIDC_CLIENT_SECRET`
-- `OIDC_ISSUER_URL`
+- `oidc-client-id`
+- `oidc-client-secret`
+- `oidc-issuer-url`
+- `probe-api-url`
+
+Also verify the Kubernetes secret was created in the test namespace:
+```bash
+kubectl get secret route-monitor-operator-sc -n <test-namespace>
+kubectl describe secret route-monitor-operator-sc -n <test-namespace>
+```
+
+**For Local osde2e Testing:**
+If running osde2e locally with a custom config file, verify:
+1. The `nonOSDe2eSecrets` section in your config has all required UPPERCASE keys matching `test/e2e/rmo_secret.yml`
+2. The osde2e framework created the `ci-secrets` secret in the test namespace:
+```bash
+kubectl get secret ci-secrets -n osde2e-executor-<random> -o yaml
+```
+3. The secret keys are UPPERCASE (e.g., `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`)
+4. **Important:** Shell environment variables exported in your terminal will NOT work - credentials must be in the osde2e config file's `nonOSDe2eSecrets` section
 
 #### `no matches for kind "HostedControlPlane"`
 
@@ -571,21 +661,19 @@ curl -X DELETE -H "Authorization: Bearer <token>" \
 
 Test fails because it cannot connect to RHOBS API or connects to wrong environment.
 
-**Explanation:** The PROBE_API_URL is NOT auto-detected. It must be explicitly set via environment variable.
+**Explanation:** The PROBE_API_URL is NOT auto-detected. It must be explicitly configured.
 
 **Solution:**
 
-In CI/CD, this is automatically set by app-interface configuration for each environment. For manual testing, set it explicitly:
+In CI/CD, this is automatically set by app-interface configuration for each environment.
 
-```bash
-# For integration environment
-export PROBE_API_URL="https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes"
+For local osde2e testing, set it in your config file's `nonOSDe2eSecrets` section:
 
-# For staging environment
-export PROBE_API_URL="https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"
-
-# Then run tests
-ginkgo --tags=osde2e -v test/e2e
+```yaml
+nonOSDe2eSecrets:
+  PROBE_API_URL: "https://us-east-1-0.rhobs.api.stage.openshift.com/api/metrics/v1/hcp/probes"  # staging
+  # OR
+  PROBE_API_URL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes"  # integration
 ```
 
 ---
@@ -621,6 +709,6 @@ When adding new tests:
 
 ---
 
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-03-10
 **Maintainers:** ROSA Rocket Team (@team-rosa-rocket)
 **Slack:** [#team-rosa-rocket](https://redhat-internal.slack.com/archives/C08N5S632V8)
