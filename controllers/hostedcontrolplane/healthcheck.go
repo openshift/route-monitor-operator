@@ -63,7 +63,12 @@ const (
 // HCP namespace, and this process will be restarted. Additionally, should healthchecking need to be skipped for any reason, the annotation
 // "routemonitor.managed.openshift.io/successful-healthchecks" can be added-to/edited-on the configmap with a large number (ie - 999) to bypass
 // this functionality
-func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) (bool, error) {
+	// Skip health check for test environments (e.g., osde2e tests without real kube-apiserver)
+	if cfg.SkipInfrastructureHealthCheck {
+		return true, nil
+	}
+
 	if olderThan(hostedcontrolplane, hcpHealthCheckSkipAge) {
 		return true, nil
 	}
@@ -227,7 +232,12 @@ func olderThan(obj metav1.Object, age time.Duration) bool {
 }
 
 // isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
-func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (bool, error) {
+func (r *HostedControlPlaneReconciler) isVpcEndpointReady(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) (bool, error) {
+	// Skip VPC endpoint check for test environments (e.g., osde2e tests without real VPC infrastructure)
+	if cfg.SkipInfrastructureHealthCheck {
+		return true, nil
+	}
+
 	// Create an instance of the VpcEndpoint
 	vpcEndpoint := &avov1alpha2.VpcEndpoint{}
 

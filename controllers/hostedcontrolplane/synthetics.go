@@ -252,12 +252,13 @@ func (r *HostedControlPlaneReconciler) deleteDynatraceHttpMonitorResources(dynat
 
 // RHOBSConfig holds RHOBS API configuration
 type RHOBSConfig struct {
-	ProbeAPIURL        string
-	Tenant             string
-	OIDCClientID       string
-	OIDCClientSecret   string
-	OIDCIssuerURL      string
-	OnlyPublicClusters bool
+	ProbeAPIURL             string
+	Tenant                       string
+	OIDCClientID                 string
+	OIDCClientSecret             string
+	OIDCIssuerURL                string
+	OnlyPublicClusters           bool
+	SkipInfrastructureHealthCheck bool
 }
 
 // DynatraceConfig holds Dynatrace feature flag configuration.

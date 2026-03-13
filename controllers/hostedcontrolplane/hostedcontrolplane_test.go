@@ -571,7 +571,7 @@ func TestHostedControlPlaneReconciler_deployInternalMonitoringObjects(t *testing
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := newTestReconciler(t, tt.objs...)
-			err := r.deployInternalMonitoringObjects(tt.args.ctx, tt.args.log, tt.args.hostedcontrolplane)
+			err := r.deployInternalMonitoringObjects(tt.args.ctx, tt.args.log, tt.args.hostedcontrolplane, RHOBSConfig{})
 			passed, reason := tt.eval(err, r)
 			if !passed {
 				t.Errorf("HostedControlPlaneReconciler.deployInternalMonitoringObjects() did not pass due to = %s", reason)
@@ -827,7 +827,7 @@ func TestIsVpcEndpointReady(t *testing.T) {
 			}
 
 			// Test the function
-			result, err := r.isVpcEndpointReady(context.Background(), hcp)
+			result, err := r.isVpcEndpointReady(context.Background(), hcp, RHOBSConfig{})
 
 			// Validate the results
 			if result != tt.expectedResult {
