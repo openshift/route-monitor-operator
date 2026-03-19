@@ -74,6 +74,11 @@ const (
 	// This prevents indefinite blocking while still allowing time for transient failures to resolve
 	rhobsProbeDeletionTimeout = 15 * time.Minute
 
+	// Periodic reconciliation interval -- ensures all HCPs get probes even if
+	// they existed before RMO was configured. Without this, RMO only creates
+	// probes when triggered by HCP events (create/update/delete).
+	periodicReconcileInterval = 10 * time.Minute
+
 	// ConfigMap name for dynamic configuration (uses config.OperatorName + "-config")
 	configMapName = config.OperatorName + "-config"
 )
@@ -335,7 +340,10 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	return ctrl.Result{}, err
+	// Requeue periodically to ensure probes stay in sync for HCPs that existed
+	// before RMO was configured. The ensureRHOBSProbe call is idempotent (heartbeat
+	// update if probe exists, create if not).
+	return ctrl.Result{RequeueAfter: periodicReconcileInterval}, err
 }
 
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
