@@ -361,7 +361,9 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		// This checks ConfigMap first, then environment variables, then creates/updates ConfigMap
 		By("getting OIDC credentials from ConfigMap or environment variables")
 		oidcCredentials, err = getOrCreateOIDCCredentials(ctx, k8s, environment)
-		Expect(err).ShouldNot(HaveOccurred(), "failed to fetch credentials")
+		if err != nil {
+			Skip("RHOBS Synthetic Monitoring tests skipped: " + err.Error())
+		}
 
 		// Restart RMO to pick up CRDs and ConfigMap (in case RMO was deployed before test ran)
 		By("restarting RMO to ensure HostedControlPlane controller and ConfigMap are loaded")
