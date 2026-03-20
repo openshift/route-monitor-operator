@@ -7,6 +7,7 @@ package osde2etests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,6 +96,10 @@ spec:
       status: {}
 `
 )
+
+// errCredentialsNotAvailable is returned when OIDC credentials are not
+// configured in either the ConfigMap or environment variables.
+var errCredentialsNotAvailable = errors.New("OIDC credentials not available")
 
 var _ = Describe("Route Monitor Operator", Ordered, func() {
 	var (
@@ -361,9 +366,10 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		// This checks ConfigMap first, then environment variables, then creates/updates ConfigMap
 		By("getting OIDC credentials from ConfigMap or environment variables")
 		oidcCredentials, err = getOrCreateOIDCCredentials(ctx, k8s, environment)
-		if err != nil {
+		if errors.Is(err, errCredentialsNotAvailable) {
 			Skip("RHOBS Synthetic Monitoring tests skipped: " + err.Error())
 		}
+		Expect(err).ShouldNot(HaveOccurred(), "failed to fetch credentials")
 
 		// Restart RMO to pick up CRDs and ConfigMap (in case RMO was deployed before test ran)
 		By("restarting RMO to ensure HostedControlPlane controller and ConfigMap are loaded")
@@ -1169,7 +1175,7 @@ func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentia
 
 	// Validate all required credentials are present
 	if clientID == "" || clientSecret == "" || issuerURL == "" || probeAPIURL == "" {
-		return nil, fmt.Errorf("missing required OIDC credentials - ensure OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL, and PROBE_API_URL environment variables are set")
+		return nil, fmt.Errorf("missing required OIDC credentials - ensure OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_ISSUER_URL, and PROBE_API_URL environment variables are set: %w", errCredentialsNotAvailable)
 	}
 
 	GinkgoLogr.Info("Using OIDC credentials from environment variables",
