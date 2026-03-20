@@ -194,10 +194,12 @@ func main() {
 		}
 	}
 
-	// Validate probe API URL format (if provided)
+	// Validate probe API URL format (if provided). A malformed URL disables
+	// RHOBS probe operations rather than crashing the operator, so RMO can
+	// still reconcile RouteMonitor and ClusterUrlMonitor resources.
 	if probeAPIURL != "" && !util.ValidURL(probeAPIURL) {
-		setupLog.Error(nil, "probe-api-url must be a fully qualified URL starting with 'http://' or 'https://'", "probeAPIURL", probeAPIURL)
-		os.Exit(1)
+		setupLog.Error(nil, "probe-api-url is malformed, disabling RHOBS probe operations. URL must start with 'http://' or 'https://' and include a host.", "probeAPIURL", probeAPIURL)
+		probeAPIURL = ""
 	}
 
 	enableHCP, err := shouldEnableHCP()
