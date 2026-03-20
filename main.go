@@ -286,12 +286,12 @@ func main() {
 
 	if enableHCP {
 		rhobsConfig := hostedcontrolplane.RHOBSConfig{
-			ProbeAPIURL:                  probeAPIURL,
-			Tenant:                       probeTenant,
-			OIDCClientID:                 oidcClientID,
-			OIDCClientSecret:             oidcClientSecret,
-			OIDCIssuerURL:                oidcIssuerURL,
-			OnlyPublicClusters:           onlyPublicClusters,
+			ProbeAPIURL:                   probeAPIURL,
+			Tenant:                        probeTenant,
+			OIDCClientID:                  oidcClientID,
+			OIDCClientSecret:              oidcClientSecret,
+			OIDCIssuerURL:                 oidcIssuerURL,
+			OnlyPublicClusters:            onlyPublicClusters,
 			SkipInfrastructureHealthCheck: skipInfrastructureHealthCheck,
 		}
 		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, rhobsConfig)
@@ -345,12 +345,12 @@ func shouldEnableHCP() (bool, error) {
 
 // OperatorConfig holds configuration values from ConfigMap
 type OperatorConfig struct {
-	ProbeAPIURL                  string
-	ProbeTenant                  string
-	OIDCClientID                 string
-	OIDCClientSecret             string
-	OIDCIssuerURL                string
-	OnlyPublicClusters           bool
+	ProbeAPIURL                   string
+	ProbeTenant                   string
+	OIDCClientID                  string
+	OIDCClientSecret              string
+	OIDCIssuerURL                 string
+	OnlyPublicClusters            bool
 	SkipInfrastructureHealthCheck bool
 }
 
@@ -383,12 +383,12 @@ func getConfigFromConfigMap() (*OperatorConfig, error) {
 
 	// Extract configuration values, trimming whitespace
 	cfg := &OperatorConfig{
-		ProbeAPIURL:                  strings.TrimSpace(configMap.Data["probe-api-url"]),
-		ProbeTenant:                  strings.TrimSpace(configMap.Data["probe-tenant"]),
-		OIDCClientID:                 strings.TrimSpace(configMap.Data["oidc-client-id"]),
-		OIDCClientSecret:             strings.TrimSpace(configMap.Data["oidc-client-secret"]),
-		OIDCIssuerURL:                strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
-		OnlyPublicClusters:           strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true",
+		ProbeAPIURL:                   strings.TrimSpace(configMap.Data["probe-api-url"]),
+		ProbeTenant:                   strings.TrimSpace(configMap.Data["probe-tenant"]),
+		OIDCClientID:                  strings.TrimSpace(configMap.Data["oidc-client-id"]),
+		OIDCClientSecret:              strings.TrimSpace(configMap.Data["oidc-client-secret"]),
+		OIDCIssuerURL:                 strings.TrimSpace(configMap.Data["oidc-issuer-url"]),
+		OnlyPublicClusters:            strings.TrimSpace(configMap.Data["only-public-clusters"]) == "true",
 		SkipInfrastructureHealthCheck: strings.TrimSpace(configMap.Data["skip-infrastructure-health-check"]) == "true",
 	}
 
