@@ -198,7 +198,7 @@ func main() {
 	// RHOBS probe operations rather than crashing the operator, so RMO can
 	// still reconcile RouteMonitor and ClusterUrlMonitor resources.
 	if probeAPIURL != "" && !util.ValidURL(probeAPIURL) {
-		setupLog.Error(nil, "probe-api-url is malformed, disabling RHOBS probe operations. URL must start with 'http://' or 'https://' and include a host.", "probeAPIURL", probeAPIURL)
+		setupLog.Info("probe-api-url is malformed, disabling RHOBS probe operations. URL must start with 'http://' or 'https://' and include a host.", "probeAPIURL", probeAPIURL)
 		probeAPIURL = ""
 	}
 
