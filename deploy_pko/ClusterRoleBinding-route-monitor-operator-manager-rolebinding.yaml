@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    package-operator.run/phase: rbac
+    package-operator.run/collision-protection: IfNoController
+  name: route-monitor-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: route-monitor-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: route-monitor-operator-system
+  namespace: openshift-route-monitor-operator
