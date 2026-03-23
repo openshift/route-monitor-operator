@@ -1,0 +1,109 @@
+---
+# This Job cleans up old OLM resources after migrating to PKO
+# IMPORTANT: Review and customize this template before deploying!
+# 
+# Things to customize:
+# 1. Adjust the namespace if needed
+# 2. Modify resource filters (CSV names, labels, etc.)
+# 3. Review RBAC permissions
+# 4. Update the cleanup logic for your specific operator
+#
+# Resources cleaned up:
+#   - ClusterServiceVersion (CSV)
+#   - Subscription
+#   - CatalogSource
+#   - OperatorGroup
+#   - InstallPlan
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: olm-cleanup
+  namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: cleanup-rbac
+    package-operator.run/collision-protection: IfNoController
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: olm-cleanup
+  namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: cleanup-rbac
+    package-operator.run/collision-protection: IfNoController
+rules:
+  # CUSTOMIZE: Adjust permissions as needed for your cleanup tasks
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - clusterserviceversions
+      - subscriptions
+      - catalogsources
+      - operatorgroups
+      - installplans
+    verbs:
+      - list
+      - get
+      - watch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: olm-cleanup
+  namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: cleanup-rbac
+    package-operator.run/collision-protection: IfNoController
+roleRef:
+  kind: Role
+  name: olm-cleanup
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: olm-cleanup
+    namespace: openshift-route-monitor-operator
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: olm-cleanup
+  namespace: openshift-route-monitor-operator
+  annotations:
+    package-operator.run/phase: cleanup-deploy
+    package-operator.run/collision-protection: IfNoController
+spec:
+  template:
+    metadata:
+      annotations:
+        openshift.io/required-scc: restricted-v2
+    spec:
+      serviceAccountName: olm-cleanup
+      priorityClassName: openshift-user-critical
+      restartPolicy: Never
+      containers:
+        - name: delete-csv
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              #!/bin/sh
+              set -euxo pipefail
+              
+              NS="openshift-route-monitor-operator"
+
+              LABEL="operators.coreos.com/route-monitor-operator.openshift-route-monitor-operator"
+              
+              oc -n "$NS" delete csv -l "$LABEL" || true
+              oc -n "$NS" delete sub -l "$LABEL" || true
+              oc -n "$NS" delete installplan -l "$LABEL" || true
+              oc -n "$NS" delete catalogsource route-monitor-operator-registry || true
+              oc -n "$NS" delete operatorgroup route-monitor-operator || true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
