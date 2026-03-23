@@ -85,6 +85,26 @@ func TestValidURL(t *testing.T) {
 			url:   "file:///etc/passwd",
 			valid: false,
 		},
+		{
+			name:  "scheme with empty host from label resolution",
+			url:   "https:///api/metrics/v1/hcp/probes",
+			valid: false,
+		},
+		{
+			name:  "host only no scheme",
+			url:   "rhobs-api.example.com/api/metrics/v1/hcp/probes",
+			valid: false,
+		},
+		{
+			name:  "valid probe API URL",
+			url:   "https://rhobs-api.example.com",
+			valid: true,
+		},
+		{
+			name:  "valid probe API URL with path",
+			url:   "https://rhobs-api.example.com/api/metrics/v1/hcp/probes",
+			valid: true,
+		},
 	}
 
 	for _, tt := range tests {
