@@ -1,0 +1,18 @@
+apiVersion: monitoring.rhobs/v1
+kind: ServiceMonitor
+metadata:
+  name: route-monitor-operator-rhobs
+  namespace: openshift-route-monitor-operator
+  labels:
+    app.kubernetes.io/component: route-monitor-operator
+  annotations:
+    package-operator.run/phase: deploy
+    package-operator.run/collision-protection: IfNoController
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: route-monitor-operator
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 60s
