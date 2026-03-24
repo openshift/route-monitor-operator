@@ -9,5 +9,5 @@ LABEL com.redhat.component="openshift-route-monitor-operator" \
       vendor="Red Hat, Inc." \
       release="v0.0.0" \
       version="v0.0.0"
-COPY * /package/
 
+COPY * /package/
