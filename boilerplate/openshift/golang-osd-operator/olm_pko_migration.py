@@ -446,8 +446,8 @@ def get_pko_manifest(operator_name: str) -> dict[str, Any]:
                             "type": "string",
                             "default": "None",
                         },
+                    },
                     "type": "object",
-                    }
                 }
             },
         },
@@ -538,31 +538,34 @@ def annotate_manifests(manifests: list[str]) -> list[dict[str, Any]]:
 
     for manifest_str in manifests:
         try:
-            manifest = yaml.safe_load(manifest_str)
-            if not manifest or not isinstance(manifest, dict):
-                continue
+            # Use safe_load_all to handle multi-document YAML files
+            documents = yaml.safe_load_all(manifest_str)
 
-            kind = manifest.get("kind")
+            for manifest in documents:
+                if not manifest or not isinstance(manifest, dict):
+                    continue
 
-            if kind == "CustomResourceDefinition":
-                annotated.append(annotate(manifest, PHASE_CRDS))
-            elif kind in ["ClusterRole", "ClusterRoleBinding"]:
-                annotated.append(annotate(manifest, PHASE_RBAC))
-            elif kind in ["Role", "RoleBinding"]:
-                annotated.append(annotate(manifest, PHASE_RBAC))
-            elif kind == "ServiceAccount":
-                annotated.append(annotate(manifest, PHASE_RBAC))
-            elif kind == "Service":
-                annotated.append(annotate(manifest, PHASE_DEPLOY))
-            elif kind == "Deployment":
-                manifest = annotate(manifest, PHASE_DEPLOY)
-                manifest = set_image_template(manifest)
-                annotated.append(manifest)
-            elif kind == "ServiceMonitor":
-                annotated.append(annotate(manifest, PHASE_DEPLOY))
-            else:
-                print(f"Unhandled type: {kind}")
-                annotated.append(manifest)
+                kind = manifest.get("kind")
+
+                if kind == "CustomResourceDefinition":
+                    annotated.append(annotate(manifest, PHASE_CRDS))
+                elif kind in ["ClusterRole", "ClusterRoleBinding"]:
+                    annotated.append(annotate(manifest, PHASE_RBAC))
+                elif kind in ["Role", "RoleBinding"]:
+                    annotated.append(annotate(manifest, PHASE_RBAC))
+                elif kind == "ServiceAccount":
+                    annotated.append(annotate(manifest, PHASE_RBAC))
+                elif kind == "Service":
+                    annotated.append(annotate(manifest, PHASE_DEPLOY))
+                elif kind == "Deployment":
+                    manifest = annotate(manifest, PHASE_DEPLOY)
+                    manifest = set_image_template(manifest)
+                    annotated.append(manifest)
+                elif kind == "ServiceMonitor":
+                    annotated.append(annotate(manifest, PHASE_DEPLOY))
+                else:
+                    print(f"Unhandled type: {kind}")
+                    annotated.append(manifest)
 
         except yaml.YAMLError as e:
             print(f"Error parsing manifest: {e}", file=sys.stderr)
