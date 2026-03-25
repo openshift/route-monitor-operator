@@ -10,10 +10,10 @@ spec:
   phases:
   - name: crds
   - name: namespace
-  - name: rbac
-  - name: deploy
   - name: cleanup-rbac
   - name: cleanup-deploy
+  - name: rbac
+  - name: deploy
   availabilityProbes:
   - probes:
     - condition:
