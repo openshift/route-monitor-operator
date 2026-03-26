@@ -26,7 +26,7 @@ objects:
         managed.openshift.io/gitHash: ${IMAGE_TAG}
         managed.openshift.io/gitRepoName: ${REPO_NAME}
         managed.openshift.io/osd: "true"
-      name: route-monitor-operator-stage
+      name: route-monitor-operator-pko
     spec:
       clusterDeploymentSelector:
       matchLabels:
