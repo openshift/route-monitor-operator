@@ -289,7 +289,12 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d", resp.StatusCode)
+		// Read response body for error details
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d (unable to read response body: %v)", resp.StatusCode, readErr)
+		}
+		return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d, Response: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	//return monitor id

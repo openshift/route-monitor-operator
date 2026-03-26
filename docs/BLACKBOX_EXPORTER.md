@@ -182,7 +182,7 @@ modules:
 | Option | Purpose | Example |
 |--------|---------|---------|
 | `timeout` | Maximum time to wait for probe completion | `15s` |
-| `expected_status_codes` | Acceptable HTTP response codes | `[200, 301, 302]` |
+| `valid_status_codes` | Acceptable HTTP response codes | `[200, 301, 302]` |
 | `insecure_skip_verify` | Skip TLS certificate validation | `true/false` |
 | `preferred_ip_protocol` | IP version preference | `ip4` or `ip6` |
 | `no_follow_redirects` | Don't follow HTTP redirects | `true/false` |
@@ -465,7 +465,7 @@ spec:
         key: node-role.kubernetes.io/infra
       containers:
       - name: blackbox-exporter
-        image: quay.io/prometheus/blackbox-exporter:latest
+        image: quay.io/prometheus/blackbox-exporter:0.24.0
         args:
         - --config.file=/config/blackbox.yaml
         ports:
@@ -540,7 +540,6 @@ bbe := blackboxexporter.New(
 ```
 
 **Recommended Images:**
-- `quay.io/prometheus/blackbox-exporter:latest` - Latest version
 - `quay.io/prometheus/blackbox-exporter:v0.23.0` - Specific version for stability
 - Custom registry versions for air-gapped environments
 
@@ -732,7 +731,13 @@ rate(probe_success[5m])
 rate(probe_duration_seconds_sum[5m]) / rate(probe_duration_seconds_count[5m])
 
 # Failed probes in last 5 minutes
-increase(probe_success{probe_success="0"}[5m])
+count_over_time((probe_success == 0)[5m])
+
+# Count failed probes by target
+sum(count_over_time((probe_success == 0)[5m])) by (instance, job)
+
+# Failure rate using sum/count pattern
+1 - (sum(sum_over_time(probe_success[5m])) / sum(count_over_time(probe_success[5m])))
 
 # Certificate expiry warning (< 7 days)
 probe_ssl_earliest_cert_expiry - time() < 7 * 24 * 3600

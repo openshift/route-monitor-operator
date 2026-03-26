@@ -66,10 +66,12 @@ func NewProbeRequest(staticURL string, labels map[string]string) ProbeRequest {
 
 // NewClusterProbeRequest creates a probe request specifically for cluster monitoring
 // This is a convenience function for the current use case but can be extended
-func NewClusterProbeRequest(clusterID, monitoringURL string, isPrivate bool) ProbeRequest {
+func NewClusterProbeRequest(clusterID, monitoringURL, region string, isPrivate bool) ProbeRequest {
 	labels := map[string]string{
-		"cluster-id": clusterID,
-		"private":    fmt.Sprintf("%t", isPrivate),
+		"cluster-id":      clusterID,
+		"private":         fmt.Sprintf("%t", isPrivate),
+		"region":          region,
+		"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
 	}
 	return NewProbeRequest(monitoringURL, labels)
 }
@@ -163,6 +165,10 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	c.logger.V(debugLogLevel).Info("Creating RHOBS probe", "method", "POST", "url", url, "static_url", req.StaticURL, "cluster_id", req.Labels["cluster-id"], "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "POST", "url", url, "operation", "create-probe")
 
+	start := time.Now()
+	apiSuccess := false
+	defer func() { RecordAPIRequest("create_probe", time.Since(start), apiSuccess) }()
+
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
@@ -175,6 +181,7 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	}
 
 	c.logger.Info("Received RHOBS API response", "method", "POST", "url", url, "status_code", resp.StatusCode, "operation", "create-probe")
+	apiSuccess = resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict
 
 	if resp.StatusCode == http.StatusConflict {
 		// Probe already exists for this URL, which is fine - treat as success
@@ -228,6 +235,10 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	c.logger.V(debugLogLevel).Info("Getting RHOBS probe", "method", "GET", "url", httpReq.URL.String(), "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "GET", "url", httpReq.URL.String(), "operation", "get-probe")
 
+	start := time.Now()
+	apiSuccess := false
+	defer func() { RecordAPIRequest("get_probe", time.Since(start), apiSuccess) }()
+
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
@@ -240,6 +251,7 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	}
 
 	c.logger.Info("Received RHOBS API response", "method", "GET", "url", httpReq.URL.String(), "status_code", resp.StatusCode, "operation", "get-probe")
+	apiSuccess = resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil // Probe doesn't exist
@@ -264,9 +276,56 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	return nil, nil // Probe not found
 }
 
-// ProbePatchRequest represents the payload for updating a probe status
+// ProbePatchRequest represents the payload for updating a probe
 type ProbePatchRequest struct {
-	Status string `json:"status"`
+	Status string             `json:"status,omitempty"`
+	Labels *map[string]string `json:"labels,omitempty"`
+}
+
+// UpdateProbeLabels updates the labels on an existing probe via PATCH
+func (c *Client) UpdateProbeLabels(ctx context.Context, probeID string, labels map[string]string) error {
+	url := c.buildProbeURL(probeID)
+
+	patchReq := ProbePatchRequest{
+		Labels: &labels,
+	}
+
+	payload, err := json.Marshal(patchReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, httpMethodPatch, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", contentTypeJSON)
+	c.addRHOBSHeaders(httpReq)
+	if err := c.addAuthHeaders(ctx, httpReq); err != nil {
+		return fmt.Errorf("failed to add auth headers: %w", err)
+	}
+
+	c.logger.Info("Updating RHOBS probe labels", "method", "PATCH", "url", url, "probe_id", probeID)
+
+	start := time.Now()
+	apiSuccess := false
+	defer func() { RecordAPIRequest("update_probe_labels", time.Since(start), apiSuccess) }()
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to send HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	apiSuccess = resp.StatusCode == http.StatusOK
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("%s %d: %s", apiErrorPrefix, resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully updated probe labels", "probe_id", probeID)
+	return nil
 }
 
 // DeleteProbe marks a probe for termination by cluster ID using PATCH method
@@ -335,6 +394,10 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	c.logger.Info("Terminating RHOBS probe", "method", "PATCH", "url", url, "cluster_id", clusterID, "tenant", c.tenant, "username", username)
 	c.logger.Info("Sending RHOBS API request", "method", "PATCH", "url", url, "operation", "delete-probe")
 
+	start := time.Now()
+	apiSuccess := false
+	defer func() { RecordAPIRequest("delete_probe", time.Since(start), apiSuccess) }()
+
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		c.logger.Error(err, "Failed to send HTTP request", "cluster_id", clusterID, "url", url)
@@ -343,6 +406,7 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	defer resp.Body.Close()
 
 	c.logger.Info("Received RHOBS API response", "method", "PATCH", "url", url, "status_code", resp.StatusCode, "operation", "delete-probe")
+	apiSuccess = resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Probe already doesn't exist, consider this success
@@ -415,6 +479,10 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 
 	c.logger.V(debugLogLevel).Info("Requesting OIDC access token", "issuer_url", c.oidcConfig.IssuerURL, "token_url", tokenURL)
 
+	start := time.Now()
+	refreshSuccess := false
+	defer func() { RecordOIDCTokenRefresh(time.Since(start), refreshSuccess) }()
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to request access token: %w", err)
@@ -429,6 +497,8 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(body))
 	}
+
+	refreshSuccess = true
 
 	var tokenResp tokenResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {

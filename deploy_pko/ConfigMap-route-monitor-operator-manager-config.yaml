@@ -1,0 +1,12 @@
+apiVersion: v1
+data:
+  controller_manager_config.yaml: "apiVersion: controller-runtime.sigs.k8s.io/v1alpha1\n\
+    kind: ControllerManagerConfig\nhealth:\n  healthProbeBindAddress: :8081\nmetrics:\n\
+    \  bindAddress: :8080\nwebhook:\n  port: 9443\nleaderElection:\n  leaderElect:\
+    \ true\n  resourceName: 431ceb26.my.domain\n"
+kind: ConfigMap
+metadata:
+  annotations:
+    package-operator.run/phase: deploy
+  name: route-monitor-operator-manager-config
+  namespace: openshift-route-monitor-operator

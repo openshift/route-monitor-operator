@@ -245,13 +245,17 @@ endif
 go-build: ## Build binary
 	${GOENV} go build ${GOBUILDFLAGS} -o build/_output/bin/$(OPERATOR_NAME) .
 
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.23
-SETUP_ENVTEST = setup-envtest
+ENVTEST_K8S_VERSION = 1.28.0
+SETUP_ENVTEST_VERSION = release-0.23
+GOPATH ?= $(shell go env GOPATH)
+SETUP_ENVTEST = $(GOPATH)/bin/setup-envtest
 
 .PHONY: setup-envtest
 setup-envtest:
-	$(eval KUBEBUILDER_ASSETS := "$(shell $(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) -p path --bin-dir /tmp/envtest/bin)")
+	@if [ ! -f "$(SETUP_ENVTEST)" ]; then \
+		echo "Installing setup-envtest..."; \
+		GOBIN=$(GOPATH)/bin go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(SETUP_ENVTEST_VERSION); \
+	fi
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -267,7 +271,14 @@ go-test: setup-envtest
 		exit 1; \
 	fi
 
-	${GOENV} KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS) go test $(TESTOPTS) $(TESTTARGETS)
+	@echo "Setting up kubebuilder test assets..."; \
+	if ! ASSETS_PATH=$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --arch amd64 --os linux --bin-dir /tmp/envtest-binaries -p path 2>&1); then \
+		echo "ERROR: Could not obtain kubebuilder test assets"; \
+		echo "Output: $$ASSETS_PATH"; \
+		exit 1; \
+	fi; \
+	echo "Using test assets: $$ASSETS_PATH"; \
+	${GOENV} KUBEBUILDER_ASSETS="$$ASSETS_PATH" go test $(TESTOPTS) $(TESTTARGETS)
 
 .PHONY: python-venv
 python-venv:
@@ -364,6 +375,7 @@ endif
 # Boilerplate container-make targets.
 # Runs 'make' in the boilerplate backing container.
 # If the command fails, starts a shell in the container so you can debug.
+# Set NONINTERACTIVE=true to skip the debug shell for CI/automation.
 .PHONY: container-test
 container-test:
 	${BOILERPLATE_CONTAINER_MAKE} test
@@ -384,6 +396,11 @@ container-validate:
 container-coverage:
 	${BOILERPLATE_CONTAINER_MAKE} coverage
 
+# Run all container-* validation targets in sequence.
+# Set NONINTERACTIVE=true to skip debug shells and fail fast for CI/automation.
+.PHONY: container-all
+container-all: container-lint container-generate container-coverage container-test container-validate
+
 .PHONY: rvmo-bundle
 rvmo-bundle:
 	RELEASE_BRANCH=$(RELEASE_BRANCH) \
@@ -393,3 +410,35 @@ rvmo-bundle:
 	OPERATOR_OLM_REGISTRY_IMAGE=$(REGISTRY_IMAGE) \
 	TEMPLATE_DIR=$(abspath hack/release-bundle) \
 	bash ${CONVENTION_DIR}/rvmo-bundle.sh
+
+.PHONY: pko-migrate
+pko-migrate: ## Migrate operator from OLM to PKO (Package Operator) format
+	@echo "Starting OLM to PKO migration..."
+	@if [ ! -f "${CONVENTION_DIR}/olm_pko_migration.py" ]; then \
+		echo "ERROR: Migration script not found at ${CONVENTION_DIR}/olm_pko_migration.py"; \
+		exit 1; \
+	fi
+	@python3 ${CONVENTION_DIR}/olm_pko_migration.py \
+		--folder deploy \
+		--output deploy_pko
+	@echo ""
+	@echo "Migration complete! Next steps:"
+	@echo "  1. Review generated files in deploy_pko/"
+	@echo "  2. Customize Cleanup-OLM-Job.yaml for your operator"
+	@echo "  3. Update build/Dockerfile.pko if needed"
+	@echo "  4. Review .tekton pipeline files"
+	@echo "  5. Test the PKO package deployment"
+
+.PHONY: pko-migrate-no-dockerfile
+pko-migrate-no-dockerfile: ## Migrate to PKO without generating Dockerfile
+	@python3 ${CONVENTION_DIR}/olm_pko_migration.py \
+		--folder deploy \
+		--output deploy_pko \
+		--no-dockerfile
+
+.PHONY: pko-migrate-no-tekton
+pko-migrate-no-tekton: ## Migrate to PKO without generating Tekton pipelines
+	@python3 ${CONVENTION_DIR}/olm_pko_migration.py \
+		--folder deploy \
+		--output deploy_pko \
+		--no-tekton

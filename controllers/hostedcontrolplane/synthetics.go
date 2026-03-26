@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -251,16 +252,24 @@ func (r *HostedControlPlaneReconciler) deleteDynatraceHttpMonitorResources(dynat
 
 // RHOBSConfig holds RHOBS API configuration
 type RHOBSConfig struct {
-	ProbeAPIURL        string
-	Tenant             string
-	OIDCClientID       string
-	OIDCClientSecret   string
-	OIDCIssuerURL      string
-	OnlyPublicClusters bool
+	ProbeAPIURL                   string
+	Tenant                        string
+	OIDCClientID                  string
+	OIDCClientSecret              string
+	OIDCIssuerURL                 string
+	OnlyPublicClusters            bool
+	SkipInfrastructureHealthCheck bool
+}
+
+// DynatraceConfig holds Dynatrace feature flag configuration.
+// Dynatrace monitoring is disabled by default and can be enabled per-sector/region
+// by setting "dynatrace-enabled: true" in the ConfigMap.
+type DynatraceConfig struct {
+	Enabled bool // Feature flag - defaults to false
 }
 
 // ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
-func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID
 	if clusterID == "" {
 		return fmt.Errorf("cluster ID is empty")
@@ -270,8 +279,24 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
 		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
+	// Check if cluster is in limited support -- delete probe if it exists and skip creation
+	if hostedcontrolplane.Labels["api.openshift.com/limited-support"] == "true" {
+		client := r.createRHOBSClient(log, cfg)
+		existingProbe, err := client.GetProbe(ctx, clusterID)
+		if err != nil {
+			return fmt.Errorf("failed to check existing probe: %w", err)
+		}
+		if existingProbe != nil {
+			log.Info("Cluster is in limited support, deleting probe", "cluster_id", clusterID, "probe_id", existingProbe.ID)
+			if err := client.DeleteProbe(ctx, clusterID); err != nil {
+				return fmt.Errorf("failed to delete probe for limited support cluster: %w", err)
+			}
+		}
+		return nil
+	}
+
 	// Skip private clusters if OnlyPublicClusters flag is set
-	if r.RHOBSConfig.OnlyPublicClusters && isPrivate {
+	if cfg.OnlyPublicClusters && isPrivate {
 		log.V(2).Info("Skipping probe creation for private cluster (only-public-clusters is enabled)", "cluster_id", clusterID)
 		return nil
 	}
@@ -283,8 +308,8 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	}
 	monitoringURL = fmt.Sprintf("https://%s/livez", monitoringURL)
 
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
+	// Create RHOBS client
+	client := r.createRHOBSClient(log, cfg)
 
 	existingProbe, err := client.GetProbe(ctx, clusterID)
 	if err != nil {
@@ -305,24 +330,56 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		} else {
 			// Probe exists - validate that it's configured correctly according to the hostedcontrolplane object
 			log.V(2).Info("RHOBS probe already exists", "cluster_id", clusterID, "probe_id", existingProbe.ID, "status", existingProbe.Status)
-			if isPrivateProbe(existingProbe) == isPrivate {
-				// Probe already configured correctly, return
+
+			// Always update heartbeat first so the probe doesn't get GC'd
+			// even if the subsequent label update fails
+			heartbeatLabels := map[string]string{"last-reconciled": time.Now().UTC().Format("20060102T150405Z")}
+			heartbeatErr := client.UpdateProbeLabels(ctx, existingProbe.ID, heartbeatLabels)
+			if heartbeatErr != nil {
+				log.Info("Failed to update probe heartbeat", "cluster_id", clusterID, "probe_id", existingProbe.ID, "error", heartbeatErr)
+			}
+
+			// Check if labels match expected values
+			clusterRegion, err := getClusterRegion(hostedcontrolplane)
+			if err != nil {
+				return fmt.Errorf("failed to get cluster region: %w", err)
+			}
+			_, hasPrivateLabel := existingProbe.Labels["private"]
+			labelsMatch := hasPrivateLabel &&
+				isPrivateProbe(existingProbe) == isPrivate &&
+				existingProbe.Labels["region"] == clusterRegion
+			if labelsMatch {
+				// Requeue if heartbeat failed so it gets retried
+				if heartbeatErr != nil {
+					return fmt.Errorf("probe labels match but heartbeat update failed: %w", heartbeatErr)
+				}
 				return nil
 			}
 
-			// Probe configuration incorrect or out-of-date: delete and recreate
-			log.Info("RHOBS probe 'private' label does not match hostedcontrolplane configuration, possibly due to API publishing strategy change in OCM. Deleting RHOBS probe in order to recreate in the correct cell", "probe", existingProbe)
-			err = client.DeleteProbe(ctx, clusterID)
-			if err != nil {
-				return fmt.Errorf("failed to delete RHOBS probe: %w", err)
+			// Probe labels are stale or incorrect: update labels in place via PATCH
+			log.Info("RHOBS probe labels do not match expected configuration, updating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
+			updatedLabels := map[string]string{
+				"cluster-id":      clusterID,
+				"private":         fmt.Sprintf("%t", isPrivate),
+				"region":          clusterRegion,
+				"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
 			}
-			// Continue to create new probe below
+			err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
+			if err != nil {
+				return fmt.Errorf("failed to update RHOBS probe labels: %w", err)
+			}
+			return nil
 		}
 	}
 
-	// Create probe request using the convenience function
-	// Note: Additional labels like management-cluster-id can be added in the future
-	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
+	// Get cluster region for probe assignment
+	clusterRegion, err := getClusterRegion(hostedcontrolplane)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster region: %w", err)
+	}
+
+	// Create probe request with region label for regional filtering
+	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, clusterRegion, isPrivate)
 
 	// Create the probe
 	probe, err := client.CreateProbe(ctx, probeReq)
@@ -335,40 +392,43 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 }
 
 // deleteRHOBSProbe deletes the RHOBS probe for the HostedControlPlane
-func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+//
+// This function attempts to mark the probe for deletion (sets status to terminating).
+// It returns an error if the deletion fails to enable retry logic in the caller.
+func (r *HostedControlPlaneReconciler) deleteRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID
 	if clusterID == "" {
 		return fmt.Errorf("cluster ID is empty")
 	}
 
-	// Create RHOBS client - using "hcp" as temporary tenant name
-	client := r.createRHOBSClient(log)
+	// Create RHOBS client
+	client := r.createRHOBSClient(log, cfg)
 
 	// Delete the probe (sets status to terminating)
 	err := client.DeleteProbe(ctx, clusterID)
 	if err != nil {
-		return fmt.Errorf("failed to delete RHOBS probe: %w", err)
+		return fmt.Errorf("failed to delete RHOBS probe for cluster %s: %w", clusterID, err)
 	}
 
-	log.Info("Successfully marked RHOBS probe for termination", "cluster_id", clusterID)
+	log.V(2).Info("Successfully marked RHOBS probe for termination", "cluster_id", clusterID)
 	return nil
 }
 
 // createRHOBSClient creates an RHOBS client with or without OIDC authentication based on configuration
-func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger) *rhobs.Client {
-	if r.RHOBSConfig.OIDCClientID != "" && r.RHOBSConfig.OIDCClientSecret != "" && r.RHOBSConfig.OIDCIssuerURL != "" {
+func (r *HostedControlPlaneReconciler) createRHOBSClient(log logr.Logger, cfg RHOBSConfig) *rhobs.Client {
+	if cfg.OIDCClientID != "" && cfg.OIDCClientSecret != "" && cfg.OIDCIssuerURL != "" {
 		oidcConfig := rhobs.OIDCConfig{
-			ClientID:     r.RHOBSConfig.OIDCClientID,
-			ClientSecret: r.RHOBSConfig.OIDCClientSecret,
-			IssuerURL:    r.RHOBSConfig.OIDCIssuerURL,
+			ClientID:     cfg.OIDCClientID,
+			ClientSecret: cfg.OIDCClientSecret,
+			IssuerURL:    cfg.OIDCIssuerURL,
 		}
 		log.V(2).Info("Creating RHOBS client with OIDC authentication")
 		// Use configurable tenant name in URL path, OIDC client ID is used for authentication headers
-		return rhobs.NewClientWithOIDC(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, oidcConfig, log)
+		return rhobs.NewClientWithOIDC(cfg.ProbeAPIURL, cfg.Tenant, oidcConfig, log)
 	}
 
 	log.V(2).Info("Creating RHOBS client without authentication")
-	return rhobs.NewClient(r.RHOBSConfig.ProbeAPIURL, r.RHOBSConfig.Tenant, log)
+	return rhobs.NewClient(cfg.ProbeAPIURL, cfg.Tenant, log)
 }
 
 func isPrivateProbe(probe *rhobs.ProbeResponse) bool {

@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    package-operator.run/phase: deploy
+    package-operator.run/collision-protection: IfNoController
+  labels:
+    app: route-monitor-operator
+    component: operator
+    control-plane: controller-manager
+  name: route-monitor-operator-controller-manager
+  namespace: openshift-route-monitor-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: route-monitor-operator
+      component: operator
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        package-operator.run/phase: deploy
+      labels:
+        app: route-monitor-operator
+        component: operator
+        control-plane: controller-manager
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: node-role.kubernetes.io/infra
+                operator: Exists
+            weight: 1
+      containers:
+      - args:
+        - --zap-log-level=debug
+        - --blackbox-image=$(BLACKBOX_IMAGE)
+        - --blackbox-namespace=$(BLACKBOX_NAMESPACE)
+        - --probe-api-url=$(PROBE_API_URL)
+        - --oidc-client-id=$(OIDC_CLIENT_ID)
+        - --oidc-client-secret=$(OIDC_CLIENT_SECRET)
+        - --oidc-issuer-url=$(OIDC_ISSUER_URL)
+        - --only-public-clusters=$(ONLY_PUBLIC_CLUSTERS)
+        - --skip-infrastructure-health-check=$(SKIP_INFRASTRUCTURE_HEALTH_CHECK)
+        command:
+        - /manager
+        env:
+        - name: LOG_LEVEL
+          value: '1'
+        - name: BLACKBOX_IMAGE
+          value: quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e
+        - name: BLACKBOX_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: PROBE_API_URL
+          value: ''
+        - name: OIDC_CLIENT_ID
+          value: ''
+        - name: OIDC_CLIENT_SECRET
+          value: ''
+        - name: OIDC_ISSUER_URL
+          value: ''
+        - name: ONLY_PUBLIC_CLUSTERS
+          value: 'false'
+        - name: SKIP_INFRASTRUCTURE_HEALTH_CHECK
+          value: 'false'
+        image: '{{ .config.image }}'
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 200m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: route-monitor-operator-system
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/infra
+        operator: Exists

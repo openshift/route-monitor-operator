@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr/testr"
 )
@@ -1061,13 +1062,13 @@ func TestFullURLSupport(t *testing.T) {
 	}{
 		{
 			name:        "full URL with /probes endpoint",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
 		},
 		{
 			name:        "base URL without path",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/test-tenant/probes",
 		},
 	}
 
@@ -1091,8 +1092,8 @@ func TestFullURLSupport(t *testing.T) {
 
 			// Replace the example domain with test server for the full URL test
 			baseURL := tt.baseURL
-			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
-				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			if strings.Contains(baseURL, "us-west-2.rhobs.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://us-west-2.rhobs.api.integration.openshift.com", server.URL, 1)
 			} else {
 				baseURL = server.URL
 			}
@@ -1114,7 +1115,7 @@ func TestFullURLSupport(t *testing.T) {
 			}
 
 			// Verify the URL used
-			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://us-west-2.rhobs.api.integration.openshift.com")
 			if !strings.HasSuffix(actualURL, expectedPath) {
 				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
 			}
@@ -1132,15 +1133,15 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 	}{
 		{
 			name:        "full URL with /probes endpoint for specific probe",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/hcp/probes/probe-123",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes/probe-123",
 		},
 		{
 			name:        "base URL without path for specific probe",
-			baseURL:     "https://rhobs.us-west-2.api.integration.openshift.com",
+			baseURL:     "https://us-west-2.rhobs.api.integration.openshift.com",
 			clusterID:   "test-cluster-123",
-			expectedURL: "https://rhobs.us-west-2.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/probe-123",
+			expectedURL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/test-tenant/probes/probe-123",
 		},
 	}
 
@@ -1171,8 +1172,8 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 
 			// Replace the example domain with test server for the full URL test
 			baseURL := tt.baseURL
-			if strings.Contains(baseURL, "rhobs.us-west-2.api.integration.openshift.com") {
-				baseURL = strings.Replace(baseURL, "https://rhobs.us-west-2.api.integration.openshift.com", server.URL, 1)
+			if strings.Contains(baseURL, "us-west-2.rhobs.api.integration.openshift.com") {
+				baseURL = strings.Replace(baseURL, "https://us-west-2.rhobs.api.integration.openshift.com", server.URL, 1)
 			} else {
 				baseURL = server.URL
 			}
@@ -1186,7 +1187,7 @@ func TestFullURLSupportForSpecificProbe(t *testing.T) {
 			}
 
 			// Verify the URL used
-			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://rhobs.us-west-2.api.integration.openshift.com")
+			expectedPath := strings.TrimPrefix(tt.expectedURL, "https://us-west-2.rhobs.api.integration.openshift.com")
 			if !strings.HasSuffix(actualURL, expectedPath) {
 				t.Errorf("Expected URL to end with %s, got %s", expectedPath, actualURL)
 			}
@@ -1231,9 +1232,10 @@ func TestNewProbeRequest(t *testing.T) {
 func TestNewClusterProbeRequest(t *testing.T) {
 	clusterID := "test-cluster-123"
 	monitoringURL := "https://api.test-cluster.example.com/livez"
+	region := "us-east-1"
 	isPrivate := true
 
-	req := NewClusterProbeRequest(clusterID, monitoringURL, isPrivate)
+	req := NewClusterProbeRequest(clusterID, monitoringURL, region, isPrivate)
 
 	if req.StaticURL != monitoringURL {
 		t.Errorf("Expected StaticURL %s, got %s", monitoringURL, req.StaticURL)
@@ -1247,8 +1249,23 @@ func TestNewClusterProbeRequest(t *testing.T) {
 		t.Errorf("Expected private 'true', got %s", req.Labels["private"])
 	}
 
+	if req.Labels["region"] != region {
+		t.Errorf("Expected region %s, got %s", region, req.Labels["region"])
+	}
+
+	// Verify last-reconciled label is set and is a valid timestamp
+	lastReconciled, hasLastReconciled := req.Labels["last-reconciled"]
+	if !hasLastReconciled {
+		t.Error("Expected last-reconciled label to be set")
+	} else {
+		_, err := time.Parse("20060102T150405Z", lastReconciled)
+		if err != nil {
+			t.Errorf("Expected last-reconciled to be valid RFC3339 timestamp, got %s: %v", lastReconciled, err)
+		}
+	}
+
 	// Test with private=false
-	req2 := NewClusterProbeRequest(clusterID, monitoringURL, false)
+	req2 := NewClusterProbeRequest(clusterID, monitoringURL, region, false)
 	if req2.Labels["private"] != "false" {
 		t.Errorf("Expected private 'false', got %s", req2.Labels["private"])
 	}

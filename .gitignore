@@ -47,3 +47,6 @@ saas-route-monitor-operator-bundle/
 bin
 
 /config.bak/
+
+CLAUDE.md
+.claude/
