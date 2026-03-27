@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    managed.openshift.io/aggregate-to-dedicated-admins: "cluster"
+  name: route-monitor-operator-dedicated-admins-cluster
+  annotations:
+    package-operator.run/phase: rbac
+    package-operator.run/collision-protection: IfNoController
+rules:
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors
+  - routemonitors
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - monitoring.openshift.io
+  resources:
+  - clusterurlmonitors/status
+  - routemonitors/status
+  verbs:
+  - get
