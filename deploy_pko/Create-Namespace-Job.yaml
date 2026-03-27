@@ -1,0 +1,128 @@
+---
+# This Job creates the operator namespace if it doesn't exist
+# Running as a Job (not a PKO-managed resource) ensures the namespace
+# is created without owner references, so it persists when ClusterPackage is deleted
+#
+# The Job runs in the 'default' namespace since the target namespace doesn't exist yet
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rmo-namespace-creator
+  namespace: default
+  annotations:
+    package-operator.run/phase: namespace
+    package-operator.run/collision-protection: IfNoController
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rmo-namespace-creator
+  annotations:
+    package-operator.run/phase: namespace
+    package-operator.run/collision-protection: IfNoController
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - create
+      - patch
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rmo-namespace-creator
+  annotations:
+    package-operator.run/phase: namespace
+    package-operator.run/collision-protection: IfNoController
+roleRef:
+  kind: ClusterRole
+  name: rmo-namespace-creator
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: rmo-namespace-creator
+    namespace: default
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rmo-create-namespace
+  namespace: default
+  annotations:
+    package-operator.run/phase: namespace
+    package-operator.run/collision-protection: IfNoController
+spec:
+  # Retry up to 4 times (60s total with 15s intervals)
+  backoffLimit: 4
+  # Each attempt can run for up to 1 minute
+  activeDeadlineSeconds: 60
+  template:
+    metadata:
+      annotations:
+        openshift.io/required-scc: restricted-v2
+    spec:
+      serviceAccountName: rmo-namespace-creator
+      priorityClassName: openshift-user-critical
+      restartPolicy: Never
+      containers:
+        - name: create-namespace
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -c
+            - |
+              #!/bin/bash
+              set -euxo pipefail
+
+              NS="openshift-route-monitor-operator"
+              MAX_WAIT=45  # Wait up to 45 seconds for namespace to become Active
+
+              echo "$(date): Creating/verifying namespace ${NS}..."
+
+              # Create or update namespace (idempotent)
+              cat <<EOF | oc apply -f -
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: ${NS}
+                labels:
+                  openshift.io/cluster-monitoring: "true"
+                  pod-security.kubernetes.io/enforce: restricted
+                  pod-security.kubernetes.io/audit: restricted
+                  pod-security.kubernetes.io/warn: restricted
+              EOF
+
+              # Wait for namespace to become Active
+              echo "$(date): Waiting for namespace to become Active..."
+              for i in $(seq 1 $MAX_WAIT); do
+                PHASE=$(oc get namespace ${NS} -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+
+                if [ "$PHASE" = "Active" ]; then
+                  echo "$(date): SUCCESS - Namespace ${NS} is Active and ready"
+                  exit 0
+                fi
+
+                sleep 1
+              done
+
+              # If we get here, namespace didn't become Active in time
+              echo "$(date): ERROR - Namespace ${NS} did not become Active within ${MAX_WAIT}s (status: ${PHASE})"
+              exit 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
