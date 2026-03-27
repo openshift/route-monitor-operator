@@ -3,6 +3,7 @@ kind: ClusterRole
 metadata:
   labels:
     managed.openshift.io/aggregate-to-dedicated-admins: "cluster"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
   name: route-monitor-operator-dedicated-admins-cluster
   annotations:
     package-operator.run/phase: rbac
