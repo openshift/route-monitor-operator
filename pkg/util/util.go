@@ -53,6 +53,17 @@ func IsClusterVersionHigherOrEqualThan(kclient client.Client, givenVersionStr st
 // ClusterHasPrivateNLB checks whether the default ingress is private and an aws NLB
 // Returns false if there's an exception
 func ClusterHasPrivateNLB(kclient client.Client) (bool, error) {
+	// First check if this is an AWS cluster
+	infra := &configv1.Infrastructure{}
+	if err := kclient.Get(context.TODO(), client.ObjectKey{Name: "cluster"}, infra); err != nil {
+		return false, fmt.Errorf("failed to GET 'cluster' infrastructure: %w", err)
+	}
+
+	// If not AWS, return false - this check is AWS-specific
+	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.Type != configv1.AWSPlatformType {
+		return false, nil
+	}
+
 	i := &operatorv1.IngressController{}
 	err := kclient.Get(context.TODO(), client.ObjectKey{
 		Namespace: "openshift-ingress-operator",
