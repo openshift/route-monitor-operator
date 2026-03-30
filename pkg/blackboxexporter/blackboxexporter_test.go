@@ -19,6 +19,7 @@ import (
 	. "github.com/openshift/route-monitor-operator/pkg/blackboxexporter"
 	"github.com/openshift/route-monitor-operator/pkg/util/test/helper"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
@@ -218,8 +219,10 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) is Not Found", func() {
 			// Arrange
 			BeforeEach(func() {
+				infrastructure := testAWSInfrastructure()
 				ingresscontroller = testPrivateDefaultIC()
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, infrastructure).Times(1)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller).Times(1)
 				get.CalledTimes = 2
 				get.ErrorResponse = consterror.NotFoundErr
 				create.CalledTimes = 1
@@ -234,8 +237,10 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) Get fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
+				infrastructure := testAWSInfrastructure()
 				ingresscontroller = testPrivateDefaultIC()
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, infrastructure).Times(1)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller).Times(1)
 				get.CalledTimes = 2
 				get.ErrorResponse = consterror.ErrCustomError
 			})
@@ -250,8 +255,10 @@ var _ = Describe("Blackboxexporter", func() {
 		When("the resource(deployment) Create fails unexpectedly", func() {
 			// Arrange
 			BeforeEach(func() {
+				infrastructure := testAWSInfrastructure()
 				ingresscontroller = testPrivateDefaultIC()
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, infrastructure).Times(1)
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).SetArg(2, ingresscontroller).Times(1)
 				get.CalledTimes = 2
 				get.ErrorResponse = consterror.NotFoundErr
 				create = helper.CustomErrorHappensOnce()
@@ -526,4 +533,18 @@ func testPrivateDefaultIC() operatorv1.IngressController {
 		},
 	}
 	return ic
+}
+
+func testAWSInfrastructure() configv1.Infrastructure {
+	infra := configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Type: configv1.AWSPlatformType,
+			},
+		},
+	}
+	return infra
 }
