@@ -17,7 +17,7 @@ This directory contains end-to-end tests for the Route Monitor Operator (RMO), v
 
 The RMO e2e test suite validates the complete synthetic monitoring workflow:
 
-```
+```text
 HostedControlPlane CR → RMO → RHOBS API → Synthetics Agent → Prometheus/Blackbox Exporter
 ```
 
@@ -285,7 +285,7 @@ go test -v -tags=e2e -timeout=10m .
 
 ### Local Test Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ Test Process                                                 │
 │                                                              │
@@ -501,7 +501,7 @@ When running via osde2e with the `nonOSDe2eSecrets` config, credentials are inje
 
 ### CI/CD Test Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ Real OpenShift Cluster (Integration/Staging)                │
 │                                                              │
@@ -660,6 +660,29 @@ nonOSDe2eSecrets:
   # OR
   PROBE_API_URL: "https://us-west-2.rhobs.api.integration.openshift.com/api/metrics/v1/hcp/probes"  # integration
 ```
+
+---
+
+## Contributing
+
+When adding or modifying e2e tests:
+
+1. **Choose the right build tag:**
+   - `//go:build e2e` for local tests (no cluster required)
+   - `//go:build osde2e` for CI/CD tests (runs on real clusters)
+
+2. **Follow existing patterns:**
+   - Use `helpers.go` utilities for common operations
+   - Add new helper functions if reusable across tests
+   - Keep test isolation - clean up resources in `AfterEach`/`DeferCleanup`
+
+3. **Update documentation:**
+   - Add new test descriptions to this README
+   - Document any new environment variables or prerequisites
+
+4. **Test locally first:**
+   - Run `make test-e2e-full` before pushing
+   - For osde2e changes, test against a real cluster when possible
 
 ---
 
