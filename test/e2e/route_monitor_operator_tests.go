@@ -101,6 +101,15 @@ spec:
 // configured in either the ConfigMap or environment variables.
 var errCredentialsNotAvailable = errors.New("OIDC credentials not available")
 
+// isTransientError checks if an error is a transient/retryable Kubernetes API error
+func isTransientError(err error) bool {
+	return k8serrors.IsTooManyRequests(err) ||
+		k8serrors.IsTimeout(err) ||
+		k8serrors.IsServerTimeout(err) ||
+		k8serrors.IsServiceUnavailable(err) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
 var _ = Describe("Route Monitor Operator", Ordered, func() {
 	var (
 		k8s                   *openshift.Client
@@ -320,6 +329,181 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 			Expect(k8s.Delete(ctx, svc)).Should(Succeed(), "Failed to delete service")
 			By("Deleting test route " + routeMonitorName)
 			Expect(k8s.Delete(ctx, appRoute)).Should(Succeed(), "Failed to delete route")
+		})
+	})
+
+	It("handles RouteMonitor spec updates", func(ctx context.Context) {
+		const updateTestName = "routemonitor-update-test"
+
+		By("Creating a pod for the update test")
+		var allowPrivilegeEscalation *bool = new(bool)
+		*allowPrivilegeEscalation = false
+		var runAsNonRoot *bool = new(bool)
+		*runAsNonRoot = true
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateTestName,
+				Namespace: namespace,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "quay.io/jitesoft/nginx:mainline",
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: allowPrivilegeEscalation,
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"ALL"},
+							},
+							RunAsNonRoot: runAsNonRoot,
+							SeccompProfile: &corev1.SeccompProfile{
+								Type: corev1.SeccompProfileTypeRuntimeDefault,
+							},
+						},
+					},
+				},
+			},
+		}
+		err := k8s.Create(ctx, pod)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create update test pod")
+
+		By("Waiting for the pod to be running")
+		var phase kubev1.PodPhase
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
+			err := k8s.Get(ctx, pod.Name, pod.Namespace, pod)
+			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching pod, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
+			}
+			phase = pod.Status.Phase
+			if phase == kubev1.PodRunning {
+				return true, nil
+			}
+			GinkgoLogr.Info(fmt.Sprintf("Waiting for Pod '%s/%s' to be Running, currently %s", pod.Namespace, pod.Name, phase))
+			return false, nil
+		})
+		Expect(err).ShouldNot(HaveOccurred(), "Update test pod did not reach Running state")
+
+		By("Creating the service")
+		svc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateTestName,
+				Namespace: namespace,
+				Labels:    map[string]string{updateTestName: updateTestName},
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt(80),
+						Name:       "web",
+					},
+				},
+				Selector: map[string]string{updateTestName: updateTestName},
+			},
+		}
+		err = k8s.Create(ctx, svc)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create update test service")
+
+		By("Creating the route")
+		appRoute := &routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateTestName,
+				Namespace: namespace,
+			},
+			Spec: routev1.RouteSpec{
+				To: routev1.RouteTargetReference{
+					Name: updateTestName,
+				},
+				TLS: &routev1.TLSConfig{Termination: "edge"},
+			},
+		}
+		err = k8s.Create(ctx, appRoute)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create update test route")
+
+		By("Creating a RouteMonitor with SLO 99.5%")
+		rmo := &routemonitorv1alpha1.RouteMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      updateTestName,
+			},
+			Spec: routemonitorv1alpha1.RouteMonitorSpec{
+				Slo: routemonitorv1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.5",
+				},
+				Route: routemonitorv1alpha1.RouteMonitorRouteSpec{
+					Namespace: namespace,
+					Name:      updateTestName,
+				},
+			},
+		}
+		err = k8s.Create(ctx, rmo)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create RouteMonitor for update test")
+
+		By("Waiting for dependent resources to be created")
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
+			_, err := prometheusRulesClient.Get(ctx, updateTestName, metav1.GetOptions{})
+			if k8serrors.IsNotFound(err) {
+				return false, nil
+			}
+			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching PrometheusRule, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		})
+		Expect(err).ShouldNot(HaveOccurred(), "PrometheusRule was not created for update test")
+
+		By("Updating the RouteMonitor SLO from 99.5% to 99.95%")
+		err = k8s.Get(ctx, rmo.Name, rmo.Namespace, rmo)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to fetch RouteMonitor for update")
+		rmo.Spec.Slo.TargetAvailabilityPercent = "99.95"
+		err = k8s.Update(ctx, rmo)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to update RouteMonitor SLO")
+
+		By("Verifying the PrometheusRule is updated with the new SLO")
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
+			promRule, err := prometheusRulesClient.Get(ctx, updateTestName, metav1.GetOptions{})
+			if err != nil {
+				if isTransientError(err) {
+					GinkgoLogr.Info("Transient error fetching PrometheusRule, will retry", "error", err)
+					return false, nil
+				}
+				return false, err
+			}
+			// Marshal the unstructured object to JSON and check for the new SLO value
+			ruleBytes, err := json.Marshal(promRule.Object)
+			if err != nil {
+				return false, fmt.Errorf("failed to marshal PrometheusRule: %w", err)
+			}
+			ruleJSON := string(ruleBytes)
+			// PromQL expressions use (1-<SLO_decimal>), so the literal SLO decimal appears in the JSON
+			// New SLO 99.95% → 0.9995 appears in expressions like (1-0.9995)
+			// Old SLO 99.5% → 0.995 appears in expressions like (1-0.995)
+			hasNewSLO := strings.Contains(ruleJSON, "0.9995")
+			hasOldSLO := strings.Contains(ruleJSON, "0.995")
+			if hasNewSLO && !hasOldSLO {
+				return true, nil
+			}
+			GinkgoLogr.Info("Waiting for PrometheusRule to reflect updated SLO 99.95%")
+			return false, nil
+		})
+		Expect(err).ShouldNot(HaveOccurred(), "PrometheusRule was not updated with new SLO value")
+
+		// Cleanup - deletion behavior is already verified by "required dependent resources are created" test
+		DeferCleanup(func(ctx context.Context) {
+			By("Cleaning up update test resources")
+			_ = k8s.Delete(ctx, rmo)
+			_ = k8s.Delete(ctx, appRoute)
+			_ = k8s.Delete(ctx, svc)
+			_ = k8s.Delete(ctx, pod)
 		})
 	})
 })
