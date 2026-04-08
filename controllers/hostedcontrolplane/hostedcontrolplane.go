@@ -286,9 +286,12 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Gate on HCP Available condition to prevent creating probes for
 	// installing clusters. Without this, probes start failing before
 	// the API server is reachable, causing false API SLO Burn alerts.
-	if available, reason := isHCPAvailable(hostedcontrolplane); !available {
-		log.Info("HCP not yet Available, delaying probe deployment", "reason", reason)
-		return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
+	// Skip this check for test environments (e.g., osde2e tests without real HCP status)
+	if !rhobsConfig.SkipInfrastructureHealthCheck {
+		if available, reason := isHCPAvailable(hostedcontrolplane); !available {
+			log.Info("HCP not yet Available, delaying probe deployment", "reason", reason)
+			return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
+		}
 	}
 
 	// Ensure cluster is ready to be monitored before deploying any probing objects
