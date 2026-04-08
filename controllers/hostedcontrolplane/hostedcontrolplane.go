@@ -35,6 +35,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -280,6 +281,19 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if err != nil {
 			return utilreconcile.RequeueWith(err)
 		}
+	}
+
+	// Gate on HCP Available condition to prevent creating probes for
+	// installing clusters. Without this, probes start failing before
+	// the API server is reachable, causing false API SLO Burn alerts.
+	availableCondition := apimeta.FindStatusCondition(hostedcontrolplane.Status.Conditions, string(hypershiftv1beta1.HostedControlPlaneAvailable))
+	if availableCondition == nil || availableCondition.Status != metav1.ConditionTrue {
+		reason := "unknown"
+		if availableCondition != nil {
+			reason = availableCondition.Reason
+		}
+		log.Info("HCP not yet Available, delaying probe deployment", "reason", reason)
+		return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
 	}
 
 	// Ensure cluster is ready to be monitored before deploying any probing objects
