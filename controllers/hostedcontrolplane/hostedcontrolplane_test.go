@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -837,6 +838,206 @@ func TestIsVpcEndpointReady(t *testing.T) {
 			// Check if error status matches expectedError
 			if (err != nil) != tt.expectedError {
 				t.Errorf("expected error: %v, but got error: %v", tt.expectedError, err != nil)
+			}
+		})
+	}
+}
+
+func TestIsHCPAvailable(t *testing.T) {
+	tests := []struct {
+		name             string
+		conditions       []metav1.Condition
+		expectedResult   bool
+		expectedReason   string
+	}{
+		{
+			name: "Available condition is True",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+			},
+			expectedResult: true,
+			expectedReason: "",
+		},
+		{
+			name: "Available condition is False with reason",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionFalse,
+					Reason: "KASLoadBalancerNotReachable",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "KASLoadBalancerNotReachable",
+		},
+		{
+			name:           "No conditions at all",
+			conditions:     nil,
+			expectedResult: false,
+			expectedReason: "AvailableConditionNotFound",
+		},
+		{
+			name: "Other conditions present but no Available",
+			conditions: []metav1.Condition{
+				{
+					Type:   "Degraded",
+					Status: metav1.ConditionFalse,
+					Reason: "AsExpected",
+				},
+				{
+					Type:   "InfrastructureReady",
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "AvailableConditionNotFound",
+		},
+		{
+			name: "Available condition is Unknown",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionUnknown,
+					Reason: "StatusUnknown",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "StatusUnknown",
+		},
+		{
+			name: "KubeAPIServerAvailable True but Available False",
+			conditions: []metav1.Condition{
+				{
+					Type:   "KubeAPIServerAvailable",
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionFalse,
+					Reason: "KASLoadBalancerNotReachable",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "KASLoadBalancerNotReachable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hcp := &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "default",
+				},
+				Status: hypershiftv1beta1.HostedControlPlaneStatus{
+					Conditions: tt.conditions,
+				},
+			}
+
+			available, reason := isHCPAvailable(hcp)
+
+			if available != tt.expectedResult {
+				t.Errorf("expected available=%v, got %v", tt.expectedResult, available)
+			}
+			if reason != tt.expectedReason {
+				t.Errorf("expected reason=%q, got %q", tt.expectedReason, reason)
+			}
+		})
+	}
+}
+
+func TestReconcile_HCPAvailableGate(t *testing.T) {
+	tests := []struct {
+		name                 string
+		conditions           []metav1.Condition
+		expectRequeue        bool
+		expectMonitorObjects bool
+	}{
+		{
+			name: "HCP not available - should requeue without creating objects",
+			conditions: []metav1.Condition{
+				{
+					Type:               string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status:             metav1.ConditionFalse,
+					Reason:             "KASLoadBalancerNotReachable",
+					LastTransitionTime: metav1.Now(),
+				},
+			},
+			expectRequeue:        true,
+			expectMonitorObjects: false,
+		},
+		{
+			name:                 "HCP no conditions - should requeue without creating objects",
+			conditions:           nil,
+			expectRequeue:        true,
+			expectMonitorObjects: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hcp := &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+				Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+					ClusterID: "test-cluster-id",
+					Platform: hypershiftv1beta1.PlatformSpec{
+						AWS: &hypershiftv1beta1.AWSPlatformSpec{
+							Region:         "us-east-1",
+							EndpointAccess: hypershiftv1beta1.Public,
+						},
+					},
+				},
+				Status: hypershiftv1beta1.HostedControlPlaneStatus{
+					Conditions: tt.conditions,
+				},
+			}
+
+			r := newTestReconciler(t, hcp)
+
+			result, err := r.Reconcile(context.Background(), ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "test-hcp",
+					Namespace: "test-namespace",
+				},
+			})
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if tt.expectRequeue {
+				if result.RequeueAfter == 0 && !result.Requeue {
+					t.Errorf("expected requeue, got result: %+v", result)
+				}
+			}
+
+			if !tt.expectMonitorObjects {
+				// Verify no Route was created
+				routeList := &routev1.RouteList{}
+				if err := r.List(context.Background(), routeList, client.InNamespace("test-namespace")); err != nil {
+					t.Fatalf("failed to list routes: %v", err)
+				}
+				if len(routeList.Items) > 0 {
+					t.Errorf("expected no routes to be created, found %d", len(routeList.Items))
+				}
+
+				// Verify no RouteMonitor was created
+				rmList := &v1alpha1.RouteMonitorList{}
+				if err := r.List(context.Background(), rmList, client.InNamespace("test-namespace")); err != nil {
+					t.Fatalf("failed to list routemonitors: %v", err)
+				}
+				if len(rmList.Items) > 0 {
+					t.Errorf("expected no routemonitors to be created, found %d", len(rmList.Items))
+				}
 			}
 		})
 	}
