@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -231,6 +232,26 @@ func olderThan(obj metav1.Object, age time.Duration) bool {
 	now := time.Now()
 	minCreationTime := now.Add((-1 * age))
 	return obj.GetCreationTimestamp().Time.Before(minCreationTime)
+}
+
+// isKubeAPIServerReachable performs a TLS dial to the kube-apiserver internal service URL
+// to verify the service cert is ready. This runs every reconcile (unlike hcpReady which
+// only runs during the initial healthcheck window) to catch cert issues that appear after
+// initial healthcheck passes, e.g., during upgrade rolling restarts.
+// The port parameter should come from getKubeAPIServerPort to match the RouteMonitor config.
+func isKubeAPIServerReachable(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, port int64) error {
+	url := fmt.Sprintf("kube-apiserver.%s.svc.cluster.local:%d", hostedcontrolplane.Namespace, port)
+	conn, err := tls.DialWithDialer(
+		&net.Dialer{Timeout: 5 * time.Second},
+		"tcp",
+		url,
+		&tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Required for internal cluster communication
+	)
+	if err != nil {
+		return fmt.Errorf("TLS dial to kube-apiserver failed: %w", err)
+	}
+	conn.Close()
+	return nil
 }
 
 // isVpcEndpointReady checks if the VPC Endpoint associated with the HostedControlPlane is ready.
