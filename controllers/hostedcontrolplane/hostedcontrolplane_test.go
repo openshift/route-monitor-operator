@@ -954,10 +954,11 @@ func TestIsHCPAvailable(t *testing.T) {
 
 func TestReconcile_HCPAvailableGate(t *testing.T) {
 	tests := []struct {
-		name                 string
-		conditions           []metav1.Condition
-		expectRequeue        bool
-		expectMonitorObjects bool
+		name                          string
+		conditions                    []metav1.Condition
+		skipInfrastructureHealthCheck bool
+		expectRequeue                 bool
+		expectMonitorObjects          bool
 	}{
 		{
 			name: "HCP not available - should requeue without creating objects",
@@ -969,14 +970,23 @@ func TestReconcile_HCPAvailableGate(t *testing.T) {
 					LastTransitionTime: metav1.Now(),
 				},
 			},
-			expectRequeue:        true,
-			expectMonitorObjects: false,
+			skipInfrastructureHealthCheck: false,
+			expectRequeue:                 true,
+			expectMonitorObjects:          false,
 		},
 		{
-			name:                 "HCP no conditions - should requeue without creating objects",
-			conditions:           nil,
-			expectRequeue:        true,
-			expectMonitorObjects: false,
+			name:                          "HCP no conditions - should requeue without creating objects",
+			conditions:                    nil,
+			skipInfrastructureHealthCheck: false,
+			expectRequeue:                 true,
+			expectMonitorObjects:          false,
+		},
+		{
+			name:                          "HCP no conditions but skip-infrastructure-health-check=true - should bypass Available check",
+			conditions:                    nil,
+			skipInfrastructureHealthCheck: true,
+			expectRequeue:                 false,
+			expectMonitorObjects:          false, // Won't create objects due to missing kube-apiserver service, but won't block on Available
 		},
 	}
 
@@ -1002,6 +1012,10 @@ func TestReconcile_HCPAvailableGate(t *testing.T) {
 			}
 
 			r := newTestReconciler(t, hcp)
+			// Set the RHOBSConfig with SkipInfrastructureHealthCheck if specified
+			r.RHOBSConfig = RHOBSConfig{
+				SkipInfrastructureHealthCheck: tt.skipInfrastructureHealthCheck,
+			}
 
 			result, err := r.Reconcile(context.Background(), ctrl.Request{
 				NamespacedName: types.NamespacedName{
