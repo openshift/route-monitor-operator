@@ -359,19 +359,27 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 				return nil
 			}
 
-			// Probe labels are stale or incorrect: update labels in place via PATCH
-			log.Info("RHOBS probe labels do not match expected configuration, updating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe), "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
-			updatedLabels := map[string]string{
-				"cluster-id":      clusterID,
-				"private":         fmt.Sprintf("%t", isPrivate),
-				"region":          clusterRegion,
-				"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
+			// Private label mismatch requires delete+recreate (API treats private as system-managed)
+			if !hasPrivateLabel || isPrivateProbe(existingProbe) != isPrivate {
+				log.Info("Private label mismatch, deleting probe for recreation", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_private", isPrivate, "actual_private", isPrivateProbe(existingProbe))
+				if err := client.DeleteProbe(ctx, clusterID); err != nil {
+					return fmt.Errorf("failed to delete probe for private label correction: %w", err)
+				}
+				// Fall through to recreate probe below
+			} else {
+				// Region-only mismatch: PATCH without private label
+				log.Info("RHOBS probe region label mismatch, updating", "cluster_id", clusterID, "probe_id", existingProbe.ID, "expected_region", clusterRegion, "actual_region", existingProbe.Labels["region"])
+				updatedLabels := map[string]string{
+					"cluster-id":      clusterID,
+					"region":          clusterRegion,
+					"last-reconciled": time.Now().UTC().Format("20060102T150405Z"),
+				}
+				err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
+				if err != nil {
+					return fmt.Errorf("failed to update RHOBS probe labels: %w", err)
+				}
+				return nil
 			}
-			err = client.UpdateProbeLabels(ctx, existingProbe.ID, updatedLabels)
-			if err != nil {
-				return fmt.Errorf("failed to update RHOBS probe labels: %w", err)
-			}
-			return nil
 		}
 	}
 
