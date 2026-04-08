@@ -842,6 +842,115 @@ func TestIsVpcEndpointReady(t *testing.T) {
 	}
 }
 
+func TestIsHCPAvailable(t *testing.T) {
+	tests := []struct {
+		name             string
+		conditions       []metav1.Condition
+		expectedResult   bool
+		expectedReason   string
+	}{
+		{
+			name: "Available condition is True",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+			},
+			expectedResult: true,
+			expectedReason: "",
+		},
+		{
+			name: "Available condition is False with reason",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionFalse,
+					Reason: "KASLoadBalancerNotReachable",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "KASLoadBalancerNotReachable",
+		},
+		{
+			name:           "No conditions at all",
+			conditions:     nil,
+			expectedResult: false,
+			expectedReason: "AvailableConditionNotFound",
+		},
+		{
+			name: "Other conditions present but no Available",
+			conditions: []metav1.Condition{
+				{
+					Type:   "Degraded",
+					Status: metav1.ConditionFalse,
+					Reason: "AsExpected",
+				},
+				{
+					Type:   "InfrastructureReady",
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "AvailableConditionNotFound",
+		},
+		{
+			name: "Available condition is Unknown",
+			conditions: []metav1.Condition{
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionUnknown,
+					Reason: "StatusUnknown",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "StatusUnknown",
+		},
+		{
+			name: "KubeAPIServerAvailable True but Available False",
+			conditions: []metav1.Condition{
+				{
+					Type:   "KubeAPIServerAvailable",
+					Status: metav1.ConditionTrue,
+					Reason: "AsExpected",
+				},
+				{
+					Type:   string(hypershiftv1beta1.HostedControlPlaneAvailable),
+					Status: metav1.ConditionFalse,
+					Reason: "KASLoadBalancerNotReachable",
+				},
+			},
+			expectedResult: false,
+			expectedReason: "KASLoadBalancerNotReachable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hcp := &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "default",
+				},
+				Status: hypershiftv1beta1.HostedControlPlaneStatus{
+					Conditions: tt.conditions,
+				},
+			}
+
+			available, reason := isHCPAvailable(hcp)
+
+			if available != tt.expectedResult {
+				t.Errorf("expected available=%v, got %v", tt.expectedResult, available)
+			}
+			if reason != tt.expectedReason {
+				t.Errorf("expected reason=%q, got %q", tt.expectedReason, reason)
+			}
+		})
+	}
+}
+
 func TestHostedControlPlaneReconciler_getRHOBSConfig(t *testing.T) {
 	ctx := context.Background()
 
