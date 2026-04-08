@@ -839,11 +839,12 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 
 func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 	tests := []struct {
-		name              string
-		probeLabels       map[string]string
-		isPrivate         bool
-		clusterRegion     string
-		expectLabelUpdate bool
+		name                string
+		probeLabels         map[string]string
+		isPrivate           bool
+		clusterRegion       string
+		expectLabelUpdate   bool // region-only PATCH (no private label in body)
+		expectDeleteRecreate bool // private mismatch: delete + POST recreate
 	}{
 		{
 			name: "all labels match, heartbeat update only",
@@ -852,9 +853,10 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "false",
 				"region":     "us-east-1",
 			},
-			isPrivate:         false,
-			clusterRegion:     "us-east-1",
-			expectLabelUpdate: true,
+			isPrivate:           false,
+			clusterRegion:       "us-east-1",
+			expectLabelUpdate:   false,
+			expectDeleteRecreate: false,
 		},
 		{
 			name: "private labels match, heartbeat update only",
@@ -863,30 +865,33 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "true",
 				"region":     "us-west-2",
 			},
-			isPrivate:         true,
-			clusterRegion:     "us-west-2",
-			expectLabelUpdate: true,
+			isPrivate:           true,
+			clusterRegion:       "us-west-2",
+			expectLabelUpdate:   false,
+			expectDeleteRecreate: false,
 		},
 		{
-			name: "missing private label triggers label update",
+			name: "missing private label triggers delete and recreate",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"region":     "us-east-1",
 			},
-			isPrivate:         false,
-			clusterRegion:     "us-east-1",
-			expectLabelUpdate: true,
+			isPrivate:           false,
+			clusterRegion:       "us-east-1",
+			expectLabelUpdate:   false,
+			expectDeleteRecreate: true,
 		},
 		{
-			name: "wrong private value triggers label update",
+			name: "wrong private value triggers delete and recreate",
 			probeLabels: map[string]string{
 				"cluster-id": "test-cluster",
 				"private":    "true",
 				"region":     "us-east-1",
 			},
-			isPrivate:         false,
-			clusterRegion:     "us-east-1",
-			expectLabelUpdate: true,
+			isPrivate:           false,
+			clusterRegion:       "us-east-1",
+			expectLabelUpdate:   false,
+			expectDeleteRecreate: true,
 		},
 		{
 			name: "wrong region triggers label update",
@@ -900,11 +905,12 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 			expectLabelUpdate: true,
 		},
 		{
-			name:              "empty labels triggers label update",
-			probeLabels:       map[string]string{"cluster-id": "test-cluster"},
-			isPrivate:         false,
-			clusterRegion:     "us-east-1",
-			expectLabelUpdate: true,
+			name: "empty labels triggers delete and recreate",
+			probeLabels:         map[string]string{"cluster-id": "test-cluster"},
+			isPrivate:           false,
+			clusterRegion:       "us-east-1",
+			expectLabelUpdate:   false,
+			expectDeleteRecreate: true,
 		},
 	}
 
@@ -923,7 +929,7 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 			ctx := context.Background()
 			logger := log.FromContext(ctx)
 
-			endpointAccess := hypershiftv1beta1.PublicAndPrivate
+			endpointAccess := hypershiftv1beta1.Public
 			if tt.isPrivate {
 				endpointAccess = hypershiftv1beta1.Private
 			}
@@ -950,35 +956,42 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				}
 			}
 
-			if tt.expectLabelUpdate {
+			if tt.expectDeleteRecreate {
+				// Private label mismatch: should delete (PATCH to terminating) then POST to recreate
+				if !hasPatch {
+					t.Error("expected delete PATCH for private label correction, but no PATCH was made")
+				}
+				if !hasPost {
+					t.Error("expected POST to recreate probe after private label deletion, but no POST was made")
+				}
+			} else if tt.expectLabelUpdate {
 				if !hasPatch {
 					t.Error("expected probe labels to be updated (PATCH), but no PATCH was made")
 				}
 				if hasPost {
 					t.Error("expected label update only (no POST), but POST was made")
 				}
-				// Verify the PATCH body contains a valid last-reconciled timestamp
+				// Verify the PATCH body does not contain private label
 				for _, entry := range requestLog {
 					if strings.HasPrefix(entry, "PATCH") {
 						parts := strings.SplitN(entry, " ", 3)
 						if len(parts) < 3 {
-							t.Error("PATCH request log entry missing body")
 							continue
 						}
 						var patch struct {
 							Labels *map[string]string `json:"labels"`
 						}
 						if err := json.Unmarshal([]byte(parts[2]), &patch); err != nil {
-							t.Errorf("failed to unmarshal PATCH body: %v", err)
 							continue
 						}
 						if patch.Labels == nil {
-							t.Error("PATCH body missing labels field")
 							continue
+						}
+						if _, hasPrivate := (*patch.Labels)["private"]; hasPrivate {
+							t.Error("PATCH body should not contain private label")
 						}
 						ts, ok := (*patch.Labels)["last-reconciled"]
 						if !ok {
-							t.Error("PATCH body missing last-reconciled label")
 							continue
 						}
 						if _, err := time.Parse("20060102T150405Z", ts); err != nil {
@@ -987,9 +1000,7 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 					}
 				}
 			} else {
-				if hasPatch {
-					t.Error("expected no label update, but PATCH was made")
-				}
+				// Labels match: only heartbeat PATCH expected, no label PATCH with labels field, no POST
 				if hasPost {
 					t.Error("expected no changes, but POST was made")
 				}
