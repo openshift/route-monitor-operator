@@ -952,6 +952,37 @@ func TestIsHCPAvailable(t *testing.T) {
 	}
 }
 
+func TestIsKubeAPIServerReachable(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		expectErr bool
+	}{
+		{
+			name:      "Unreachable service returns error",
+			namespace: "ocm-nonexistent-namespace",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hcp := &hypershiftv1beta1.HostedControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: tt.namespace,
+				},
+			}
+			err := isKubeAPIServerReachable(hcp, 6443)
+			if tt.expectErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+		})
+	}
+}
+
 func TestReconcile_HCPAvailableGate(t *testing.T) {
 	tests := []struct {
 		name                 string

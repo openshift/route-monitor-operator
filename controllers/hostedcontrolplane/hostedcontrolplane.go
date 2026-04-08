@@ -312,6 +312,26 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueAfter(vpcEndpointRetryTimeout), err
 	}
 
+	// Verify kube-apiserver TLS is reachable before deploying monitoring.
+	// This catches cases where the initial healthcheck passed but TLS
+	// later breaks (e.g., cert reprovisioning during upgrade rolling restarts).
+	// If TLS fails and monitoring objects already exist, delete them so the
+	// blackbox exporter stops probing and generating probe_success=0 data.
+	if !rhobsConfig.SkipInfrastructureHealthCheck {
+		apiServerPort, err := r.getKubeAPIServerPort(ctx, hostedcontrolplane)
+		if err != nil {
+			log.Info("kube-apiserver service not found, delaying monitoring deployment", "error", err.Error())
+			return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
+		}
+		if err := isKubeAPIServerReachable(hostedcontrolplane, apiServerPort); err != nil {
+			log.Info("kube-apiserver TLS not ready, removing monitoring objects", "error", err.Error())
+			if deleteErr := r.deleteInternalMonitoringObjects(ctx, log, hostedcontrolplane); deleteErr != nil {
+				return utilreconcile.RequeueWith(fmt.Errorf("failed to remove internal monitoring objects while kube-apiserver TLS is unavailable: %w", deleteErr))
+			}
+			return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
+		}
+	}
+
 	// Cluster ready - deploy kube-apiserver monitoring objects
 	log.Info("Deploying internal monitoring objects")
 	err = r.deployInternalMonitoringObjects(ctx, log, hostedcontrolplane, rhobsConfig)
@@ -355,6 +375,20 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	return ctrl.Result{RequeueAfter: periodicReconcileInterval}, err
 }
 
+// getKubeAPIServerPort resolves the kube-apiserver Service port. Used by both the
+// TLS reachability check and RouteMonitor creation to ensure both use the same port.
+func (r *HostedControlPlaneReconciler) getKubeAPIServerPort(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (int64, error) {
+	apiServerService := corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
+	if err != nil {
+		return 0, fmt.Errorf("couldn't query API server service resource: %w", err)
+	}
+	if len(apiServerService.Spec.Ports) > 0 {
+		return int64(apiServerService.Spec.Ports[0].Port), nil
+	}
+	return 6443, nil
+}
+
 // deployInternalMonitoringObjects creates or updates the objects needed to monitor the kube-apiserver using cluster-internal routes
 func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	// Skip internal monitoring for test environments (e.g., osde2e tests without real kube-apiserver infrastructure)
@@ -385,15 +419,9 @@ func (r *HostedControlPlaneReconciler) deployInternalMonitoringObjects(ctx conte
 		}
 	}
 
-	// Quick fix to discover the API server port from the service resource
-	apiServerService := corev1.Service{}
-	err = r.Get(ctx, types.NamespacedName{Name: "kube-apiserver", Namespace: hostedcontrolplane.Namespace}, &apiServerService)
+	apiServerPort, err := r.getKubeAPIServerPort(ctx, hostedcontrolplane)
 	if err != nil {
-		return fmt.Errorf("couldn't query API server service resource: %w", err)
-	}
-	apiServerPort := int64(6443)
-	if len(apiServerService.Spec.Ports) > 0 {
-		apiServerPort = int64(apiServerService.Spec.Ports[0].Port)
+		return err
 	}
 
 	// Create or update RouteMonitor object
