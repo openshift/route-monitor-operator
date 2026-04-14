@@ -190,10 +190,12 @@ func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedC
 
 	var url string
 	var secure bool
-	// Both Private and PublicAndPrivate clusters have API URLs that resolve
-	// to VPCE endpoints, so use the internal kube-apiserver URL for health checks.
+	// Only Private clusters have API URLs that resolve exclusively to VPCE
+	// endpoints. PublicAndPrivate clusters have externally reachable APIs,
+	// so use the external URL for health checks. Use internal kube-apiserver
+	// URL only for Private clusters.
 	if hostedcontrolplane.Spec.Platform.AWS != nil &&
-		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess != hypershiftv1beta1.Public {
+		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private {
 		url = fmt.Sprintf("https://kube-apiserver.%s.svc.cluster.local:6443/livez", hostedcontrolplane.Namespace)
 		secure = false
 	} else {

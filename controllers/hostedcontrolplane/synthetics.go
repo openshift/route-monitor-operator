@@ -275,12 +275,13 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 		return fmt.Errorf("cluster ID is empty")
 	}
 
-	// Determine if cluster is private. Both Private and PublicAndPrivate
-	// clusters have API URLs that resolve to VPCE endpoints, making them
-	// unreachable from RHOBS cell networks. Only Public clusters have
-	// externally reachable API URLs for cell-side probing.
+	// Determine if cluster is private. Only Private clusters have API URLs
+	// that resolve exclusively to VPCE endpoints, making them unreachable
+	// from RHOBS cell networks. PublicAndPrivate clusters have both public
+	// and PrivateLink access, so their APIs ARE externally reachable and
+	// can be probed by the cell-side synthetics-agent.
 	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
-		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess != hypershiftv1beta1.Public
+		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
 	// Check if cluster is in limited support -- delete probe if it exists and skip creation
 	if hostedcontrolplane.Labels["api.openshift.com/limited-support"] == "true" {
