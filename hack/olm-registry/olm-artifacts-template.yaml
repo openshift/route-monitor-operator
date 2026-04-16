@@ -31,7 +31,7 @@ objects:
     clusterDeploymentSelector:
       matchLabels:
         api.openshift.com/managed: 'true'
-    resourceApplyMode: Sync
+    resourceApplyMode: Upsert
     applyBehavior: CreateOrUpdate
     resources:
     - apiVersion: v1
