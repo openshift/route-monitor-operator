@@ -21,6 +21,7 @@ spec:
     metadata:
       annotations:
         package-operator.run/phase: deploy
+        openshift.io/required-scc: restricted-v2
       labels:
         app: route-monitor-operator
         component: operator
@@ -91,6 +92,7 @@ spec:
             memory: 20Mi
         securityContext:
           allowPrivilegeEscalation: false
+        terminationMessagePolicy: FallbackToLogsOnError
       securityContext:
         runAsNonRoot: true
       serviceAccountName: route-monitor-operator-system

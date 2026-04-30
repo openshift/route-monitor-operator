@@ -20,6 +20,7 @@ spec:
   template:
     metadata:
       annotations:
+        openshift.io/required-scc: restricted-v2
         package-operator.run/phase: deploy
       labels:
         app: route-monitor-operator
@@ -91,6 +92,7 @@ spec:
               memory: 20Mi
           securityContext:
             allowPrivilegeEscalation: false
+          terminationMessagePolicy: FallbackToLogsOnError
       securityContext:
         runAsNonRoot: true
       serviceAccountName: route-monitor-operator-system

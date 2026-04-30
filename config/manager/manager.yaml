@@ -17,6 +17,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        openshift.io/required-scc: restricted-v2
       labels:
         control-plane: controller-manager
         app: route-monitor-operator
@@ -77,6 +79,7 @@ spec:
           name: manager
           securityContext:
             allowPrivilegeEscalation: false
+          terminationMessagePolicy: FallbackToLogsOnError
           livenessProbe:
             httpGet:
               path: /healthz
