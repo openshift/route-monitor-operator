@@ -36,6 +36,9 @@ spec:
           spec:
             description: RouteMonitorSpec defines the desired state of RouteMonitor
             properties:
+              insecureSkipTLSVerify:
+                default: false
+                type: boolean
               route:
                 description: RouteMonitorRouteSpec references the observed Route resource
                 properties:
@@ -45,8 +48,22 @@ spec:
                   namespace:
                     description: Namespace is the namespace of the Route
                     type: string
+                  port:
+                    format: int64
+                    type: integer
+                  suffix:
+                    type: string
                 type: object
+              serviceMonitorType:
+                default: monitoring.coreos.com
+                description: ServiceMonitorType dictates the type of ServiceMonitor
+                  the RouteMonitor should create
+                enum:
+                - monitoring.coreos.com
+                - monitoring.rhobs
+                type: string
               skipPrometheusRule:
+                default: false
                 description: SkipPrometheusRule instructs the controller to skip the
                   creation of PrometheusRule CRs. One common use-case for is for alerts
                   that are defined separately, such as for hosted clusters.
