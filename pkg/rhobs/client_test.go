@@ -760,8 +760,7 @@ func TestOIDCTokenFlow(t *testing.T) {
 		}
 
 		// Parse form data
-		//nolint:gosec // G120: Test code - limited test server request size is safe
-		if err := r.ParseForm(); err != nil {
+		if err := r.ParseForm(); err != nil { //nolint:gosec // G120: Test code with limited request size
 			t.Fatalf("Failed to parse form: %v", err)
 		}
 
@@ -785,8 +784,7 @@ func TestOIDCTokenFlow(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		//nolint:gosec // G117: Test code - encoding mock tokens is safe
-		_ = json.NewEncoder(w).Encode(tokenResp)
+		_ = json.NewEncoder(w).Encode(tokenResp) //nolint:gosec // G117: Test code with mock tokens
 	}))
 	defer tokenServer.Close()
 
@@ -936,8 +934,7 @@ func TestOIDCTokenCaching(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		//nolint:gosec // G117: Test code - encoding mock tokens is safe
-		_ = json.NewEncoder(w).Encode(tokenResp)
+		_ = json.NewEncoder(w).Encode(tokenResp) //nolint:gosec // G117: Test code with mock tokens
 	}))
 	defer tokenServer.Close()
 
@@ -1022,8 +1019,7 @@ func TestOIDCTokenURL(t *testing.T) {
 				}
 
 				w.Header().Set("Content-Type", "application/json")
-				//nolint:gosec // Test code - encoding mock tokens is safe
-				_ = json.NewEncoder(w).Encode(tokenResp)
+				_ = json.NewEncoder(w).Encode(tokenResp) //nolint:gosec // G117: Test code with mock tokens
 			}))
 			defer tokenServer.Close()
 
