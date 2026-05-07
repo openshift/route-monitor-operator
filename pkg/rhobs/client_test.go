@@ -3,6 +3,7 @@ package rhobs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -327,8 +328,8 @@ func TestGetProbe_NotFound(t *testing.T) {
 	client := NewClient(server.URL, "test-tenant", testr.New(t))
 
 	probe, err := client.GetProbe(context.Background(), "non-existent-cluster")
-	if err != nil {
-		t.Fatalf("GetProbe failed: %v", err)
+	if !errors.Is(err, ErrProbeNotFound) {
+		t.Fatalf("Expected ErrProbeNotFound, got: %v", err)
 	}
 
 	if probe != nil {
@@ -349,8 +350,8 @@ func TestGetProbe_EmptyList(t *testing.T) {
 	client := NewClient(server.URL, "test-tenant", testr.New(t))
 
 	probe, err := client.GetProbe(context.Background(), "test-cluster")
-	if err != nil {
-		t.Fatalf("GetProbe failed: %v", err)
+	if !errors.Is(err, ErrProbeNotFound) {
+		t.Fatalf("Expected ErrProbeNotFound, got: %v", err)
 	}
 
 	if probe != nil {
@@ -377,8 +378,8 @@ func TestGetProbe_NoMatchingCluster(t *testing.T) {
 	client := NewClient(server.URL, "test-tenant", testr.New(t))
 
 	probe, err := client.GetProbe(context.Background(), "test-cluster")
-	if err != nil {
-		t.Fatalf("GetProbe failed: %v", err)
+	if !errors.Is(err, ErrProbeNotFound) {
+		t.Fatalf("Expected ErrProbeNotFound, got: %v", err)
 	}
 
 	if probe != nil {
@@ -708,8 +709,8 @@ func TestGetProbe_LabelSelectorFormat(t *testing.T) {
 
 	// Test with cluster ID that contains hyphens and numbers
 	probe, err := client.GetProbe(context.Background(), "my-cluster-123")
-	if err != nil {
-		t.Fatalf("GetProbe failed: %v", err)
+	if !errors.Is(err, ErrProbeNotFound) {
+		t.Fatalf("Expected ErrProbeNotFound, got: %v", err)
 	}
 
 	if probe != nil {

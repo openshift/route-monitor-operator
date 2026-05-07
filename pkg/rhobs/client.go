@@ -347,6 +347,11 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 	// First check if probe exists and get its current state
 	existingProbe, err := c.GetProbe(ctx, clusterID)
 	if err != nil {
+		if errors.Is(err, ErrProbeNotFound) {
+			// Probe doesn't exist, consider this success
+			c.logger.Info("Probe not found, nothing to delete", "cluster_id", clusterID)
+			return nil
+		}
 		c.logger.Error(err, "Failed to get existing probe", "cluster_id", clusterID)
 		return fmt.Errorf("failed to check existing probe: %w", err)
 	}
