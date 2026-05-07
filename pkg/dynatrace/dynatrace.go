@@ -18,6 +18,7 @@ package dynatrace
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -153,7 +154,7 @@ func (dynatraceApiClient *DynatraceApiClient) MakeRequest(method, path string, r
 		reqBody = bytes.NewBufferString(renderedJSON)
 	}
 
-	req, err := http.NewRequest(method, url, reqBody)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +171,9 @@ func (dynatraceApiClient *DynatraceApiClient) ListDynatraceHttpMonitorsForCluste
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch monitor in Dynatrace. Status code: %d", resp.StatusCode)
@@ -192,6 +195,9 @@ func (dynatraceApiClient *DynatraceApiClient) GetDynatraceHttpMonitor(entityId s
 	if err != nil {
 		return HttpMonitor{}, fmt.Errorf("failed to GET HTTP monitor from Dynatrace: %w", err)
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return HttpMonitor{}, fmt.Errorf("unexpected response from Dynatrace when retrieving monitor %q: expected status code %d, got %d.\nFull response: %#v", entityId, http.StatusOK, resp.StatusCode, resp)
@@ -211,7 +217,9 @@ func (dynatraceApiClient *DynatraceApiClient) GetLocationEntityIdFromDynatrace(l
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch locations. Status code: %d", resp.StatusCode)
@@ -278,7 +286,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	var tplBuffer bytes.Buffer
 	err := tmpl.Execute(&tplBuffer, monitorConfig)
 	if err != nil {
-		return "", fmt.Errorf("error rendering JSON template - %v", err)
+		return "", fmt.Errorf("error rendering JSON template - %w", err)
 	}
 	renderedJSON := tplBuffer.String()
 
@@ -286,13 +294,15 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		// Read response body for error details
 		bodyBytes, readErr := io.ReadAll(resp.Body)
 		if readErr != nil {
-			return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d (unable to read response body: %v)", resp.StatusCode, readErr)
+			return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d (unable to read response body: %w)", resp.StatusCode, readErr)
 		}
 		return "", fmt.Errorf("failed to create HTTP monitor. Status code: %d, Response: %s", resp.StatusCode, string(bodyBytes))
 	}
@@ -301,7 +311,7 @@ func (dynatraceApiClient *DynatraceApiClient) CreateDynatraceHttpMonitor(monitor
 	var createdMonitor BasicHttpMonitor
 	err = json.NewDecoder(resp.Body).Decode(&createdMonitor)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch monitor id: %v", err)
+		return "", fmt.Errorf("failed to fetch monitor id: %w", err)
 	}
 	monitorId := createdMonitor.EntityId
 	return monitorId, nil
@@ -313,7 +323,9 @@ func (dynatraceApiClient *DynatraceApiClient) DeleteSingleMonitor(monitorId stri
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to delete monitor %s. Status code: %d", monitorId, resp.StatusCode)

@@ -32,7 +32,7 @@ func (*ResourceComparer) DeepEqual(x, y any) bool {
 
 type MonitorResourceCommon struct {
 	Client   client.Client
-	Ctx      context.Context
+	Ctx      context.Context //nolint:containedctx // Test struct - context stored for test setup
 	Comparer ResourceComparerInterface
 }
 

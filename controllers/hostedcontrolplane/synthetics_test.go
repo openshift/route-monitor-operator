@@ -260,8 +260,8 @@ func TestDeployDynatraceHTTPMonitorResources(t *testing.T) {
 			log := log.FromContext(ctx) // Replace with a proper logger if needed
 
 			// Call the function under test
-			// nolint:errcheck // this was a placeholder test, and does not work under the covers - we need to mock multiple calls to the mocked API server
-			r.deployDynatraceHttpMonitorResources(ctx, apiClient, log, hostedControlPlane)
+			// This is a placeholder test and does not work under the covers - we need to mock multiple calls to the mocked API server
+			_ = r.deployDynatraceHttpMonitorResources(apiClient, log, hostedControlPlane)
 
 		})
 	}
@@ -662,7 +662,7 @@ func mockRHOBSServer(t *testing.T, getResponse *rhobs.ProbeResponse, getErr bool
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		*requestLog = append(*requestLog, r.Method+" "+r.URL.Path+" "+string(body))
 
 		if !strings.HasPrefix(r.URL.Path, "/probes") {
@@ -837,13 +837,14 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 	}
 }
 
+//nolint:gocyclo // Test function with comprehensive test cases
 func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 	tests := []struct {
-		name                string
-		probeLabels         map[string]string
-		isPrivate           bool
-		clusterRegion       string
-		expectLabelUpdate   bool // region-only PATCH (no private label in body)
+		name                 string
+		probeLabels          map[string]string
+		isPrivate            bool
+		clusterRegion        string
+		expectLabelUpdate    bool // region-only PATCH (no private label in body)
 		expectDeleteRecreate bool // private mismatch: delete + POST recreate
 	}{
 		{
@@ -853,9 +854,9 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "false",
 				"region":     "us-east-1",
 			},
-			isPrivate:           false,
-			clusterRegion:       "us-east-1",
-			expectLabelUpdate:   false,
+			isPrivate:            false,
+			clusterRegion:        "us-east-1",
+			expectLabelUpdate:    false,
 			expectDeleteRecreate: false,
 		},
 		{
@@ -865,9 +866,9 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "true",
 				"region":     "us-west-2",
 			},
-			isPrivate:           true,
-			clusterRegion:       "us-west-2",
-			expectLabelUpdate:   false,
+			isPrivate:            true,
+			clusterRegion:        "us-west-2",
+			expectLabelUpdate:    false,
 			expectDeleteRecreate: false,
 		},
 		{
@@ -876,9 +877,9 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"cluster-id": "test-cluster",
 				"region":     "us-east-1",
 			},
-			isPrivate:           false,
-			clusterRegion:       "us-east-1",
-			expectLabelUpdate:   false,
+			isPrivate:            false,
+			clusterRegion:        "us-east-1",
+			expectLabelUpdate:    false,
 			expectDeleteRecreate: true,
 		},
 		{
@@ -888,9 +889,9 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 				"private":    "true",
 				"region":     "us-east-1",
 			},
-			isPrivate:           false,
-			clusterRegion:       "us-east-1",
-			expectLabelUpdate:   false,
+			isPrivate:            false,
+			clusterRegion:        "us-east-1",
+			expectLabelUpdate:    false,
 			expectDeleteRecreate: true,
 		},
 		{
@@ -905,11 +906,11 @@ func TestEnsureRHOBSProbe_LabelValidation(t *testing.T) {
 			expectLabelUpdate: true,
 		},
 		{
-			name: "empty labels triggers delete and recreate",
-			probeLabels:         map[string]string{"cluster-id": "test-cluster"},
-			isPrivate:           false,
-			clusterRegion:       "us-east-1",
-			expectLabelUpdate:   false,
+			name:                 "empty labels triggers delete and recreate",
+			probeLabels:          map[string]string{"cluster-id": "test-cluster"},
+			isPrivate:            false,
+			clusterRegion:        "us-east-1",
+			expectLabelUpdate:    false,
 			expectDeleteRecreate: true,
 		},
 	}

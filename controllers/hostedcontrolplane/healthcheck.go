@@ -93,7 +93,7 @@ func (r *HostedControlPlaneReconciler) hcpReady(ctx context.Context, hostedcontr
 		return true, nil
 	}
 
-	err = healthcheckHostedControlPlane(hostedcontrolplane)
+	err = healthcheckHostedControlPlane(ctx, hostedcontrolplane)
 	if err != nil {
 		_, resetErr := r.resetHealthCheckSuccesses(ctx, healthcheckConfigMap)
 		if resetErr != nil {
@@ -182,7 +182,7 @@ func (r *HostedControlPlaneReconciler) addHealthCheckSuccess(ctx context.Context
 
 // healthcheckHostedControlPlane performs a healthcheck against the provided HCP by checking the response from its kube-apiserver's
 // /livez endpoint
-func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func healthcheckHostedControlPlane(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	controlplaneEndpoint := hostedcontrolplane.Status.ControlPlaneEndpoint.Host
 	if controlplaneEndpoint == "" {
 		return fmt.Errorf("missing .Status.ControlPlaneEndpoint.Host")
@@ -203,12 +203,12 @@ func healthcheckHostedControlPlane(hostedcontrolplane *hypershiftv1beta1.HostedC
 		secure = true
 	}
 
-	return endpointOK(url, secure)
+	return endpointOK(ctx, url, secure)
 }
 
 // endpointOK checks the readiness of the given url, and returns an error if the GET fails, or a non-200
 // response is received
-func endpointOK(endpoint string, secure bool) error {
+func endpointOK(ctx context.Context, endpoint string, secure bool) error {
 	// Create HTTP client with appropriate TLS configuration
 	client := &http.Client{}
 	if !secure {
@@ -218,11 +218,18 @@ func endpointOK(endpoint string, secure bool) error {
 		}
 	}
 
-	resp, err := client.Get(endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to GET endpoint: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("non 200 HTTP status returned: %s", resp.Status)
 	}
@@ -241,18 +248,17 @@ func olderThan(obj metav1.Object, age time.Duration) bool {
 // only runs during the initial healthcheck window) to catch cert issues that appear after
 // initial healthcheck passes, e.g., during upgrade rolling restarts.
 // The port parameter should come from getKubeAPIServerPort to match the RouteMonitor config.
-func isKubeAPIServerReachable(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, port int64) error {
+func isKubeAPIServerReachable(ctx context.Context, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, port int64) error {
 	url := fmt.Sprintf("kube-apiserver.%s.svc.cluster.local:%d", hostedcontrolplane.Namespace, port)
-	conn, err := tls.DialWithDialer(
-		&net.Dialer{Timeout: 5 * time.Second},
-		"tcp",
-		url,
-		&tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Required for internal cluster communication
-	)
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 5 * time.Second},
+		Config:    &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // Required for internal cluster communication
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", url)
 	if err != nil {
 		return fmt.Errorf("TLS dial to kube-apiserver failed: %w", err)
 	}
-	conn.Close()
+	_ = conn.Close()
 	return nil
 }
 

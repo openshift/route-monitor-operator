@@ -25,7 +25,7 @@ import (
 type BlackBoxExporter struct {
 	Client         client.Client
 	Log            logr.Logger
-	Ctx            context.Context
+	Ctx            context.Context //nolint:containedctx // Legacy design - context stored for operations
 	Image          string
 	NamespacedName types.NamespacedName
 }

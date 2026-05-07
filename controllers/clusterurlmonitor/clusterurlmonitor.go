@@ -38,7 +38,7 @@ import (
 // ClusterUrlMonitorReconciler reconciles a ClusterUrlMonitor object
 type ClusterUrlMonitorReconciler struct {
 	Client client.Client
-	Ctx    context.Context
+	Ctx    context.Context //nolint:containedctx // Legacy design - context stored for reconciliation
 	Log    logr.Logger
 	Scheme *runtime.Scheme
 

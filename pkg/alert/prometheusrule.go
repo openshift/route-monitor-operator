@@ -24,7 +24,7 @@ import (
 
 type PrometheusRule struct {
 	Client   client.Client
-	Ctx      context.Context
+	Ctx      context.Context //nolint:containedctx // Test struct - context stored for test setup
 	Comparer util.ResourceComparerInterface
 }
 
@@ -148,8 +148,6 @@ func (r *multiWindowMultiBurnAlertRule) renderLabels(url, namespace string) map[
 
 // TemplateForPrometheusRuleResource returns a PrometheusRule
 func TemplateForPrometheusRuleResource(url, percent string, namespacedName types.NamespacedName) monitoringv1.PrometheusRule {
-
-	rules := []monitoringv1.Rule{}
 	alertRules := []multiWindowMultiBurnAlertRule{
 		{
 			duration:    "2m",
@@ -181,6 +179,7 @@ func TemplateForPrometheusRuleResource(url, percent string, namespacedName types
 		},
 	}
 
+	rules := make([]monitoringv1.Rule, 0, len(alertRules))
 	for _, alertrule := range alertRules { // Create all the alerts
 		rules = append(rules, alertrule.render(url, percent, namespacedName))
 	}

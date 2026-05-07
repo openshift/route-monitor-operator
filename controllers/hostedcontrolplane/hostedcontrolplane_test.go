@@ -357,7 +357,7 @@ func TestHostedControlPlaneReconciler_buildOwnerReferences(t *testing.T) {
 // so testing it doesn't actually provide any value at this point.
 func TestHostedControlPlaneReconciler_finalizeHostedControlPlane(t *testing.T) {
 	type args struct {
-		ctx                context.Context
+		ctx                context.Context //nolint:containedctx // Test struct - context stored for test setup
 		log                logr.Logger
 		hostedcontrolplane *hypershiftv1beta1.HostedControlPlane
 	}
@@ -417,7 +417,7 @@ func TestHostedControlPlaneReconciler_deployInternalMonitoringObjects(t *testing
 	)
 
 	type args struct {
-		ctx                context.Context
+		ctx                context.Context //nolint:containedctx // Test struct - context stored for test setup
 		log                logr.Logger
 		hostedcontrolplane *hypershiftv1beta1.HostedControlPlane
 	}
@@ -845,10 +845,10 @@ func TestIsVpcEndpointReady(t *testing.T) {
 
 func TestIsHCPAvailable(t *testing.T) {
 	tests := []struct {
-		name             string
-		conditions       []metav1.Condition
-		expectedResult   bool
-		expectedReason   string
+		name           string
+		conditions     []metav1.Condition
+		expectedResult bool
+		expectedReason string
 	}{
 		{
 			name: "Available condition is True",
@@ -972,7 +972,7 @@ func TestIsKubeAPIServerReachable(t *testing.T) {
 					Namespace: tt.namespace,
 				},
 			}
-			err := isKubeAPIServerReachable(hcp, 6443)
+			err := isKubeAPIServerReachable(context.Background(), hcp, 6443)
 			if tt.expectErr && err == nil {
 				t.Error("expected error, got nil")
 			}

@@ -58,7 +58,7 @@ const (
 
 	//fetch dynatrace secret to get dynatrace api token and tenant url
 	dynatraceSecretNamespace = "openshift-route-monitor-operator"
-	dynatraceSecretName      = "dynatrace-token" // nolint:gosec // Not a hardcoded credential
+	dynatraceSecretName      = "dynatrace-token" //nolint:gosec // Not a hardcoded credential
 	dynatraceApiKey          = "apiToken"
 	dynatraceTenantKey       = "apiUrl"
 
@@ -158,6 +158,8 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 //+kubebuilder:rbac:groups=openshift.io,resources=hostedcontrolplanes/finalizers,verbs=update
 
 // Reconcile responds to events against watched objects
+//
+//nolint:gocyclo // Complex reconciliation logic - refactoring would reduce readability
 func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.WithName("Reconcile").WithValues("name", req.Name, "namespace", req.Namespace)
 	log.Info("Reconciling HostedControlPlanes")
@@ -203,6 +205,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if shouldDelete {
 		// Only attempt Dynatrace deletion if Dynatrace is enabled and client was successfully created
 		if dynatraceConfig.Enabled && dynatraceApiClient != nil {
+			//nolint:contextcheck // Context not passed to legacy Dynatrace client
 			err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
 			if err != nil {
 				// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
@@ -298,7 +301,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	hcpReady, err := r.hcpReady(ctx, hostedcontrolplane, rhobsConfig)
 	if err != nil {
 		log.Error(err, "HCP readiness check failed")
-		return utilreconcile.RequeueWith(fmt.Errorf("HCP readiness check failed: %v", err))
+		return utilreconcile.RequeueWith(fmt.Errorf("HCP readiness check failed: %w", err))
 	}
 	if !hcpReady {
 		log.Info("skipped deploying monitoring objects, HostedControlPlane not yet ready")
@@ -326,7 +329,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 			log.Info("kube-apiserver service not found, delaying monitoring deployment", "error", err.Error())
 			return utilreconcile.RequeueAfter(healthcheckIntervalSeconds * time.Second), nil
 		}
-		if err := isKubeAPIServerReachable(hostedcontrolplane, apiServerPort); err != nil {
+		if err := isKubeAPIServerReachable(ctx, hostedcontrolplane, apiServerPort); err != nil {
 			log.Info("kube-apiserver TLS not ready, removing monitoring objects", "error", err.Error())
 			if deleteErr := r.deleteInternalMonitoringObjects(ctx, log, hostedcontrolplane); deleteErr != nil {
 				return utilreconcile.RequeueWith(fmt.Errorf("failed to remove internal monitoring objects while kube-apiserver TLS is unavailable: %w", deleteErr))
@@ -346,7 +349,8 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Only attempt Dynatrace deployment if Dynatrace is enabled and client was successfully created
 	if dynatraceConfig.Enabled && dynatraceApiClient != nil {
 		log.Info("Deploying HTTP Monitor Resources")
-		err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
+		//nolint:contextcheck // Context not passed to legacy Dynatrace client
+		err = r.deployDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
 		if err != nil {
 			// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
 			if rhobsConfig.ProbeAPIURL != "" {

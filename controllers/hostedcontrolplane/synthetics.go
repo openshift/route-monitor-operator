@@ -51,7 +51,7 @@ func (r *HostedControlPlaneReconciler) getDynatraceSecrets(ctx context.Context) 
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: dynatraceSecretName, Namespace: dynatraceSecretNamespace}, secret)
 	if err != nil {
-		return "", "", fmt.Errorf("error getting Kubernetes secret: %v", err)
+		return "", "", fmt.Errorf("error getting Kubernetes secret: %w", err)
 	}
 
 	apiTokenBytes, ok := secret.Data[dynatraceApiKey]
@@ -161,15 +161,18 @@ func determineDynatraceClusterRegionName(clusterRegion string, monitorLocationTy
 			Ref: https://issues.redhat.com/browse/OSD-25167
 		*/
 		return "backplane", nil
+	case hypershiftv1beta1.Public:
+		// For Public HCPs, use the same behavior as PublicAndPrivate
+		return getDynatraceEquivalentClusterRegionName(clusterRegion)
 	default:
 		return "", fmt.Errorf("monitorLocationType '%s' not supported", monitorLocationType)
 	}
 }
 
-func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx context.Context, dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
+func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(dynatraceApiClient *dynatrace.DynatraceApiClient, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) error {
 	apiServerHostname, err := GetAPIServerHostname(hostedcontrolplane)
 	if err != nil {
-		return fmt.Errorf("failed to get APIServer hostname %v", err)
+		return fmt.Errorf("failed to get APIServer hostname %w", err)
 	}
 	monitorName := strings.Replace(apiServerHostname, "api.", "", 1)
 	monitorLocationType := hostedcontrolplane.Spec.Platform.AWS.EndpointAccess
@@ -179,16 +182,16 @@ func (r *HostedControlPlaneReconciler) deployDynatraceHttpMonitorResources(ctx c
 	*/
 	clusterRegion, err := getClusterRegion(hostedcontrolplane)
 	if err != nil {
-		return fmt.Errorf("error calling getClusterRegion: %v", err)
+		return fmt.Errorf("error calling getClusterRegion: %w", err)
 	}
 	dynatraceClusterRegionName, err := determineDynatraceClusterRegionName(clusterRegion, monitorLocationType)
 	if err != nil {
-		return fmt.Errorf("error calling determineDynatraceClusterRegionId: %v", err)
+		return fmt.Errorf("error calling determineDynatraceClusterRegionId: %w", err)
 	}
 
 	locationId, err := dynatraceApiClient.GetLocationEntityIdFromDynatrace(dynatraceClusterRegionName, monitorLocationType)
 	if err != nil {
-		return fmt.Errorf("error calling GetLocationEntityIdFromDynatrace: %v", err)
+		return fmt.Errorf("error calling GetLocationEntityIdFromDynatrace: %w", err)
 	}
 
 	clusterID := hostedcontrolplane.Spec.ClusterID
@@ -244,7 +247,7 @@ func (r *HostedControlPlaneReconciler) deleteDynatraceHttpMonitorResources(dynat
 
 	err := dynatraceApiClient.DeleteDynatraceMonitorByCluserId(clusterId)
 	if err != nil {
-		return fmt.Errorf("error deleting HTTP monitor(s). Status Code: %v", err)
+		return fmt.Errorf("error deleting HTTP monitor(s). Status Code: %w", err)
 	}
 	log.Info("Successfully deleted HTTP monitor(s)")
 	return nil
@@ -269,6 +272,8 @@ type DynatraceConfig struct {
 }
 
 // ensureRHOBSProbe ensures that a RHOBS probe exists for the HostedControlPlane
+//
+//nolint:gocyclo // Complex probe management logic - refactoring would reduce readability
 func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log logr.Logger, hostedcontrolplane *hypershiftv1beta1.HostedControlPlane, cfg RHOBSConfig) error {
 	clusterID := hostedcontrolplane.Spec.ClusterID
 	if clusterID == "" {
@@ -287,7 +292,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	if hostedcontrolplane.Labels["api.openshift.com/limited-support"] == "true" {
 		client := r.createRHOBSClient(log, cfg)
 		existingProbe, err := client.GetProbe(ctx, clusterID)
-		if err != nil {
+		if err != nil && !errors.Is(err, rhobs.ErrProbeNotFound) {
 			return fmt.Errorf("failed to check existing probe: %w", err)
 		}
 		if existingProbe != nil {
@@ -316,7 +321,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	client := r.createRHOBSClient(log, cfg)
 
 	existingProbe, err := client.GetProbe(ctx, clusterID)
-	if err != nil {
+	if err != nil && !errors.Is(err, rhobs.ErrProbeNotFound) {
 		return fmt.Errorf("failed to check existing probe: %w", err)
 	}
 

@@ -78,6 +78,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+//nolint:gocyclo // Main function with necessary initialization steps
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool

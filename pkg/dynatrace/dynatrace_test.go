@@ -98,7 +98,9 @@ func TestAPIClient_makeRequest(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error making %s request: %v", tt.method, err)
 			}
-			defer response.Body.Close()
+			defer func() {
+				_ = response.Body.Close()
+			}()
 
 			// Assert the response status code
 			if response.StatusCode != tt.expectedStatus {

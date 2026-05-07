@@ -39,7 +39,7 @@ import (
 // RouteMonitorReconciler reconciles a RouteMonitor object
 type RouteMonitorReconciler struct {
 	Client           client.Client
-	Ctx              context.Context
+	Ctx              context.Context //nolint:containedctx // Legacy design - context stored for reconciliation
 	Log              logr.Logger
 	Scheme           *runtime.Scheme
 	BlackBoxExporter controllers.BlackBoxExporterHandler
@@ -143,6 +143,7 @@ func (r *RouteMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.V(2).Info("Entering EnsureServiceMonitorExists")
+	//nolint:contextcheck // Context not passed through legacy service monitor interface
 	res, err = r.EnsureServiceMonitorExists(routeMonitor)
 	if err != nil {
 		log.Error(err, "Failed to set ServiceMonitor. Requeueing...")

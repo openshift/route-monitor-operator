@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+)
+
+var (
+	// ErrProbeNotFound is returned when a probe doesn't exist
+	ErrProbeNotFound = errors.New("probe not found")
 )
 
 const (
@@ -173,7 +179,9 @@ func (c *Client) CreateProbe(ctx context.Context, req ProbeRequest) (*ProbeRespo
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -243,7 +251,9 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	if err != nil {
 		return nil, fmt.Errorf("failed to send HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -254,7 +264,7 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 	apiSuccess = resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, nil // Probe doesn't exist
+		return nil, ErrProbeNotFound
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -273,7 +283,7 @@ func (c *Client) GetProbe(ctx context.Context, clusterID string) (*ProbeResponse
 		}
 	}
 
-	return nil, nil // Probe not found
+	return nil, ErrProbeNotFound
 }
 
 // ProbePatchRequest represents the payload for updating a probe
@@ -316,7 +326,9 @@ func (c *Client) UpdateProbeLabels(ctx context.Context, probeID string, labels m
 	if err != nil {
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	apiSuccess = resp.StatusCode == http.StatusOK
 	if resp.StatusCode != http.StatusOK {
@@ -403,7 +415,9 @@ func (c *Client) DeleteProbe(ctx context.Context, clusterID string) error {
 		c.logger.Error(err, "Failed to send HTTP request", "cluster_id", clusterID, "url", url)
 		return fmt.Errorf("failed to send HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	c.logger.Info("Received RHOBS API response", "method", "PATCH", "url", url, "status_code", resp.StatusCode, "operation", "delete-probe")
 	apiSuccess = resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound
@@ -487,7 +501,9 @@ func (c *Client) refreshAccessToken(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to request access token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

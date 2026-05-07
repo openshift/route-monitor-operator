@@ -29,7 +29,7 @@ import (
 
 type Integration struct {
 	Client     client.Client
-	ctx        context.Context
+	ctx        context.Context //nolint:containedctx // Test struct - context stored for test setup
 	mgr        manager.Manager
 	cancelFunc context.CancelFunc
 }
