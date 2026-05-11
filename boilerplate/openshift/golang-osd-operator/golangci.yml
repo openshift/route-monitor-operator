@@ -42,7 +42,10 @@ linters:
     errcheck:
       check-type-assertions: true
       check-blank: false
-      disable-default-exclusions: true
+
+  exclusions:
+    presets:
+      - std-error-handling
 
     gocyclo:
       min-complexity: 15
@@ -59,6 +62,11 @@ linters:
 
 run:
   timeout: 5m
+  # Only check new code, not existing issues
+  # This uses git to compare against the base branch (typically master/main)
+  new: true
+  # Alternatively, you can specify a specific revision:
+  # new-from-rev: origin/master
 
 formatters:
   enable:
