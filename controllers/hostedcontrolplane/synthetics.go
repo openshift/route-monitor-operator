@@ -286,8 +286,25 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	isPrivate := hostedcontrolplane.Spec.Platform.AWS != nil &&
 		hostedcontrolplane.Spec.Platform.AWS.EndpointAccess == hypershiftv1beta1.Private
 
-	// Check if cluster is in limited support -- delete probe if it exists and skip creation
+	// Check if cluster is in limited support -- delete probe if it exists and skip creation.
+	// Cross-check the HostedCluster CR label as the source of truth, since the HCP label
+	// can become stale when LS is removed (OCPBUGS-85584: reconcileHostedControlPlane
+	// only does additive label sync, never removes deleted labels).
+	isLimitedSupport := false
 	if hostedcontrolplane.Labels["api.openshift.com/limited-support"] == "true" {
+		hcNamespace := strings.TrimSuffix(hostedcontrolplane.Namespace, "-"+hostedcontrolplane.Name)
+		hc := &hypershiftv1beta1.HostedCluster{}
+		err := r.Get(ctx, types.NamespacedName{Name: hostedcontrolplane.Name, Namespace: hcNamespace}, hc)
+		if err != nil {
+			log.Info("Could not read HostedCluster to verify LS status, trusting HCP label", "cluster_id", clusterID, "error", err.Error())
+			isLimitedSupport = true
+		} else if hc.Labels["api.openshift.com/limited-support"] == "true" {
+			isLimitedSupport = true
+		} else {
+			log.Info("HCP has stale limited-support label (HC label cleared), ignoring", "cluster_id", clusterID)
+		}
+	}
+	if isLimitedSupport {
 		client := r.createRHOBSClient(log, cfg)
 		existingProbe, err := client.GetProbe(ctx, clusterID)
 		if err != nil {
