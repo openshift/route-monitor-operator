@@ -120,7 +120,10 @@ func getDynatraceEquivalentClusterRegionName(clusterRegion string) (string, erro
 func GetAPIServerHostname(hostedcontrolplane *hypershiftv1beta1.HostedControlPlane) (string, error) {
 	for _, service := range hostedcontrolplane.Spec.Services {
 		if service.Service == "APIServer" {
-			return service.Route.Hostname, nil
+			if service.Route != nil && service.Route.Hostname != "" {
+				return service.Route.Hostname, nil
+			}
+			return "", fmt.Errorf("APIServer Route hostname is empty (service type: %s)", service.Type)
 		}
 	}
 	return "", fmt.Errorf("APIServer service not found in the hostedcontrolplane")
@@ -308,6 +311,7 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 	// Get monitoring URL (API server health endpoint in this case)
 	monitoringURL, err := GetAPIServerHostname(hostedcontrolplane)
 	if err != nil {
+		log.Info("Failed to get API server hostname for probe", "cluster_id", clusterID, "error", err.Error())
 		return fmt.Errorf("failed to get API server hostname: %w", err)
 	}
 	monitoringURL = fmt.Sprintf("https://%s/livez", monitoringURL)
@@ -392,6 +396,8 @@ func (r *HostedControlPlaneReconciler) ensureRHOBSProbe(ctx context.Context, log
 
 	// Create probe request with region label for regional filtering
 	probeReq := rhobs.NewClusterProbeRequest(clusterID, monitoringURL, clusterRegion, isPrivate)
+
+	log.Info("Creating new RHOBS probe", "cluster_id", clusterID, "monitoring_url", monitoringURL, "private", isPrivate, "region", clusterRegion)
 
 	// Create the probe
 	probe, err := client.CreateProbe(ctx, probeReq)
