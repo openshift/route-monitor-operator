@@ -64,6 +64,7 @@ rules:
   - apiGroups:
       - hypershift.openshift.io
     resources:
+      - hostedclusters
       - hostedcontrolplanes
     verbs:
       - get

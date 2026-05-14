@@ -707,9 +707,15 @@ func mockRHOBSServer(t *testing.T, getResponse *rhobs.ProbeResponse, getErr bool
 
 // newHCP creates a HostedControlPlane for testing with the given clusterID, region, labels, and endpoint access.
 func newHCP(clusterID, region string, labels map[string]string, endpointAccess hypershiftv1beta1.AWSEndpointAccessType) *hypershiftv1beta1.HostedControlPlane {
+	return newHCPWithMeta(clusterID, region, labels, endpointAccess, "", "")
+}
+
+func newHCPWithMeta(clusterID, region string, labels map[string]string, endpointAccess hypershiftv1beta1.AWSEndpointAccessType, name, namespace string) *hypershiftv1beta1.HostedControlPlane {
 	return &hypershiftv1beta1.HostedControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
 		},
 		Spec: hypershiftv1beta1.HostedControlPlaneSpec{
 			ClusterID: clusterID,
@@ -785,14 +791,25 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 			server := mockRHOBSServer(t, tt.getResponse, tt.getErr, tt.deleteErr, &requestLog)
 			defer server.Close()
 
-			r := newTestReconciler(t)
-			ctx := context.Background()
-			logger := log.FromContext(ctx)
-
-			hcp := newHCP("test-cluster", "us-east-1",
+			// Create HC with LS label in the parent namespace so cross-check confirms LS
+			hcp := newHCPWithMeta("test-cluster", "us-east-1",
 				map[string]string{"api.openshift.com/limited-support": "true"},
 				hypershiftv1beta1.PublicAndPrivate,
+				"test-hcp", "ocm-production-clusterid-test-hcp",
 			)
+			hc := &hypershiftv1beta1.HostedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hcp",
+					Namespace: "ocm-production-clusterid",
+					Labels:    map[string]string{"api.openshift.com/limited-support": "true"},
+				},
+			}
+
+			r := &HostedControlPlaneReconciler{
+				Client: fake.NewFakeClient(hc),
+			}
+			ctx := context.Background()
+			logger := log.FromContext(ctx)
 
 			cfg := RHOBSConfig{
 				ProbeAPIURL: server.URL + "/probes",
@@ -834,6 +851,96 @@ func TestEnsureRHOBSProbe_LimitedSupport(t *testing.T) {
 				t.Error("expected limited-support flow to skip probe creation, but POST request was made")
 			}
 		})
+	}
+}
+
+func TestEnsureRHOBSProbe_StaleLimitedSupportLabel(t *testing.T) {
+	// Test that when HCP has stale LS label but HC does not, RMO ignores the stale label
+	// and proceeds with probe creation (OCPBUGS-85584)
+	var requestLog []string
+	server := mockRHOBSServer(t, nil, false, false, &requestLog)
+	defer server.Close()
+
+	hcp := newHCPWithMeta("test-cluster", "us-east-1",
+		map[string]string{"api.openshift.com/limited-support": "true"},
+		hypershiftv1beta1.PublicAndPrivate,
+		"test-hcp", "ocm-staging-clusterid-test-hcp",
+	)
+	// HC does NOT have the LS label (it was cleared by CS)
+	hc := &hypershiftv1beta1.HostedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hcp",
+			Namespace: "ocm-staging-clusterid",
+			Labels:    map[string]string{"api.openshift.com/name": "test-hcp"},
+		},
+	}
+
+	r := &HostedControlPlaneReconciler{
+		Client: fake.NewFakeClient(hc),
+	}
+	ctx := context.Background()
+	logger := log.FromContext(ctx)
+
+	cfg := RHOBSConfig{
+		ProbeAPIURL: server.URL + "/probes",
+		Tenant:      "test-tenant",
+	}
+
+	err := r.ensureRHOBSProbe(ctx, logger, hcp, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have created a probe (POST), not skipped due to stale LS
+	hasPost := false
+	for _, entry := range requestLog {
+		if strings.HasPrefix(entry, "POST") {
+			hasPost = true
+		}
+	}
+	if !hasPost {
+		t.Error("expected probe creation (POST) after detecting stale LS label, but no POST was made")
+	}
+}
+
+func TestEnsureRHOBSProbe_LSLabelHCNotFound(t *testing.T) {
+	// Test fallback: when HC cannot be read, trust the HCP label (safe default)
+	var requestLog []string
+	server := mockRHOBSServer(t, nil, false, false, &requestLog)
+	defer server.Close()
+
+	hcp := newHCPWithMeta("test-cluster", "us-east-1",
+		map[string]string{"api.openshift.com/limited-support": "true"},
+		hypershiftv1beta1.PublicAndPrivate,
+		"test-hcp", "ocm-staging-clusterid-test-hcp",
+	)
+	// No HC created in fake client -- simulates HC not found
+
+	r := &HostedControlPlaneReconciler{
+		Client: fake.NewFakeClient(),
+	}
+	ctx := context.Background()
+	logger := log.FromContext(ctx)
+
+	cfg := RHOBSConfig{
+		ProbeAPIURL: server.URL + "/probes",
+		Tenant:      "test-tenant",
+	}
+
+	err := r.ensureRHOBSProbe(ctx, logger, hcp, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should NOT have created a probe (falls back to trusting HCP label)
+	hasPost := false
+	for _, entry := range requestLog {
+		if strings.HasPrefix(entry, "POST") {
+			hasPost = true
+		}
+	}
+	if hasPost {
+		t.Error("expected LS flow to skip probe creation when HC not found, but POST was made")
 	}
 }
 
