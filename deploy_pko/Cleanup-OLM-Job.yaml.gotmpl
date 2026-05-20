@@ -64,7 +64,7 @@ metadata:
   annotations:
     package-operator.run/phase: cleanup-deploy
 spec:
-  activeDeadlineSeconds: 300
+  backoffLimit: 40
   template:
     metadata:
       annotations:
@@ -72,7 +72,7 @@ spec:
     spec:
       serviceAccountName: olm-cleanup
       priorityClassName: openshift-user-critical
-      restartPolicy: Never
+      restartPolicy: OnFailure
       containers:
         - name: delete-csv
           image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest

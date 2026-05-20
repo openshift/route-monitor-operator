@@ -32,7 +32,7 @@ spec:
         image:
           description: Operator image to deploy
           type: string
-          default: None
+          default: ""
         version:
           description: Operator version tag for resource naming
           type: string
