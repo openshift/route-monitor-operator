@@ -49,3 +49,4 @@ objects:
             image: ${PKO_IMAGE}:${IMAGE_TAG}
             config:
               image: ${OPERATOR_IMAGE}:${IMAGE_TAG}
+              version: ${IMAGE_TAG}

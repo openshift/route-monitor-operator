@@ -33,4 +33,10 @@ spec:
           description: Operator image to deploy
           type: string
           default: None
+        version:
+          description: Operator version tag for resource naming
+          type: string
+          default: "0000000"
+          pattern: "^[a-z0-9][a-z0-9.-]*$"
+          maxLength: 51
       type: object
