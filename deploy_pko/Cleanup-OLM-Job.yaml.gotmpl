@@ -84,14 +84,29 @@ spec:
               #!/bin/sh
               set -euxo pipefail
 
+              ERRORS=""
               NS="openshift-route-monitor-operator"
-              LABEL="operators.coreos.com/route-monitor-operator.openshift-route-monitor-operator"
+              LABEL="operators.coreos.com/route-monitor-operator.${NS}"
 
-              oc -n "$NS" delete csv -l "$LABEL" || true
-              oc -n "$NS" delete sub -l "$LABEL" || true
-              oc -n "$NS" delete installplan -l "$LABEL" || true
-              oc -n "$NS" delete catalogsource route-monitor-operator-registry || true
-              oc -n "$NS" delete operatorgroup route-monitor-operator || true
+              oc -n "$NS" delete csv -l "$LABEL" --timeout=300s --ignore-not-found=true \
+                || ERRORS="${ERRORS}Failed to delete CSV. "
+
+              oc -n "$NS" delete subscription.operators.coreos.com -l "$LABEL" --timeout=300s --ignore-not-found=true \
+                || ERRORS="${ERRORS}Failed to delete Subscription. "
+
+              oc -n "$NS" delete installplan -l "$LABEL" --timeout=300s --ignore-not-found=true \
+                || ERRORS="${ERRORS}Failed to delete InstallPlan. "
+
+              oc -n "$NS" delete catalogsource.operators.coreos.com route-monitor-operator-registry --timeout=300s --ignore-not-found=true \
+                || ERRORS="${ERRORS}Failed to delete CatalogSource. "
+
+              oc -n "$NS" delete operatorgroup route-monitor-operator --timeout=300s --ignore-not-found=true \
+                || ERRORS="${ERRORS}Failed to delete OperatorGroup. "
+
+              if [ -n "$ERRORS" ]; then
+                echo "ERROR: OLM cleanup failed, will retry: ${ERRORS}" >&2
+                exit 1
+              fi
           resources:
             requests:
               cpu: 100m
