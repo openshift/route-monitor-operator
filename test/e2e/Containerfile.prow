@@ -1,0 +1,12 @@
+FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.21 AS builder
+
+WORKDIR /build
+ENV GOFLAGS=""
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /e2e.test
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+
+COPY --from=builder /e2e.test /usr/local/bin/e2e.test
