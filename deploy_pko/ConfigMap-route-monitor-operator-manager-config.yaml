@@ -8,5 +8,6 @@ kind: ConfigMap
 metadata:
   annotations:
     package-operator.run/phase: deploy
+    package-operator.run/collision-protection: IfNoController
   name: route-monitor-operator-manager-config
   namespace: openshift-route-monitor-operator
