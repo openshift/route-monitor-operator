@@ -99,9 +99,9 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
-	github.com/openshift-online/ocm-api-model/clientapi v0.0.440 // indirect
-	github.com/openshift-online/ocm-api-model/model v0.0.440 // indirect
-	github.com/openshift-online/ocm-sdk-go v0.1.486 // indirect
+	github.com/openshift-online/ocm-api-model/clientapi v0.0.456 // indirect
+	github.com/openshift-online/ocm-api-model/model v0.0.456 // indirect
+	github.com/openshift-online/ocm-sdk-go v0.1.501 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
