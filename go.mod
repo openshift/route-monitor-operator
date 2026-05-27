@@ -89,7 +89,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
+	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/openshift-online/ocm-api-model/clientapi v0.0.440 // indirect
 	github.com/openshift-online/ocm-api-model/model v0.0.440 // indirect
 	github.com/openshift-online/ocm-sdk-go v0.1.486 // indirect
