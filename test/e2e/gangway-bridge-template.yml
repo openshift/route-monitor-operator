@@ -14,7 +14,7 @@ parameters:
     description: Maximum seconds to wait for job completion
   - name: JOB_ENVS
     value: ""
-    description: Comma-separated KEY=VALUE pairs passed to the Prow job (e.g. OCM_LOGIN_ENV=integration)
+    description: Comma-separated KEY=VALUE pairs passed to the Prow job
   - name: JOBID
     generate: expression
     from: "[0-9a-z]{7}"
@@ -33,13 +33,35 @@ objects:
         spec:
           automountServiceAccountToken: false
           restartPolicy: Never
-          volumes:
-            - name: gangway-token
-              secret:
-                secretName: gangway-api-token
           containers:
             - name: gangway-bridge
-              image: quay.io/app-sre/gangway-bridge:${IMAGE_TAG}
+              image: quay.io/openshift/origin-tools:latest
+              command:
+                - /bin/bash
+                - -ceu
+                - |
+                  GW="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
+                  log() { echo "$(date +%H:%M:%S) $*" >&2; }
+
+                  BODY='{"job_execution_type":"1"}'
+                  if [[ -n "${JOB_ENVS:-}" ]]; then
+                    ENVS=$(echo "${JOB_ENVS}" | jq -Rn '[inputs // input | split(",")[] | split("=") | {(.[0]): .[1:] | join("=")}] | add' <<< "${JOB_ENVS}")
+                    BODY=$(jq -cn --argjson e "$ENVS" '{"job_execution_type":"1","pod_spec_options":{"envs":$e}}')
+                  fi
+
+                  RESP=$(curl -sfSL --retry 3 --retry-delay 10 -X POST -H "Authorization: Bearer ${GANGWAY_TOKEN}" -H "Content-Type: application/json" -d "${BODY}" "${GW}/${JOB_NAME}")
+                  ID=$(echo "$RESP" | jq -re .id)
+                  log "Triggered ${JOB_NAME} -> ${ID}"
+                  log "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${ID}"
+
+                  END=$((SECONDS + ${TIMEOUT}))
+                  while [[ $SECONDS -lt $END ]]; do
+                    sleep "${POLL_INTERVAL}"
+                    S=$(curl -sfSL -H "Authorization: Bearer ${GANGWAY_TOKEN}" "${GW}/${ID}" | jq -r .job_status) || S=UNKNOWN
+                    log "${S} ($((SECONDS))s)"
+                    case $S in SUCCESS) exit 0;; FAILURE|ABORTED|ERROR) exit 1;; esac
+                  done
+                  log "Timeout"; exit 1
               env:
                 - name: JOB_NAME
                   value: ${JOB_NAME}
@@ -63,7 +85,6 @@ objects:
                   memory: "128Mi"
               securityContext:
                 runAsNonRoot: true
-                readOnlyRootFilesystem: true
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]
