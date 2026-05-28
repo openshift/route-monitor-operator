@@ -1,0 +1,71 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: gangway-bridge-e2e
+parameters:
+  - name: JOB_NAME
+    required: true
+    description: Prow periodic job name to trigger via Gangway
+  - name: POLL_INTERVAL
+    value: "60"
+    description: Seconds between status polls
+  - name: TIMEOUT
+    value: "3600"
+    description: Maximum seconds to wait for job completion
+  - name: JOB_ENVS
+    value: ""
+    description: Comma-separated KEY=VALUE pairs passed to the Prow job (e.g. OCM_LOGIN_ENV=integration)
+  - name: JOBID
+    generate: expression
+    from: "[0-9a-z]{7}"
+  - name: IMAGE_TAG
+    value: ''
+    required: true
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: gangway-bridge-${IMAGE_TAG}-${JOBID}
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 7200
+      template:
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          volumes:
+            - name: gangway-token
+              secret:
+                secretName: gangway-api-token
+          containers:
+            - name: gangway-bridge
+              image: quay.io/app-sre/gangway-bridge:${IMAGE_TAG}
+              env:
+                - name: JOB_NAME
+                  value: ${JOB_NAME}
+                - name: GANGWAY_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: gangway-api-token
+                      key: token
+                - name: POLL_INTERVAL
+                  value: ${POLL_INTERVAL}
+                - name: TIMEOUT
+                  value: ${TIMEOUT}
+                - name: JOB_ENVS
+                  value: ${JOB_ENVS}
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "128Mi"
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
