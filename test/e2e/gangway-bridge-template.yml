@@ -10,7 +10,7 @@ parameters:
     value: "60"
     description: Seconds between status polls
   - name: TIMEOUT
-    value: "3600"
+    value: "7200"
     description: Maximum seconds to wait for job completion
   - name: JOB_ENVS
     value: ""
