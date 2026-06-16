@@ -845,10 +845,10 @@ func TestIsVpcEndpointReady(t *testing.T) {
 
 func TestIsHCPAvailable(t *testing.T) {
 	tests := []struct {
-		name             string
-		conditions       []metav1.Condition
-		expectedResult   bool
-		expectedReason   string
+		name           string
+		conditions     []metav1.Condition
+		expectedResult bool
+		expectedReason string
 	}{
 		{
 			name: "Available condition is True",
