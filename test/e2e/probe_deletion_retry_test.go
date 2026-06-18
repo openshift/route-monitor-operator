@@ -37,8 +37,8 @@ import (
 //  8. RMO successfully deletes the probe on retry
 //
 // This validates the HYBRID APPROACH:
-//  - Within timeout (15 min): Fail closed - retry and block deletion (prevents orphaned probes)
-//  - Past timeout: Fail open - allow deletion to proceed (prevents indefinite blocking)
+//   - Within timeout (15 min): Fail closed - retry and block deletion (prevents orphaned probes)
+//   - Past timeout: Fail open - allow deletion to proceed (prevents indefinite blocking)
 //
 // REQUIREMENTS:
 // Same as TestFullStackIntegration - needs local RHOBS repos

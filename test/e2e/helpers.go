@@ -43,11 +43,11 @@ type testWriter struct {
 
 func (tw *testWriter) Write(p []byte) (n int, err error) {
 	logLine := string(p)
-	
+
 	// Clean up log formatting: replace tabs with single spaces and remove trailing newlines
 	cleanedLog := strings.ReplaceAll(logLine, "\t", " ")
 	cleanedLog = strings.TrimRight(cleanedLog, "\n")
-	
+
 	tw.t.Log(cleanedLog)
 
 	tw.logMutex.Lock()
@@ -76,12 +76,12 @@ func createProbeViaAPI(baseURL, clusterID, probeURL string, private bool) (strin
 	probeData := map[string]interface{}{
 		"static_url": probeURL,
 		"labels": map[string]string{
-			"cluster-id":   clusterID,
-			"private":      fmt.Sprintf("%t", private),
-			"app":          "rhobs-synthetics-probe",
-			"source":       "route-monitor-operator",
+			"cluster-id":    clusterID,
+			"private":       fmt.Sprintf("%t", private),
+			"app":           "rhobs-synthetics-probe",
+			"source":        "route-monitor-operator",
 			"resource_type": "hostedcontrolplane",
-			"probe_type":   "blackbox",
+			"probe_type":    "blackbox",
 		},
 		"provider": "aws",
 		"region":   "us-east-1",
@@ -297,14 +297,14 @@ func waitForProbeDeletion(baseURL, probeID string, timeout time.Duration) error 
 // This function mocks the agent's behavior for local testing.
 //
 // In a real environment with Kubernetes:
-//   1. Agent fetches probe from API (status: "pending")
-//   2. Agent deploys Prometheus + blackbox-exporter resources to K8s
-//   3. Agent updates probe status to "active" via API
+//  1. Agent fetches probe from API (status: "pending")
+//  2. Agent deploys Prometheus + blackbox-exporter resources to K8s
+//  3. Agent updates probe status to "active" via API
 //
 // In this local test without Kubernetes:
-//   1. Agent fetches probe from API (status: "pending") ✅ Works
-//   2. Agent cannot deploy K8s resources ❌ No cluster
-//   3. Test calls this function to simulate step 3 ✅ Mock
+//  1. Agent fetches probe from API (status: "pending") ✅ Works
+//  2. Agent cannot deploy K8s resources ❌ No cluster
+//  3. Test calls this function to simulate step 3 ✅ Mock
 func updateProbeStatus(baseURL, probeID, status string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 

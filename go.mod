@@ -18,7 +18,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.5
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.6.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.32.3
 	k8s.io/apiextensions-apiserver v0.32.2

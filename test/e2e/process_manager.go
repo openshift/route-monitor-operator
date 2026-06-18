@@ -28,15 +28,15 @@ import (
 
 // ProcessManager provides common functionality for managing external processes
 type ProcessManager struct {
-	name        string
-	cmd         *exec.Cmd
-	sourcePath  string
-	envVarName  string
-	repoName    string
-	stopChan    chan struct{}
-	started     bool
-	ctx         context.Context
-	cancel      context.CancelFunc
+	name       string
+	cmd        *exec.Cmd
+	sourcePath string
+	envVarName string
+	repoName   string
+	stopChan   chan struct{}
+	started    bool
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 // NewProcessManager creates a base process manager
@@ -200,4 +200,3 @@ func (pm *ProcessManager) IsStarted() bool {
 func (pm *ProcessManager) Context() context.Context {
 	return pm.ctx
 }
-

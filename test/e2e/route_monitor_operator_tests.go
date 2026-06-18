@@ -924,7 +924,6 @@ func listRHOBSProbes(baseURL, labelSelector string, creds *OIDCCredentials) ([]m
 	return probes, nil
 }
 
-
 // createNamespaceWithCleanup creates a namespace and registers cleanup via DeferCleanup
 func createNamespaceWithCleanup(ctx context.Context, k8s *openshift.Client, namespace string) (*corev1.Namespace, error) {
 	ns := &corev1.Namespace{
@@ -1348,7 +1347,6 @@ func getOIDCCredentialsFromConfigMap(ctx context.Context, k8s *openshift.Client)
 		ProbeAPIURL:  probeAPIURL,
 	}, nil
 }
-
 
 func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentials, error) {
 	// Read credentials from environment variables (must match rmo_secret.yml for CI/CD compatibility)

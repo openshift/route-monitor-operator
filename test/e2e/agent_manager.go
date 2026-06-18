@@ -101,7 +101,7 @@ func (m *AgentManager) startAgent() error {
 	}
 
 	binaryPath := filepath.Join(sourcePath, "rhobs-synthetics-agent")
-	
+
 	cmd := exec.CommandContext(m.Context(), binaryPath, "start", "--config", m.configPath)
 	cmd.Dir = sourcePath
 
