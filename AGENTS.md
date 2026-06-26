@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The route-monitor-operator is a Kubernetes operator that enables blackbox probing of OpenShift routes and cluster URLs for Prometheus-based SLO monitoring. It creates ServiceMonitor and PrometheusRule CRs to drive multi-window, multi-burn-rate alerting.
 
-**Go version**: 1.25.5 | **Operator SDK**: v3 (kubebuilder v3) | **FIPS**: enabled
+**Go version**: 1.25.9 | **Operator SDK**: v3 (kubebuilder v3) | **FIPS**: enabled
 
 ## Build & Development Commands
 
