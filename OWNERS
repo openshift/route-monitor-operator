@@ -1,12 +1,10 @@
 ---
 maintainers:
   - chcollin
-  - srep-functional-leads
-  - srep-team-leads
+  - rosa-staff-engineers
 approvers:
   - Tessg22  # cspell:ignore Tessg
-  - srep-functional-leads
-  - srep-team-leads
+  - rosa-staff-engineers
   - srep-functional-team-rocket
 reviewers:
   - srep-functional-team-rocket
