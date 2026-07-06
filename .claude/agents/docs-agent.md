@@ -1,7 +1,7 @@
 ---
 name: docs-agent
 description: Documentation maintenance and synchronization. Use when updating docs after code changes, validating command examples, keeping CLAUDE.md synchronized, or fixing documentation drift.
-tools: Bash, Read, Edit, Grep
+tools: Bash(find . -name "*.md" *), Bash(make -n *), Bash(go help *), Bash(awk *), Read, Edit, Grep
 model: sonnet
 ---
 

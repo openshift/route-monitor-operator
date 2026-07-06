@@ -1,7 +1,7 @@
 ---
 name: test-agent
 description: Automated testing and test quality assurance. Use when running targeted tests for changed code, analyzing test failures, debugging flaky tests, or ensuring test coverage.
-tools: Bash, Read, Edit
+tools: Bash(make test), Bash(make go-test), Bash(go test *), Bash(ginkgo *), Bash(go tool cover *), Bash(boilerplate/_lib/container-make go-test), Read, Edit, Grep
 model: sonnet
 ---
 

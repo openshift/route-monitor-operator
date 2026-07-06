@@ -1,7 +1,7 @@
 ---
 name: ci-agent
 description: CI/CD validation and workflow integrity. Use when validating Tekton pipelines, checking local/CI parity, debugging CI failures, or ensuring pre-commit hooks mirror CI checks.
-tools: Bash, Read, Grep, WebFetch, WebSearch
+tools: Bash(make go-build), Bash(make go-test), Bash(make lint), Bash(make docker-build), Bash(prek run *), Bash(boilerplate/_lib/container-make *), Bash(gitleaks detect *), Bash(go env *), Bash(python3 .claude/skills/prow-ci/fetch_prow_artifacts.py *), Bash(python3 .claude/skills/prow-ci/analyze_failure.py *), Read, Grep, WebFetch, WebSearch
 model: sonnet
 ---
 
