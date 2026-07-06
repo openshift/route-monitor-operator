@@ -11,6 +11,10 @@
 
 title = "gitleaks config for this operator"
 
+# Inherit all default gitleaks detectors (AWS, GitHub, generic secrets, etc.)
+[extend]
+useDefault = true
+
 # =============================================================================
 # GLOBAL ALLOWLIST
 # =============================================================================

@@ -16,6 +16,14 @@ hooks = [
   { id = "check-toml" },
 ]
 
+# Secret scanning
+[[repos]]
+repo = "https://github.com/gitleaks/gitleaks"
+rev = "v8.21.2"
+hooks = [
+  { id = "gitleaks" },
+]
+
 # golangci-lint static analysis
 [[repos]]
 repo = "https://github.com/golangci/golangci-lint"

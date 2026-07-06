@@ -10,7 +10,7 @@ This repository uses two versions of Ginkgo:
 - **Ginkgo v2** (`github.com/onsi/ginkgo/v2 v2.27.3`): Used in E2E tests (`test/e2e/`)
 - **Gomega**: Matchers and assertions (used with both Ginkgo versions)
 
-There is **no envtest** and **no GoMock** in this repository. Tests use real or fake implementations alongside Ginkgo/Gomega.
+There is **no envtest** in this repository. Tests use real, fake, or generated mock implementations (via `//go:generate mockgen`; generated mocks in `pkg/util/test/generated/mocks/`) alongside Ginkgo/Gomega.
 
 ## Quick Commands
 

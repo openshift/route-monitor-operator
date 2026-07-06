@@ -203,8 +203,9 @@ make go-test
 # CI environment
 boilerplate/_lib/container-make go-test
 
-# Check for environment differences
-env | grep -E "GO|CI|BUILD"
+# Check for environment differences (explicit safe vars only)
+go env GOPATH GOOS GOARCH GOFLAGS CGO_ENABLED
+echo "CI=${CI:-false} GITHUB_ACTIONS=${GITHUB_ACTIONS:-false} BUILD_ID=${BUILD_ID:-}"
 ```
 
 ### Build Failures

@@ -41,8 +41,8 @@ Update docs when:
 
 ### Command Examples
 ```bash
-# Extract commands from markdown
-grep '```bash' -A 10 *.md | grep '^make\|^go\|^ginkgo'
+# Extract commands from inside markdown bash blocks (not the fence lines)
+awk '/^```bash/{f=1;next} /^```/{f=0} f && /^(make|go|ginkgo)/' *.md
 
 # Test each command (in safe read-only way)
 make -n go-build  # Dry-run
@@ -177,8 +177,8 @@ Escalate to human when:
 # Check all markdown files
 find . -name "*.md" -not -path "./vendor/*" -not -path "./.git/*"
 
-# Verify make targets exist
-grep '```bash' *.md | grep 'make ' | sed 's/.*make \([a-z-]*\).*/\1/' | sort -u
+# Verify make targets exist (extract from inside bash blocks)
+awk '/^```bash/{f=1;next} /^```/{f=0} f && /make /' *.md | sed 's/.*make \([a-z-]*\).*/\1/' | sort -u
 
 # Check for dead links (manual review)
 grep -r '\[.*\](' *.md

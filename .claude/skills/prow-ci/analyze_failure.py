@@ -46,13 +46,17 @@ def analyze_build_log(log_file):
                 if pattern_regex.search(line):
                     analysis['patterns'][pattern_name] += 1
 
-            # Record line numbers only — never store raw log content to avoid PII/secret leakage
+            # Store line number + sanitized excerpt (redact potential secrets)
+            def _sanitize(s):
+                s = re.sub(r'(?i)(password|token|secret|key|auth)\s*[:=]\s*\S+', r'\1=<redacted>', s)
+                return s.strip()[:200]
+
             if len(analysis['errors']) < 10 and re.search(r'\bERROR\b', line, re.IGNORECASE):
-                analysis['errors'].append(i + 1)
+                analysis['errors'].append({'line': i + 1, 'excerpt': _sanitize(line)})
             if len(analysis['failures']) < 10 and re.search(r'\bFAIL(ED)?\b', line, re.IGNORECASE):
-                analysis['failures'].append(i + 1)
+                analysis['failures'].append({'line': i + 1, 'excerpt': _sanitize(line)})
             if len(analysis['warnings']) < 5 and re.search(r'\bWARNING\b', line, re.IGNORECASE):
-                analysis['warnings'].append(i + 1)
+                analysis['warnings'].append({'line': i + 1, 'excerpt': _sanitize(line)})
 
     # Remove patterns with zero occurrences
     analysis['patterns'] = {k: v for k, v in analysis['patterns'].items() if v > 0}
@@ -116,7 +120,8 @@ def generate_analysis_report(artifacts_dir):
             summary_parts.append(f"  - {pattern}: {count} occurrences")
 
     if report['build_log'] and report['build_log']['errors']:
-        summary_parts.append(f"\nError lines: {report['build_log']['errors'][:3]}")
+        lines_preview = [str(e['line']) for e in report['build_log']['errors'][:3]]
+        summary_parts.append(f"\nError lines: {', '.join(lines_preview)}")
 
     report['summary'] = '\n'.join(summary_parts)
 
@@ -148,12 +153,14 @@ def format_markdown_report(report):
 
         if bl['errors']:
             lines.append("## Errors")
-            lines.append(f"- {len(bl['errors'])} error line(s) at lines: {bl['errors']}")
+            for e in bl['errors']:
+                lines.append(f"- Line {e['line']}: `{e['excerpt']}`")
             lines.append("")
 
         if bl['failures']:
             lines.append("## Failures")
-            lines.append(f"- {len(bl['failures'])} failure line(s) at lines: {bl['failures'][:5]}")
+            for f in bl['failures'][:5]:
+                lines.append(f"- Line {f['line']}: `{f['excerpt']}`")
             lines.append("")
 
     return '\n'.join(lines)
@@ -189,11 +196,16 @@ def main():
     else:  # text
         output = report['summary']
 
-    # Write output
+    # Write output — validate path stays within workspace
     if args.output:
-        with open(args.output, 'w') as f:
+        workspace = os.path.realpath(os.path.join(os.getcwd(), '.work', 'prow-artifacts'))
+        resolved = os.path.realpath(os.path.abspath(args.output))
+        if not resolved.startswith(workspace + os.sep) and resolved != workspace:
+            print(f"Error: --output must be under .work/prow-artifacts/, got: {args.output}", file=sys.stderr)
+            return 1
+        with open(resolved, 'w') as f:
             f.write(output)
-        print(f"Analysis saved to: {args.output}")
+        print(f"Analysis saved to: {resolved}")
     else:
         print(output)
 

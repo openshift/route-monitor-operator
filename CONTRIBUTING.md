@@ -83,7 +83,7 @@ Follow existing patterns:
 
 - **Unit tests required** for all new functionality
 - Use Ginkgo BDD style: `Describe`, `Context`, `It`
-- No mock files exist in this repo — tests use real or fake implementations
+- Generated mocks live in `pkg/util/test/generated/mocks/` (via `//go:generate mockgen`); tests may use real, fake, or generated mock implementations
 - E2E tests live in `test/e2e/` and require a deployed operator
 
 See [TESTING.md](./TESTING.md) for testing guidelines.

@@ -20,11 +20,15 @@
       "Bash(git diff)",
       "Bash(git log)",
       "Bash(git branch)",
-      "Bash(grep *)",
+      "Bash(grep -r *)",
+      "Bash(grep -rn *)",
+      "Bash(grep -E *)",
       "Bash(find . -name *)",
       "Bash(find . -type *)",
-      "Bash(ls *)",
-      "Bash(cat *)"
+      "Bash(ls)",
+      "Bash(ls -la)",
+      "Bash(ls -la ./*)",
+      "Bash(ls ./*)"
     ],
     "ask": [
       "Bash(git commit *)",
@@ -57,6 +61,17 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/pre-edit-hook.sh\""
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

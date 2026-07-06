@@ -118,6 +118,6 @@ Planned skills for this repository:
 
 ## References
 
-- [CLAUDE.md](../../CLAUDE.md) - Agent behavioral rules
+- [AGENTS.md](../../AGENTS.md) - Agent behavioral rules
 - [.claude/agents/](../agents/) - Specialized agents
 - [.claude/hooks/](../hooks/) - Security and validation hooks

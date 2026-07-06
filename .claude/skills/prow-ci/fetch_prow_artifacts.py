@@ -68,10 +68,13 @@ def download_from_gcs(gcs_path, local_path):
             local_path,
             '--no-user-output-enabled'
         ]
-        subprocess.run(cmd, check=True, capture_output=True)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
         return True
     except FileNotFoundError:
         print("Error: 'gcloud' binary not found. Install the Google Cloud SDK and ensure it is on your PATH.", file=sys.stderr)
+        return False
+    except subprocess.TimeoutExpired:
+        print(f"Warning: Download timed out after 120s for {gcs_path}", file=sys.stderr)
         return False
     except subprocess.CalledProcessError as e:
         print(f"Warning: Could not download {gcs_path}: {e.stderr.decode()}", file=sys.stderr)
@@ -122,7 +125,10 @@ def main():
     print(f"GCS Path: {parsed['gcs_base_path']}")
     print()
 
-    # Create output directory
+    # Validate and create output directory — reject absolute paths and traversal
+    if os.path.isabs(args.output) or '..' in Path(args.output).parts:
+        print(f"Error: --output must be a relative path without '..', got: {args.output}", file=sys.stderr)
+        return 1
     output_dir = os.path.join(args.output, parsed['build_id'])
     os.makedirs(output_dir, exist_ok=True)
 
