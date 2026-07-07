@@ -48,4 +48,6 @@ bin
 
 /config.bak/
 
-.claude/
+# Claude Code: ignore worktrees and local settings, but track the rest of .claude/
+.claude/worktrees/
+.claude/settings.local.json
