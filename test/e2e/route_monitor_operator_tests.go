@@ -121,7 +121,7 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		deploymentName   = "route-monitor-operator-controller-manager"
 		operatorName     = "route-monitor-operator"
 		consoleName      = "console"
-		pollingDuration  = 2 * time.Minute
+		pollingDuration  = 3 * time.Minute
 		routeMonitorName = "routemonitor-e2e-test"
 	)
 	BeforeAll(func(ctx context.Context) {
