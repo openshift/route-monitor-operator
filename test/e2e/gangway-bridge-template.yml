@@ -51,16 +51,18 @@ objects:
 
                   RESP=$(curl -sfSL --retry 3 --retry-delay 10 -X POST -H "Authorization: Bearer ${GANGWAY_TOKEN}" -H "Content-Type: application/json" -d "${BODY}" "${GW}/${JOB_NAME}")
                   ID=$(echo "$RESP" | jq -re .id)
+                  PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${ID}"
                   log "Triggered ${JOB_NAME} -> ${ID}"
-                  log "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${ID}"
+                  log "Prow logs: ${PROW_URL}"
 
                   END=$((SECONDS + ${TIMEOUT}))
                   while [[ $SECONDS -lt $END ]]; do
                     sleep "${POLL_INTERVAL}"
                     S=$(curl -sfSL -H "Authorization: Bearer ${GANGWAY_TOKEN}" "${GW}/${ID}" | jq -r .job_status) || S=UNKNOWN
                     log "${S} ($((SECONDS))s)"
-                    case $S in SUCCESS) exit 0;; FAILURE|ABORTED|ERROR) exit 1;; esac
+                    case $S in SUCCESS) log "Prow logs: ${PROW_URL}"; exit 0;; FAILURE|ABORTED|ERROR) log "Prow logs: ${PROW_URL}"; exit 1;; esac
                   done
+                  log "Prow logs: ${PROW_URL}"
                   log "Timeout"; exit 1
               env:
                 - name: JOB_NAME
