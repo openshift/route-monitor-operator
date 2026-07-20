@@ -167,6 +167,28 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 		Expect(err).ShouldNot(HaveOccurred(), "Unable to get console prometheusRule")
 	})
 
+	It("blackbox-exporter deployment has correct spec", func(ctx context.Context) {
+		deployment := &appsv1.Deployment{}
+		err := k8s.Get(ctx, "blackbox-exporter", namespace, deployment)
+		Expect(err).ShouldNot(HaveOccurred(), "blackbox-exporter deployment should exist")
+
+		podSpec := deployment.Spec.Template.Spec
+
+		By("checking ServiceAccountName is not defaulting to 'default'")
+		Expect(podSpec.ServiceAccountName).To(Equal("route-monitor-operator-system"),
+			"blackbox-exporter should use the operator's ServiceAccount")
+
+		By("checking container configuration")
+		Expect(podSpec.Containers).To(HaveLen(1))
+		Expect(podSpec.Containers[0].Name).To(Equal("blackbox-exporter"))
+		Expect(podSpec.Containers[0].Ports).To(HaveLen(1))
+		Expect(podSpec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(9115)))
+
+		By("checking volume configuration")
+		Expect(podSpec.Volumes).To(HaveLen(1))
+		Expect(podSpec.Volumes[0].Name).To(Equal("blackbox-config"))
+	})
+
 	It("required dependent resources are created", func(ctx context.Context) {
 		By("Creating a pod, service and route to monitor with a ServiceMonitor and PrometheusRule")
 		By("Creating the test pod")

@@ -194,6 +194,7 @@ func (b *BlackBoxExporter) templateForBlackBoxExporterDeployment(blackBoxImage s
 						Effect:   corev1.TaintEffectNoSchedule,
 						Key:      nodeLabel,
 					}},
+					ServiceAccountName: "route-monitor-operator-system",
 					Containers: []corev1.Container{{
 						Image: blackBoxImage,
 						Name:  "blackbox-exporter",

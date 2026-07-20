@@ -10,7 +10,9 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	clientmocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/client"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -511,6 +513,126 @@ var _ = Describe("Blackboxexporter", func() {
 		})
 	})
 
+})
+
+var _ = Describe("BlackBoxExporter Deployment Template", func() {
+	var (
+		mockClient *clientmocks.MockClient
+		mockCtrl   *gomock.Controller
+	)
+
+	BeforeEach(func() {
+		mockCtrl = gomock.NewController(GinkgoT())
+		mockClient = clientmocks.NewMockClient(mockCtrl)
+	})
+
+	AfterEach(func() {
+		mockCtrl.Finish()
+	})
+
+	When("creating on a standard cluster", func() {
+		var createdDeployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			createdDeployment = nil
+			infra := configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.GCPPlatformType,
+					},
+				},
+			}
+
+			gomock.InOrder(
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).SetArg(2, infra),
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(consterror.NotFoundErr),
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(consterror.NotFoundErr),
+			)
+			mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
+					dep, ok := obj.(*appsv1.Deployment)
+					Expect(ok).To(BeTrue())
+					createdDeployment = dep
+					return nil
+				})
+		})
+
+		It("should set correct spec fields", func() {
+			bbe := New(mockClient, logr.Discard(), context.Background(), "test-image:latest", "test-namespace")
+			err := bbe.EnsureBlackBoxExporterDeploymentExists()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createdDeployment).NotTo(BeNil())
+
+			podSpec := createdDeployment.Spec.Template.Spec
+			Expect(podSpec.ServiceAccountName).To(Equal("route-monitor-operator-system"))
+			Expect(podSpec.Containers).To(HaveLen(1))
+			Expect(podSpec.Containers[0].Name).To(Equal("blackbox-exporter"))
+			Expect(podSpec.Containers[0].Image).To(Equal("test-image:latest"))
+			Expect(podSpec.Containers[0].Ports).To(HaveLen(1))
+			Expect(podSpec.Containers[0].Ports[0].ContainerPort).To(Equal(int32(blackboxexporter.BlackBoxExporterPortNumber)))
+			Expect(podSpec.Volumes).To(HaveLen(1))
+			Expect(podSpec.Volumes[0].Name).To(Equal("blackbox-config"))
+			Expect(podSpec.Containers[0].VolumeMounts).To(HaveLen(1))
+			Expect(podSpec.Containers[0].VolumeMounts[0].MountPath).To(Equal("/config"))
+
+			Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(HaveLen(1))
+			pref := podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0]
+			Expect(pref.Preference.MatchExpressions[0].Key).To(Equal("node-role.kubernetes.io/infra"))
+			Expect(podSpec.Tolerations[0].Key).To(Equal("node-role.kubernetes.io/infra"))
+		})
+	})
+
+	When("creating on a private NLB cluster running 4.13+", func() {
+		var createdDeployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			createdDeployment = nil
+			infra := testAWSInfrastructure()
+			ic := testPrivateDefaultIC()
+			cv := configv1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+				Status: configv1.ClusterVersionStatus{
+					Desired: configv1.Release{Version: "4.14.5"},
+				},
+			}
+
+			gomock.InOrder(
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).SetArg(2, infra),
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).SetArg(2, ic),
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).SetArg(2, cv),
+				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(consterror.NotFoundErr),
+			)
+			mockClient.EXPECT().Create(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
+					dep, ok := obj.(*appsv1.Deployment)
+					Expect(ok).To(BeTrue())
+					createdDeployment = dep
+					return nil
+				})
+		})
+
+		It("should use master node affinity and set ServiceAccountName", func() {
+			bbe := New(mockClient, logr.Discard(), context.Background(), "test-image:latest", "test-namespace")
+			err := bbe.EnsureBlackBoxExporterDeploymentExists()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createdDeployment).NotTo(BeNil())
+
+			podSpec := createdDeployment.Spec.Template.Spec
+			Expect(podSpec.ServiceAccountName).To(Equal("route-monitor-operator-system"))
+
+			pref := podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0]
+			Expect(pref.Preference.MatchExpressions[0].Key).To(Equal("node-role.kubernetes.io/master"))
+			Expect(podSpec.Tolerations[0].Key).To(Equal("node-role.kubernetes.io/master"))
+		})
+	})
 })
 
 func testPrivateDefaultIC() operatorv1.IngressController {
