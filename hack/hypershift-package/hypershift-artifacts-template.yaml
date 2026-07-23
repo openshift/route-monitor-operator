@@ -35,9 +35,6 @@ objects:
         - key: api.openshift.com/managed
           operator: In
           values: ["true"]
-        - key: api.openshift.com/fedramp
-          operator: NotIn
-          values: ["true"]
     resourceApplyMode: Sync
     resources:
     - apiVersion: policy.open-cluster-management.io/v1
