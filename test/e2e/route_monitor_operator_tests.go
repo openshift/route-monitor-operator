@@ -1106,11 +1106,26 @@ func createMCStyleHCP(clusterID, name, namespace string, endpointAccess hypershi
 		},
 		Spec: hypershiftv1beta1.HostedControlPlaneSpec{
 			ClusterID: clusterID,
+			InfraID:   clusterID,
 			Platform: hypershiftv1beta1.PlatformSpec{
 				Type: hypershiftv1beta1.AWSPlatform,
 				AWS: &hypershiftv1beta1.AWSPlatformSpec{
 					Region:         "us-west-2",
 					EndpointAccess: endpointAccess,
+				},
+			},
+			IssuerURL:  "https://kubernetes.default.svc",
+			PullSecret: corev1.LocalObjectReference{Name: "pull-secret"},
+			SSHKey:     corev1.LocalObjectReference{Name: "ssh-key"},
+			DNS: hypershiftv1beta1.DNSSpec{
+				BaseDomain: fmt.Sprintf("%s.test.devshift.org", name),
+			},
+			Etcd: hypershiftv1beta1.EtcdSpec{
+				ManagementType: hypershiftv1beta1.Managed,
+				Managed: &hypershiftv1beta1.ManagedEtcdSpec{
+					Storage: hypershiftv1beta1.ManagedEtcdStorageSpec{
+						Type: hypershiftv1beta1.PersistentVolumeEtcdStorage,
+					},
 				},
 			},
 			Services: []hypershiftv1beta1.ServicePublishingStrategyMapping{
@@ -1121,6 +1136,24 @@ func createMCStyleHCP(clusterID, name, namespace string, endpointAccess hypershi
 						Route: &hypershiftv1beta1.RoutePublishingStrategy{
 							Hostname: hostname,
 						},
+					},
+				},
+				{
+					Service: hypershiftv1beta1.OAuthServer,
+					ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+						Type: hypershiftv1beta1.Route,
+					},
+				},
+				{
+					Service: hypershiftv1beta1.Konnectivity,
+					ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+						Type: hypershiftv1beta1.Route,
+					},
+				},
+				{
+					Service: hypershiftv1beta1.Ignition,
+					ServicePublishingStrategy: hypershiftv1beta1.ServicePublishingStrategy{
+						Type: hypershiftv1beta1.Route,
 					},
 				},
 			},
