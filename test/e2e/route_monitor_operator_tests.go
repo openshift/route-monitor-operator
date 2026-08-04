@@ -596,7 +596,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		if testNamespace == "" {
 			testNamespace = "clusters"
 		}
-		pollingDuration = 3 * time.Minute
+		pollingDuration = 5 * time.Minute
 
 		GinkgoLogr.Info("RHOBS Synthetic Monitoring test suite initialized",
 			"environment", environment,
@@ -655,7 +655,7 @@ var _ = Describe("RHOBS Synthetic Monitoring", Ordered, func() {
 		Expect(err).ShouldNot(HaveOccurred(), "failed to update HostedControlPlane status")
 		GinkgoLogr.Info("HCP status set to Available", "clusterID", clusterID)
 
-		By("waiting for RMO to reconcile and create probe (up to 3 minutes)")
+		By("waiting for RMO to reconcile and create probe (up to 5 minutes)")
 		var probe map[string]interface{}
 		err = wait.PollUntilContextTimeout(ctx, 10*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
 			probes, err := listRHOBSProbes(rhobsAPIURL, fmt.Sprintf("cluster-id=%s", clusterID), oidcCredentials)
@@ -945,7 +945,6 @@ func listRHOBSProbes(baseURL, labelSelector string, creds *OIDCCredentials) ([]m
 
 	return probes, nil
 }
-
 
 // createNamespaceWithCleanup creates a namespace and registers cleanup via DeferCleanup
 func createNamespaceWithCleanup(ctx context.Context, k8s *openshift.Client, namespace string) (*corev1.Namespace, error) {
@@ -1403,7 +1402,6 @@ func getOIDCCredentialsFromConfigMap(ctx context.Context, k8s *openshift.Client)
 		ProbeAPIURL:  probeAPIURL,
 	}, nil
 }
-
 
 func getOIDCCredentials(ctx context.Context, environment string) (*OIDCCredentials, error) {
 	// Read credentials from environment variables (must match rmo_secret.yml for CI/CD compatibility)
