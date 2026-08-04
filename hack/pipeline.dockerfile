@@ -17,7 +17,7 @@ FROM quay.io/operator-framework/operator-sdk:v1.13.1
 RUN microdnf install -y git gcc
 # Clean up after install
 RUN rm -rf /.cache
-# Copy kustomize binary from builder 
+# Copy kustomize binary from builder
 COPY --from=kustomize-builder /root/go/bin/kustomize /usr/local/bin/kustomize
 
 # Set workdir so we have a known location to copy files from

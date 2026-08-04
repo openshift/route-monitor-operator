@@ -25,21 +25,21 @@ spec:
     default: https://github.com/openshift/route-monitor-operator
   resourcetemplates:
   - apiVersion: tekton.dev/v1beta1
-    kind: PipelineRun 
+    kind: PipelineRun
     metadata:
-      name: pipeline-int-run-$(uid) 
+      name: pipeline-int-run-$(uid)
       namespace: ci
     spec:
       timeout: 30m
       serviceAccountName: rmo-pipelines
       pipelineRef:
-        name: pipeline-integration-test 
-      params: 
+        name: pipeline-integration-test
+      params:
       - name: git-revision
         value: $(tt.params.gitrevision)
       - name: git-url
         value: $(tt.params.gitrepositoryurl)
-      workspaces: 
+      workspaces:
       - name: ci
         persistentVolumeClaim:
           claimName: ci-pvc
@@ -75,4 +75,3 @@ spec:
             image: curlimages/curl
             args: ["curl", "-X", "POST", "--connect-timeout", "1", "-v", "--data", "{}", "http://el-pipeline-event-listener.ci.svc.cluster.local:8080"]
           restartPolicy: Never
-

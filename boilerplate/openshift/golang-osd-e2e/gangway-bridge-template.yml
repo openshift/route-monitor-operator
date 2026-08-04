@@ -29,7 +29,7 @@ objects:
       name: gangway-bridge-${IMAGE_TAG}-${JOBID}
     spec:
       backoffLimit: 0
-      activeDeadlineSeconds: 7200
+      activeDeadlineSeconds: ${{TIMEOUT}}
       template:
         spec:
           automountServiceAccountToken: false
@@ -43,6 +43,9 @@ objects:
                 - |
                   GW="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
                   log() { echo "$(date +%H:%M:%S) $*" >&2; }
+
+                  [[ "${TIMEOUT}" =~ ^[1-9][0-9]*$ ]] || { log "ERROR: TIMEOUT must be a positive integer"; exit 1; }
+                  [[ "${POLL_INTERVAL}" =~ ^[1-9][0-9]*$ ]] || { log "ERROR: POLL_INTERVAL must be a positive integer"; exit 1; }
 
                   BODY='{"job_execution_type":"1"}'
                   if [[ -n "${JOB_ENVS:-}" ]]; then
@@ -88,6 +91,7 @@ objects:
                   memory: "128Mi"
               securityContext:
                 runAsNonRoot: true
+                readOnlyRootFilesystem: true
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]

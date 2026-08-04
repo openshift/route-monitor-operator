@@ -63,7 +63,7 @@ function buildImage {
 function verifyForBuildSuccess {
   sleep 300
   local latestJobName phase
-  latestJobName="$IMAGE_NAME"-$( oc -n "$NAMESPACE" get buildconfig "$IMAGE_NAME" -ojsonpath='{.status.lastVersion}') 
+  latestJobName="$IMAGE_NAME"-$( oc -n "$NAMESPACE" get buildconfig "$IMAGE_NAME" -ojsonpath='{.status.lastVersion}')
   phase=$(oc -n "$NAMESPACE" get build "$latestJobName" -ojsonpath='{.status.phase}')
   if [[ $phase != "Complete" ]]; then
 	  echo "build was not completed fully, the state was $phase but expected to be 'Complete'"
@@ -81,7 +81,7 @@ function deployOperator {
   # Override namespace in all objects
   cp -r config{,.bak}
   find config -type f -print0 | xargs -0 sed -i "s/openshift-route-monitor-operator/$NAMESPACE/g"
- 
+
   IMG=$IMAGE_NAME make deploy
 }
 
@@ -104,7 +104,7 @@ function waitForDeployment {
   fi
 }
 function printOperatorLogs {
-	if [[ $(oc -n "$NAMESPACE" get po -lapp="route-monitor-operator" --no-headers | wc -l) == 0 ]];then 
+	if [[ $(oc -n "$NAMESPACE" get po -lapp="route-monitor-operator" --no-headers | wc -l) == 0 ]];then
 		return
 	fi
 	podName=$(oc -n "$NAMESPACE" get po -lapp="route-monitor-operator" -ojsonpath='{.items[0].metadata.name}')
@@ -138,7 +138,7 @@ function cleanup {
 parseArgs "$@"
 
 
-if [[ -z $SKIP_CLEANUP ]]; then  
+if [[ -z $SKIP_CLEANUP ]]; then
   trap cleanup EXIT
 else
   trap printOperatorLogs EXIT

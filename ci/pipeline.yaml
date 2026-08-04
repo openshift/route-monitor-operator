@@ -4,7 +4,7 @@ metadata:
   name: pipeline-integration-test
   namespace: ci
 spec:
-  workspaces: 
+  workspaces:
     - name: ci
   params:
     - default: 'https://github.com/openshift/route-monitor-operator'

@@ -8,13 +8,13 @@ the installed `route-monitor-operator` version in the logged in cluster.
 A `route-monitor-operator` installation has to be present.
 The rest of the installation is done by running the following commands:
 
-First, apply the subscription to the pipeline operator: 
+First, apply the subscription to the pipeline operator:
 ```console
 $ oc apply -f pipeline-operator-subscription.yaml
 ```
 Wait a minute until it becomes available then apply the rest:
 ```console
-$ oc apply -f . 
+$ oc apply -f .
 ```
 
 The pipeline and other resources will be installed in the `ci` namespace.
@@ -47,7 +47,7 @@ $ tkn pipelinerun logs -f -n ci $(tkn pipelinerun list -n ci -o name --limit 1 |
 The result of the last runs can be seen with:
 
 ```console
-$ tkn pipelinerun list -n ci 
+$ tkn pipelinerun list -n ci
 ```
 
 The documentation for further tekton commands is available [here](https://docs.openshift.com/container-platform/4.4/cli_reference/tkn_cli/op-tkn-reference.html).

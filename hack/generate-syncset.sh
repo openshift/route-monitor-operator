@@ -20,7 +20,7 @@ if [ -z "$REPO_NAME" ]; then
   echo 'Failed to discover repository name! $REPO_NAME not set!'
 fi
 
-if [[ "${IN_CONTAINER}" == "true" ]]; then 
+if [[ "${IN_CONTAINER}" == "true" ]]; then
   $CONTAINER_ENGINE run --rm \
     -e SELECTOR_SYNC_SET_TEMPLATE_DIR \
     -e YAML_DIRECTORY \

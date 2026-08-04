@@ -11,7 +11,7 @@ spec:
           if [ -z "$version" ]
           then
             echo "Couldn't determine RMO installation version"
-            exit -1 
+            exit -1
           else
             echo "Found RMO with commit hash:"
             echo ${version}
