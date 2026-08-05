@@ -12,8 +12,8 @@ metadata:
       == "__DEFAULT_BRANCH__"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: __OPERATOR_NAME__
-    appstudio.openshift.io/component: __OPERATOR_NAME__
+    appstudio.openshift.io/application: __APP_NAME__
+    appstudio.openshift.io/component: __COMPONENT_NAME__
     pipelines.appstudio.openshift.io/type: test
   name: __OPERATOR_NAME__-agentic-sdlc-check
   namespace: __TENANT_NAMESPACE__
@@ -43,7 +43,7 @@ spec:
       - name: url
         value: https://github.com/openshift/boilerplate
       - name: revision
-        value: master
+        value: __BOILERPLATE_REVISION__
       - name: pathInRepo
         value: pipelines/agentic-sdlc-check/pipeline.yaml
 status: {}
