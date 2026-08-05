@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -1028,10 +1030,17 @@ func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, 
 	// RMO only processes HCPs with Available=true status
 	// Use retry loop with optimistic concurrency control
 
-	// Retry up to 5 times if we get "object has been modified" errors
+	cfg, err := ctrl.GetConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get REST config: %w", err)
+	}
+	statusClient, err := client.New(cfg, client.Options{})
+	if err != nil {
+		return fmt.Errorf("failed to create status client: %w", err)
+	}
+
 	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		// Fetch the latest version
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(hypershiftv1beta1.GroupVersion.WithKind("HostedControlPlane"))
 		err := k8s.Get(ctx, hcp.Name, hcp.Namespace, u)
@@ -1039,7 +1048,6 @@ func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, 
 			return fmt.Errorf("failed to fetch HCP: %w", err)
 		}
 
-		// Update the status field
 		now := metav1.Now()
 		conditions := []interface{}{
 			map[string]interface{}{
@@ -1058,10 +1066,8 @@ func setHostedControlPlaneAvailable(ctx context.Context, k8s *openshift.Client, 
 			return fmt.Errorf("failed to set status field: %w", err)
 		}
 
-		// Try to update
-		err = k8s.Update(ctx, u)
+		err = statusClient.Status().Update(ctx, u)
 		if err == nil {
-			// Success!
 			return nil
 		}
 
