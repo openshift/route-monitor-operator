@@ -91,12 +91,14 @@ var _ = Describe("MC Probe Verification", Ordered, func() {
 
 		var found bool
 		for _, hcp := range hcpList.Items {
-			if hcp.Spec.ClusterID == clusterID {
+			labelID := hcp.Labels["api.openshift.com/id"]
+			if labelID == clusterID || hcp.Spec.ClusterID == clusterID {
 				found = true
 				logFields := []interface{}{
 					"name", hcp.Name,
 					"namespace", hcp.Namespace,
-					"clusterID", hcp.Spec.ClusterID,
+					"specClusterID", hcp.Spec.ClusterID,
+					"labelID", labelID,
 					"platform", hcp.Spec.Platform.Type,
 				}
 				if hcp.Spec.Platform.AWS != nil {
