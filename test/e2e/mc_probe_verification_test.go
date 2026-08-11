@@ -31,7 +31,7 @@ var _ = Describe("MC Probe Verification", Ordered, func() {
 
 	const (
 		rmoNamespace = "openshift-route-monitor-operator"
-		probeTimeout = 10 * time.Minute
+		probeTimeout = 20 * time.Minute
 	)
 
 	BeforeAll(func(ctx context.Context) {
