@@ -143,6 +143,11 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 	if strings.TrimSpace(configMap.Data["skip-infrastructure-health-check"]) == "true" {
 		cfg.SkipInfrastructureHealthCheck = true
 	}
+	if v := strings.TrimSpace(configMap.Data["reconcile-interval"]); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 10*time.Second {
+			cfg.ReconcileInterval = d
+		}
+	}
 
 	// Read Dynatrace configuration - defaults to disabled
 	dynatraceConfig := DynatraceConfig{Enabled: false}
@@ -375,7 +380,11 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Requeue periodically to ensure probes stay in sync for HCPs that existed
 	// before RMO was configured. The ensureRHOBSProbe call is idempotent (heartbeat
 	// update if probe exists, create if not).
-	return ctrl.Result{RequeueAfter: periodicReconcileInterval}, err
+	interval := periodicReconcileInterval
+	if rhobsConfig.ReconcileInterval > 0 {
+		interval = rhobsConfig.ReconcileInterval
+	}
+	return ctrl.Result{RequeueAfter: interval}, err
 }
 
 // getKubeAPIServerPort resolves the kube-apiserver Service port. Used by both the
