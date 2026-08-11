@@ -262,6 +262,7 @@ type RHOBSConfig struct {
 	OIDCIssuerURL                 string
 	OnlyPublicClusters            bool
 	SkipInfrastructureHealthCheck bool
+	ReconcileInterval             time.Duration
 }
 
 // DynatraceConfig holds Dynatrace feature flag configuration.
