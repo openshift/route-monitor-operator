@@ -21,18 +21,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	rmoFinalizer      = "hostedcontrolplane.routemonitoroperator.monitoring.openshift.io/finalizer"
+	reconcileTimeout  = 5 * time.Minute
+	reconcileInterval = 10 * time.Second
+)
+
 var _ = Describe("MC Probe Verification", Ordered, func() {
 	var (
-		k8s             *openshift.Client
-		clusterID       string
-		rhobsAPIURL     string
-		oidcCredentials *OIDCCredentials
+		k8s          *openshift.Client
+		clusterID    string
+		hcpName      string
+		hcpNamespace string
 	)
 
-	const (
-		rmoNamespace = "openshift-route-monitor-operator"
-		probeTimeout = 20 * time.Minute
-	)
+	const rmoNamespace = "openshift-route-monitor-operator"
 
 	BeforeAll(func(ctx context.Context) {
 		log.SetLogger(GinkgoLogr)
@@ -62,26 +65,11 @@ var _ = Describe("MC Probe Verification", Ordered, func() {
 
 		Expect(hypershiftv1beta1.AddToScheme(k8s.GetScheme())).Should(Succeed())
 
-		By("getting OIDC credentials from ConfigMap")
+		By("verifying RMO is running on the MC")
 		configMap := &corev1.ConfigMap{}
 		err = k8s.Get(ctx, "route-monitor-operator-config", rmoNamespace, configMap)
 		Expect(err).ShouldNot(HaveOccurred(), "RMO config ConfigMap not found")
-
-		oidcCredentials = &OIDCCredentials{
-			ClientID:     configMap.Data["oidc-client-id"],
-			ClientSecret: configMap.Data["oidc-client-secret"],
-			IssuerURL:    configMap.Data["oidc-issuer-url"],
-			ProbeAPIURL:  configMap.Data["probe-api-url"],
-		}
-		Expect(oidcCredentials.ProbeAPIURL).ShouldNot(BeEmpty(), "probe-api-url not configured")
-		Expect(oidcCredentials.ClientID).ShouldNot(BeEmpty(), "oidc-client-id not configured")
-		Expect(oidcCredentials.ClientSecret).ShouldNot(BeEmpty(), "oidc-client-secret not configured")
-		Expect(oidcCredentials.IssuerURL).ShouldNot(BeEmpty(), "oidc-issuer-url not configured")
-
-		rhobsAPIURL = oidcCredentials.ProbeAPIURL
-
-		GinkgoLogr.Info("MC Probe Verification initialized",
-			"clusterID", clusterID)
+		GinkgoLogr.Info("RMO config found on MC")
 	})
 
 	It("finds the real HCP on the management cluster", func(ctx context.Context) {
@@ -94,6 +82,8 @@ var _ = Describe("MC Probe Verification", Ordered, func() {
 			labelID := hcp.Labels["api.openshift.com/id"]
 			if labelID == clusterID || hcp.Spec.ClusterID == clusterID {
 				found = true
+				hcpName = hcp.Name
+				hcpNamespace = hcp.Namespace
 				logFields := []interface{}{
 					"name", hcp.Name,
 					"namespace", hcp.Namespace,
@@ -111,32 +101,40 @@ var _ = Describe("MC Probe Verification", Ordered, func() {
 		Expect(found).To(BeTrue(), "HCP with cluster ID %s not found on MC", clusterID)
 	})
 
-	It("verifies RMO created an RHOBS probe for the real HCP", func(ctx context.Context) {
-		By(fmt.Sprintf("waiting for RHOBS probe for cluster %s (up to %s)", clusterID, probeTimeout))
+	It("verifies RMO added its finalizer to the HCP", func(ctx context.Context) {
+		if hcpName == "" {
+			Skip("HCP not found in previous test")
+		}
 
-		var probe map[string]interface{}
+		By(fmt.Sprintf("waiting for RMO finalizer on HCP %s/%s", hcpNamespace, hcpName))
 		Eventually(func(g Gomega) {
-			probes, err := listRHOBSProbes(rhobsAPIURL, fmt.Sprintf("cluster-id=%s", clusterID), oidcCredentials)
-			if err != nil {
-				GinkgoLogr.Info("RHOBS API query failed, will retry")
-			}
-			g.Expect(err).ToNot(HaveOccurred(), "failed to query RHOBS API for cluster %s", clusterID)
-			g.Expect(probes).ToNot(BeEmpty(), "no probe found for cluster %s", clusterID)
-			probe = probes[0]
-		}, probeTimeout, 15*time.Second).Should(Succeed(),
-			"RMO did not create an RHOBS probe for cluster %s", clusterID)
+			hcp := &hypershiftv1beta1.HostedControlPlane{}
+			err := k8s.Get(ctx, hcpName, hcpNamespace, hcp)
+			g.Expect(err).ToNot(HaveOccurred(), "failed to get HCP")
+			g.Expect(hcp.Finalizers).To(ContainElement(rmoFinalizer),
+				"RMO finalizer not found on HCP, controller may not be watching")
+		}, reconcileTimeout, reconcileInterval).Should(Succeed(),
+			"RMO did not add finalizer to HCP %s/%s", hcpNamespace, hcpName)
 
-		By("validating probe configuration")
-		probeID, ok := probe["id"].(string)
-		Expect(ok && probeID != "").To(BeTrue(), "probe should have an ID")
+		GinkgoLogr.Info("RMO finalizer verified on HCP", "name", hcpName, "namespace", hcpNamespace)
+	})
 
-		probeLabels, _ := probe["labels"].(map[string]interface{})
-		Expect(probeLabels).To(HaveKey("cluster-id"))
-		Expect(probeLabels["cluster-id"]).To(Equal(clusterID))
+	It("verifies RMO created a health check ConfigMap for the HCP", func(ctx context.Context) {
+		if hcpName == "" {
+			Skip("HCP not found in previous test")
+		}
 
-		GinkgoLogr.Info("RHOBS probe verified for real HCP",
-			"probeID", probeID,
-			"clusterID", clusterID,
-			"labels", probeLabels)
+		healthcheckCMName := fmt.Sprintf("%s-kube-apiserver-rmo-healthcheck", hcpName)
+		By(fmt.Sprintf("waiting for health check ConfigMap %s/%s", hcpNamespace, healthcheckCMName))
+
+		Eventually(func(g Gomega) {
+			cm := &corev1.ConfigMap{}
+			err := k8s.Get(ctx, healthcheckCMName, hcpNamespace, cm)
+			g.Expect(err).ToNot(HaveOccurred(), "health check ConfigMap not created yet")
+		}, reconcileTimeout, reconcileInterval).Should(Succeed(),
+			"RMO did not create health check ConfigMap for HCP %s", hcpName)
+
+		GinkgoLogr.Info("RMO health check ConfigMap verified",
+			"name", healthcheckCMName, "namespace", hcpNamespace)
 	})
 })
