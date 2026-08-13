@@ -41,7 +41,7 @@ spec:
     - name: url
       value: https://github.com/openshift/boilerplate
     - name: revision
-      value: f7cb59ff422cb43ab0b9b76e06decb2a1cf384c8
+      value: 3de41519242dbf5069d63f4e73c31f90beb62ea5
     - name: pathInRepo
       value: pipelines/docker-build-oci-ta/pipeline.yaml
 status: {}
