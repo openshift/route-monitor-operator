@@ -95,7 +95,6 @@ Tests synthetic monitoring workflow with simulated Management Cluster environmen
 **What Gets Mocked:**
 - Kubernetes cluster (using `fake.NewClientBuilder()`)
 - Agent resource deployment (test updates probe status directly)
-- Dynatrace endpoints
 - Probe target endpoints
 
 ### `probe_deletion_retry_test.go` (e2e)
@@ -140,7 +139,6 @@ Tests synthetic monitoring workflow with simulated Management Cluster environmen
 | `getProbeByID()` | Fetches probe by ID from API |
 | `deleteProbeByID()` | Deletes probe from API |
 | `updateProbeStatus()` | Mocks agent behavior by updating probe status |
-| `startMockDynatraceServer()` | HTTP server mocking Dynatrace endpoints |
 | `startMockProbeTargetServer()` | HTTP server mocking probe target endpoints |
 | `testWriter` | Captures logs for validation in tests |
 
@@ -229,7 +227,6 @@ These tests run completely locally on your development machine without requiring
 
 - Kubernetes cluster (using `fake.NewClientBuilder()`)
 - Agent resource deployment (test updates probe status directly via API)
-- Dynatrace endpoints
 - Probe target endpoints
 
 ### Prerequisites
@@ -308,7 +305,6 @@ go test -v -tags=e2e -timeout=10m .
 │  └──────────────────────────────┘                           │
 │                                                              │
 │  Mock Servers:                                               │
-│  - Dynatrace endpoint (HTTP 200)                            │
 │  - Probe targets (/livez, /readyz endpoints)                │
 └─────────────────────────────────────────────────────────────┘
 ```

@@ -26,9 +26,9 @@ import (
 //
 // This file provides:
 //   - API client helpers (createProbe, getProbe, deleteProbe, updateProbeStatus)
-//   - Mock servers (Dynatrace, probe target endpoints)
+//   - Mock servers (probe target endpoints)
 //   - Test utilities (log capture and validation)
-//   - Kubernetes resource setup (namespaces, secrets, VpcEndpoints)
+//   - Kubernetes resource setup (namespaces, VpcEndpoints)
 //
 // The updateProbeStatus function is particularly important - it mocks the
 // agent's behavior of updating probe status after processing, since the agent
@@ -43,11 +43,11 @@ type testWriter struct {
 
 func (tw *testWriter) Write(p []byte) (n int, err error) {
 	logLine := string(p)
-	
+
 	// Clean up log formatting: replace tabs with single spaces and remove trailing newlines
 	cleanedLog := strings.ReplaceAll(logLine, "\t", " ")
 	cleanedLog = strings.TrimRight(cleanedLog, "\n")
-	
+
 	tw.t.Log(cleanedLog)
 
 	tw.logMutex.Lock()
@@ -76,12 +76,12 @@ func createProbeViaAPI(baseURL, clusterID, probeURL string, private bool) (strin
 	probeData := map[string]interface{}{
 		"static_url": probeURL,
 		"labels": map[string]string{
-			"cluster-id":   clusterID,
-			"private":      fmt.Sprintf("%t", private),
-			"app":          "rhobs-synthetics-probe",
-			"source":       "route-monitor-operator",
+			"cluster-id":    clusterID,
+			"private":       fmt.Sprintf("%t", private),
+			"app":           "rhobs-synthetics-probe",
+			"source":        "route-monitor-operator",
 			"resource_type": "hostedcontrolplane",
-			"probe_type":   "blackbox",
+			"probe_type":    "blackbox",
 		},
 		"provider": "aws",
 		"region":   "us-east-1",
@@ -297,14 +297,14 @@ func waitForProbeDeletion(baseURL, probeID string, timeout time.Duration) error 
 // This function mocks the agent's behavior for local testing.
 //
 // In a real environment with Kubernetes:
-//   1. Agent fetches probe from API (status: "pending")
-//   2. Agent deploys Prometheus + blackbox-exporter resources to K8s
-//   3. Agent updates probe status to "active" via API
+//  1. Agent fetches probe from API (status: "pending")
+//  2. Agent deploys Prometheus + blackbox-exporter resources to K8s
+//  3. Agent updates probe status to "active" via API
 //
 // In this local test without Kubernetes:
-//   1. Agent fetches probe from API (status: "pending") ✅ Works
-//   2. Agent cannot deploy K8s resources ❌ No cluster
-//   3. Test calls this function to simulate step 3 ✅ Mock
+//  1. Agent fetches probe from API (status: "pending") ✅ Works
+//  2. Agent cannot deploy K8s resources ❌ No cluster
+//  3. Test calls this function to simulate step 3 ✅ Mock
 func updateProbeStatus(baseURL, probeID, status string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -339,7 +339,7 @@ func updateProbeStatus(baseURL, probeID, status string) error {
 }
 
 // setupRMODependencies creates the Kubernetes resources that RMO expects to exist
-func setupRMODependencies(t *testing.T, k8sClient client.Client, ctx context.Context, dynatraceURL string) {
+func setupRMODependencies(t *testing.T, k8sClient client.Client, ctx context.Context) {
 	// Create clusters namespace for HostedControlPlane resources
 	clustersNs := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -379,21 +379,6 @@ func setupRMODependencies(t *testing.T, k8sClient client.Client, ctx context.Con
 	if err := k8sClient.Create(ctx, ns); err != nil && !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("Failed to create namespace: %v", err)
 	}
-
-	// Create Dynatrace secret
-	dynatraceSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "dynatrace-token",
-			Namespace: "openshift-route-monitor-operator",
-		},
-		Data: map[string][]byte{
-			"apiToken": []byte("mock-token"),
-			"apiUrl":   []byte(dynatraceURL),
-		},
-	}
-	if err := k8sClient.Create(ctx, dynatraceSecret); err != nil && !strings.Contains(err.Error(), "already exists") {
-		t.Fatalf("Failed to create Dynatrace secret: %v", err)
-	}
 }
 
 // startMockProbeTargetServer starts a mock server that simulates a healthy cluster API endpoint
@@ -406,24 +391,6 @@ func startMockProbeTargetServer() *httptest.Server {
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"error":"not found"}`))
-		}
-	}))
-}
-
-// startMockDynatraceServer starts a mock Dynatrace server for testing
-func startMockDynatraceServer() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Mock all Dynatrace API endpoints
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		// Return appropriate mock responses based on the path
-		if strings.Contains(r.URL.Path, "/synthetic/monitors") {
-			// Mock monitor creation response
-			_, _ = w.Write([]byte(`{"entityId":"SYNTHETIC_TEST-1234567890"}`))
-		} else {
-			// Generic success response
-			_, _ = w.Write([]byte(`{"success":true}`))
 		}
 	}))
 }

@@ -55,10 +55,6 @@ func TestFullStackIntegration(t *testing.T) {
 		t.Skip("Skipping full integration test in short mode")
 	}
 
-	mockDynatrace := startMockDynatraceServer()
-	defer mockDynatrace.Close()
-	t.Logf("Mock Dynatrace server started at %s", mockDynatrace.URL)
-
 	mockProbeTarget := startMockProbeTargetServer()
 	defer mockProbeTarget.Close()
 	t.Logf("Mock probe target server started at %s", mockProbeTarget.URL)
@@ -150,7 +146,7 @@ func TestFullStackIntegration(t *testing.T) {
 			t.Fatalf("Failed to create HostedControlPlane: %v", err)
 		}
 
-		setupRMODependencies(t, fakeClient, ctx, mockDynatrace.URL)
+		setupRMODependencies(t, fakeClient, ctx)
 		t.Logf("✅ Created HostedControlPlane CR with cluster ID: %s", testClusterID)
 
 		logWriter := &testWriter{t: t, logs: []string{}}

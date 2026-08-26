@@ -28,7 +28,6 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/config"
-	"github.com/openshift/route-monitor-operator/pkg/dynatrace"
 	"github.com/openshift/route-monitor-operator/pkg/rhobs"
 	"github.com/openshift/route-monitor-operator/pkg/util/finalizer"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -55,12 +54,6 @@ const (
 
 	// watchResourceLabel is a label key indicating which objects this controller should reconcile against
 	watchResourceLabel = "hostedcontrolplane.routemonitoroperator.monitoring.openshift.io/managed"
-
-	//fetch dynatrace secret to get dynatrace api token and tenant url
-	dynatraceSecretNamespace = "openshift-route-monitor-operator"
-	dynatraceSecretName      = "dynatrace-token" // nolint:gosec // Not a hardcoded credential
-	dynatraceApiKey          = "apiToken"
-	dynatraceTenantKey       = "apiUrl"
 
 	// Retry timeout configuration
 	retryTimeoutMinutes = 5
@@ -102,10 +95,10 @@ func NewHostedControlPlaneReconciler(mgr manager.Manager, rhobsConfig RHOBSConfi
 	}
 }
 
-// getRHOBSConfig reads RHOBS and Dynatrace configuration from the ConfigMap at reconcile time.
+// getRHOBSConfig reads RHOBS configuration from the ConfigMap at reconcile time.
 // If the ConfigMap doesn't exist or has empty values, it falls back to the command-line
 // flags stored in r.RHOBSConfig.
-func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOBSConfig, DynatraceConfig) {
+func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) RHOBSConfig {
 	configMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{
 		Name:      configMapName,
@@ -117,7 +110,7 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 		if !kerr.IsNotFound(err) {
 			logger.V(2).Info("Failed to read ConfigMap, using fallback config", "error", err.Error())
 		}
-		return r.RHOBSConfig, DynatraceConfig{Enabled: false}
+		return r.RHOBSConfig
 	}
 
 	// Merge ConfigMap values with fallback defaults
@@ -149,13 +142,7 @@ func (r *HostedControlPlaneReconciler) getRHOBSConfig(ctx context.Context) (RHOB
 		}
 	}
 
-	// Read Dynatrace configuration - defaults to disabled
-	dynatraceConfig := DynatraceConfig{Enabled: false}
-	if strings.TrimSpace(configMap.Data["dynatrace-enabled"]) == "true" {
-		dynatraceConfig.Enabled = true
-	}
-
-	return cfg, dynatraceConfig
+	return cfg
 }
 
 //+kubebuilder:rbac:groups=openshift.io,resources=hostedcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -169,8 +156,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	defer log.Info("Finished reconciling HostedControlPlane")
 
 	// Get dynamic config from ConfigMap (with fallback to command-line flags)
-	rhobsConfig, dynatraceConfig := r.getRHOBSConfig(ctx)
-	log.V(2).Info("Loaded configuration", "dynatrace_enabled", dynatraceConfig.Enabled)
+	rhobsConfig := r.getRHOBSConfig(ctx)
 
 	// Fetch the HostedControlPlane instance
 	hostedcontrolplane := &hypershiftv1beta1.HostedControlPlane{}
@@ -184,43 +170,9 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 
-	// Create Dynatrace API client only if Dynatrace is enabled
-	var dynatraceApiClient *dynatrace.DynatraceApiClient
-	if dynatraceConfig.Enabled {
-		client, err := r.NewDynatraceApiClient(ctx)
-		if err != nil {
-			// If RHOBS is configured, Dynatrace client creation failure is non-fatal
-			if rhobsConfig.ProbeAPIURL != "" {
-				log.Info("Dynatrace client creation failed, continuing with RHOBS-only monitoring", "error", err.Error())
-			} else {
-				log.Error(err, "failed to create dynatrace client")
-				return utilreconcile.RequeueWith(err)
-			}
-		} else {
-			dynatraceApiClient = client
-		}
-	} else {
-		log.V(2).Info("Dynatrace monitoring disabled via feature flag")
-	}
-
 	// If the HostedControlPlane is marked for deletion, clean up
 	shouldDelete := finalizer.WasDeleteRequested(hostedcontrolplane)
 	if shouldDelete {
-		// Only attempt Dynatrace deletion if Dynatrace is enabled and client was successfully created
-		if dynatraceConfig.Enabled && dynatraceApiClient != nil {
-			err = r.deleteDynatraceHttpMonitorResources(dynatraceApiClient, log, hostedcontrolplane)
-			if err != nil {
-				// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
-				if rhobsConfig.ProbeAPIURL != "" {
-					log.Info("Dynatrace HTTP Monitor deletion failed, continuing with RHOBS probe deletion", "error", err.Error())
-				} else {
-					log.Error(err, "failed to delete Dynatrace HTTP Monitor Resources")
-					return utilreconcile.RequeueWith(err)
-				}
-			}
-		}
-
-		// Delete RHOBS probe if API URL is configured
 		if rhobsConfig.ProbeAPIURL != "" {
 			log.Info("Attempting to delete RHOBS probe", "cluster_id", hostedcontrolplane.Spec.ClusterID, "probe_api_url", rhobsConfig.ProbeAPIURL)
 
@@ -316,7 +268,7 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return utilreconcile.RequeueWith(err)
 	}
 	if !vpcEndpointReady {
-		log.Info("VPC Endpoint is not ready, delaying HTTP Monitor deployment")
+		log.Info("VPC Endpoint is not ready, delaying probe deployment")
 		return utilreconcile.RequeueAfter(vpcEndpointRetryTimeout), err
 	}
 
@@ -346,21 +298,6 @@ func (r *HostedControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err != nil {
 		log.Error(err, "failed to deploy internal monitoring components")
 		return utilreconcile.RequeueWith(err)
-	}
-
-	// Only attempt Dynatrace deployment if Dynatrace is enabled and client was successfully created
-	if dynatraceConfig.Enabled && dynatraceApiClient != nil {
-		log.Info("Deploying HTTP Monitor Resources")
-		err = r.deployDynatraceHttpMonitorResources(ctx, dynatraceApiClient, log, hostedcontrolplane)
-		if err != nil {
-			// If RHOBS is configured, Dynatrace failures are non-fatal - log warning and continue
-			if rhobsConfig.ProbeAPIURL != "" {
-				log.Info("Dynatrace HTTP Monitor deployment failed, continuing with RHOBS probe deployment", "error", err.Error())
-			} else {
-				log.Error(err, "failed to deploy Dynatrace HTTP Monitor Resources")
-				return utilreconcile.RequeueWith(err)
-			}
-		}
 	}
 
 	// Deploy RHOBS probe if API URL is configured

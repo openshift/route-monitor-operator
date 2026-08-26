@@ -46,7 +46,7 @@ Three reconcilers, all depending on handler interfaces defined in `controllers/i
 
 1. **RouteMonitorReconciler** (`controllers/routemonitor/`) - resolves Route, ensures blackbox exporter, creates ServiceMonitor/PrometheusRule. Supports both CoreOS (`monitoring.coreos.com`) and RHOBS (`monitoring.rhobs`) ServiceMonitor types.
 2. **ClusterUrlMonitorReconciler** (`controllers/clusterurlmonitor/`) - constructs URL from cluster domain, same resource creation flow.
-3. **HostedControlPlaneReconciler** (`controllers/hostedcontrolplane/`) - optional (enabled when HCP CRD exists or `--enable-hypershift`), manages RHOBS synthetic probes and optional Dynatrace integration, reconciles every 10 minutes.
+3. **HostedControlPlaneReconciler** (`controllers/hostedcontrolplane/`) - optional (enabled when HCP CRD exists or `--enable-hypershift`), manages RHOBS synthetic probes, reconciles every 10 minutes.
 
 ### Core Packages (pkg/)
 
@@ -56,7 +56,6 @@ Three reconcilers, all depending on handler interfaces defined in `controllers/i
 | `servicemonitor/` | Templates ServiceMonitor CRs (CoreOS and RHOBS variants) |
 | `alert/` | Generates PrometheusRule CRs with multi-window multi-burn-rate SLO alerts |
 | `rhobs/` | HTTP client for RHOBS synthetics probe API (OIDC auth) |
-| `dynatrace/` | Optional Dynatrace synthetic monitor integration |
 | `reconcile/` | Shared reconciliation logic (error status, SLO parsing, finalizers, cluster ID) |
 | `util/` | Cluster version checks, URL validation, finalizer helpers |
 

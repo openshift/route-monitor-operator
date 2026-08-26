@@ -37,8 +37,8 @@ import (
 //  8. RMO successfully deletes the probe on retry
 //
 // This validates the HYBRID APPROACH:
-//  - Within timeout (15 min): Fail closed - retry and block deletion (prevents orphaned probes)
-//  - Past timeout: Fail open - allow deletion to proceed (prevents indefinite blocking)
+//   - Within timeout (15 min): Fail closed - retry and block deletion (prevents orphaned probes)
+//   - Past timeout: Fail open - allow deletion to proceed (prevents indefinite blocking)
 //
 // REQUIREMENTS:
 // Same as TestFullStackIntegration - needs local RHOBS repos
@@ -53,10 +53,6 @@ func TestProbeDeletionRetry(t *testing.T) {
 	t.Log("================================================================================")
 
 	// Setup mock servers
-	mockDynatrace := startMockDynatraceServer()
-	defer mockDynatrace.Close()
-	t.Logf("✅ Mock Dynatrace server started at %s", mockDynatrace.URL)
-
 	mockProbeTarget := startMockProbeTargetServer()
 	defer mockProbeTarget.Close()
 	t.Logf("✅ Mock probe target server started at %s", mockProbeTarget.URL)
@@ -170,7 +166,7 @@ func TestProbeDeletionRetry(t *testing.T) {
 		}
 		t.Log("✅ Created HostedControlPlane CR")
 
-		setupRMODependencies(t, fakeClient, ctx, mockDynatrace.URL)
+		setupRMODependencies(t, fakeClient, ctx)
 
 		// STEP 2: Add finalizer
 		err = fakeClient.Get(ctx, types.NamespacedName{Name: "test-hcp-delete", Namespace: "clusters"}, hcp)
