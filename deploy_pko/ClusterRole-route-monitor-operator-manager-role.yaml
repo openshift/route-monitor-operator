@@ -230,14 +230,6 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - '*'
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - avo.openshift.io
   resources:
   - vpcendpoints

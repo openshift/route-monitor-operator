@@ -138,7 +138,7 @@ go mod verify
 
 - **API Types**: `api/v1alpha1/` - CRD definitions for RouteMonitor and ClusterUrlMonitor
 - **Controllers**: `controllers/{routemonitor,clusterurlmonitor,hostedcontrolplane}/` - Reconciliation logic
-- **Core Packages**: `pkg/` - blackboxexporter, servicemonitor, alert, rhobs, dynatrace, reconcile, util
+- **Core Packages**: `pkg/` - blackboxexporter, servicemonitor, alert, rhobs, reconcile, util
 - **Tests**: `*_test.go` alongside source, `*_suite_test.go` for Ginkgo
 - **E2E**: `test/e2e/` - End-to-end tests (Ginkgo v2, require deployed operator)
 - **Integration**: `int/` - Integration tests requiring live cluster
