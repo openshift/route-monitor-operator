@@ -179,12 +179,21 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 				},
 			},
 		}
+		// Delete any stale console RouteMonitor left over from a previous run on
+		// the shared cluster so the create below does not fail with AlreadyExists.
+		if err := k8s.Delete(ctx, consoleRouteMonitor); err != nil && !k8serrors.IsNotFound(err) {
+			Expect(err).ShouldNot(HaveOccurred(), "Unable to delete pre-existing console RouteMonitor")
+		}
+
 		err := k8s.Create(ctx, consoleRouteMonitor)
 		Expect(err).ShouldNot(HaveOccurred(), "Unable to create console RouteMonitor")
 
 		DeferCleanup(func(ctx context.Context) {
 			By("Cleaning up console RouteMonitor")
-			_ = k8s.Delete(ctx, consoleRouteMonitor)
+			err := k8s.Delete(ctx, consoleRouteMonitor)
+			if !k8serrors.IsNotFound(err) {
+				Expect(err).ShouldNot(HaveOccurred(), "Unable to delete console RouteMonitor")
+			}
 		})
 
 		By("Verifying the console RouteMonitor exists")
