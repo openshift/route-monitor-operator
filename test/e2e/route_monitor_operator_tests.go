@@ -162,10 +162,46 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 	})
 
 	It("has all of the required resources", func(ctx context.Context) {
-		_, err := serviceMonitorsClient.Get(ctx, consoleName, metav1.GetOptions{})
-		Expect(err).ShouldNot(HaveOccurred(), "Unable to get console serviceMonitor")
+		By("Creating the console RouteMonitor CR")
+		consoleRouteMonitor := &routemonitorv1alpha1.RouteMonitor{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      consoleName,
+				Namespace: namespace,
+			},
+			Spec: routemonitorv1alpha1.RouteMonitorSpec{
+				Route: routemonitorv1alpha1.RouteMonitorRouteSpec{
+					Name:      "console",
+					Namespace: "openshift-console",
+					Suffix:    "/health",
+				},
+				Slo: routemonitorv1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.5",
+				},
+			},
+		}
+		err := k8s.Create(ctx, consoleRouteMonitor)
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to create console RouteMonitor")
 
-		_, err = prometheusRulesClient.Get(ctx, consoleName, metav1.GetOptions{})
+		DeferCleanup(func(ctx context.Context) {
+			By("Cleaning up console RouteMonitor")
+			_ = k8s.Delete(ctx, consoleRouteMonitor)
+		})
+
+		By("Verifying the console RouteMonitor exists")
+		_, err = serviceMonitorsClient.Get(ctx, consoleName, metav1.GetOptions{})
+		Expect(err).ShouldNot(HaveOccurred(), "Unable to get console RouteMonitor")
+
+		By("Waiting for the operator to reconcile and create the console PrometheusRule")
+		err = wait.PollUntilContextTimeout(ctx, 15*time.Second, pollingDuration, false, func(ctx context.Context) (bool, error) {
+			_, err := prometheusRulesClient.Get(ctx, consoleName, metav1.GetOptions{})
+			if k8serrors.IsNotFound(err) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		})
 		Expect(err).ShouldNot(HaveOccurred(), "Unable to get console prometheusRule")
 	})
 
