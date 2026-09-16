@@ -185,6 +185,16 @@ var _ = Describe("Route Monitor Operator", Ordered, func() {
 			Expect(err).ShouldNot(HaveOccurred(), "Unable to delete pre-existing console RouteMonitor")
 		}
 
+		// The RouteMonitor has finalizers, so a successful Delete only marks the
+		// object for deletion; it lingers in a Terminating state until the
+		// finalizers are cleared. Recreating it in that window fails with
+		// "object is being deleted". Poll until the stale object is fully gone
+		// (Get returns NotFound) before recreating it.
+		Eventually(func() bool {
+			getErr := k8s.Get(ctx, consoleName, namespace, &routemonitorv1alpha1.RouteMonitor{})
+			return k8serrors.IsNotFound(getErr)
+		}, 60*time.Second, 2*time.Second).Should(BeTrue(), "pre-existing console RouteMonitor was not fully deleted (finalizers may still be pending)")
+
 		err := k8s.Create(ctx, consoleRouteMonitor)
 		Expect(err).ShouldNot(HaveOccurred(), "Unable to create console RouteMonitor")
 
