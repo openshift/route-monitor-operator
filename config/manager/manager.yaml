@@ -58,7 +58,7 @@ spec:
             - name: BLACKBOX_IMAGE
               # override so you can pull any blackbox-exporter image you fancy
               # this value is the default value
-              value: "quay.io/prometheus/blackbox-exporter@sha256:bedbb156b4e5e85103fdc32e90177513a2f6e2069e04945cea0184b911dd5a99"
+              value: "quay.io/prometheus/blackbox-exporter@sha256:5a10bb99c2570191a6af5b2221ab2b446a4f85cc71d097890e1b30041c2e8b14"
             - name: BLACKBOX_NAMESPACE
               valueFrom:
                 fieldRef:
