@@ -101,7 +101,7 @@ func main() {
 	var onlyPublicClusters bool
 	var skipInfrastructureHealthCheck bool
 
-	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:bedbb156b4e5e85103fdc32e90177513a2f6e2069e04945cea0184b911dd5a99", "The image that will be used for the blackbox-exporter deployment")
+	flag.StringVar(&blackboxExporterImage, "blackbox-image", "quay.io/prometheus/blackbox-exporter@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc", "The image that will be used for the blackbox-exporter deployment")
 	flag.StringVar(&blackboxExporterNamespace, "blackbox-namespace", config.OperatorNamespace, "Blackbox-exporter deployment will reside on this Namespace")
 	flag.StringVar(&probeAPIURL, "probe-api-url", "", "The fully qualified API URL for RHOBS synthetics probe management (for HostedCluster monitoring). When empty, uses default blackbox exporter behavior.")
 	flag.StringVar(&probeTenant, "probe-tenant", "hcp", "RHOBS tenant name used in API URLs. Defaults to 'hcp'.")
