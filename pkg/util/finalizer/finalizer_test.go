@@ -5,7 +5,7 @@ package finalizer_test
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
