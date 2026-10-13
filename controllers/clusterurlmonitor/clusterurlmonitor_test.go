@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"go.uber.org/mock/gomock"
