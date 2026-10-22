@@ -3,9 +3,17 @@ maintainers:
   - chcollin
   - rosa-staff-engineers
 approvers:
+  - geowa4
+  - eth1030
+  - BATMAN-JD
+  - AlexSmithGH
   - Tessg22  # cspell:ignore Tessg
   - rosa-staff-engineers
   - srep-functional-team-rocket
 reviewers:
+  - geowa4
+  - eth1030
+  - BATMAN-JD
+  - AlexSmithGH
   - srep-functional-team-rocket
   - Tessg22
