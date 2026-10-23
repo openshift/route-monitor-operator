@@ -3,9 +3,11 @@ maintainers:
   - chcollin
   - rosa-staff-engineers
 approvers:
+  - rosa-trust-engineering-observability
   - Tessg22  # cspell:ignore Tessg
   - rosa-staff-engineers
   - srep-functional-team-rocket
 reviewers:
+  - rosa-trust-engineering-observability
   - srep-functional-team-rocket
   - Tessg22
