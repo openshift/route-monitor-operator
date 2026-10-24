@@ -3,7 +3,7 @@ package routemonitor_test
 import (
 	"github.com/go-logr/logr"
 	fuzz "github.com/google/gofuzz"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 
