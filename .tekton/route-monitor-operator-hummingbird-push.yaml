@@ -1,0 +1,63 @@
+# Parallel "Hummingbird" build — PILOT (ROSAENG / HPSTRAT-799 base-image workstream)
+#
+# This PipelineRun builds a SECOND image from the exact same commit and the same
+# build/Dockerfile, overriding only the runtime base via the RUNTIME_BASE build-arg
+# to a Red Hat Hardened Image (Project Hummingbird). It runs alongside the normal
+# push build and pushes to a distinct `-hummingbird` tag, so the production image
+# stream is completely untouched and nothing new is deployed.
+#
+# Isolation notes:
+# - Distinct application/component labels (…-hummingbird) keep this build out of the
+#   production component's Snapshots, so it is build-only and has no path to release.
+# - To later run full Konflux integration tests / Enterprise Contract / release on
+#   this variant, register a dedicated Konflux Component for it. For the pilot we
+#   only want the artifact built so it can be inspected and CVE-scanned.
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/route-monitor-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: 'false'
+    pipelinesascode.tekton.dev/max-keep-runs: '3'
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "master"
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: route-monitor-operator-hummingbird
+    appstudio.openshift.io/component: route-monitor-operator-hummingbird
+    pipelines.appstudio.openshift.io/type: build
+  name: route-monitor-operator-hummingbird-on-push
+  namespace: route-monitor-operator-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/route-monitor-operator-tenant/openshift/route-monitor-operator:{{revision}}-hummingbird
+  - name: dockerfile
+    value: build/Dockerfile
+  - name: path-context
+    value: .
+  - name: build-args
+    value:
+    - RUNTIME_BASE=registry.access.redhat.com/hi/core-runtime:2.43-openssl-fips
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-route-monitor-operator
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+  pipelineRef:
+    resolver: git
+    params:
+    - name: url
+      value: https://github.com/openshift/boilerplate
+    - name: revision
+      value: 56243bd0598738bea9eb26bc6260df023a414063
+    - name: pathInRepo
+      value: pipelines/docker-build-oci-ta/pipeline.yaml
+status: {}
