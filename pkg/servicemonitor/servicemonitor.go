@@ -11,6 +11,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -147,15 +148,15 @@ func (u *ServiceMonitor) TemplateForServiceMonitorResource(routeURL, blackBoxExp
 					// Timeout has to be smaller than probe interval
 					ScrapeTimeout: "15s",
 					Path:          "/probe",
-					Scheme:        "http",
+					Scheme:        ptr.To(monitoringv1.Scheme("http")),
 					Params:        params,
-					MetricRelabelConfigs: []*monitoringv1.RelabelConfig{
+					MetricRelabelConfigs: []monitoringv1.RelabelConfig{
 						{
-							Replacement: routeURL,
+							Replacement: ptr.To(routeURL),
 							TargetLabel: UrlLabelName,
 						},
 						{
-							Replacement: clusterID,
+							Replacement: ptr.To(clusterID),
 							TargetLabel: "_id",
 						},
 					},

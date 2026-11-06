@@ -12,6 +12,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
@@ -132,7 +133,7 @@ func (r *multiWindowMultiBurnAlertRule) render(url string, percent string, names
 		Annotations: map[string]string{
 			"message": fmt.Sprintf("High error budget burn for %s (current value: {{ $value }})", url),
 		},
-		For: monitoringv1.Duration(r.duration),
+		For: ptr.To(monitoringv1.Duration(r.duration)),
 	}
 }
 
