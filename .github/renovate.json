@@ -2,5 +2,17 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>openshift/boilerplate//.github/renovate.json"
+  ],
+  "packageRules": [
+    {
+      "description": "Hold kube-openapi until Go 1.27 is supported by the build image",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "k8s.io/kube-openapi"
+      ],
+      "enabled": false
+    }
   ]
 }
