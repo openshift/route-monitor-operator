@@ -20,9 +20,44 @@ included. Existing pilot PR #643 uses a base-image ARG; this implementation keep
 concrete FROM references for Renovate instead and does not apply that pilot.
 
 JSON and YAML parse, the copied PipelineRun differs only in the requested fields,
-and `git diff --check` passes. Local verification uses `--platform linux/amd64`
-on the arm64 workstation VM. Both container builds were attempted; production
-was stopped to avoid duplicate compilation, and the hardened build lost its
-connection during compilation (`unexpected EOF`). Build/run verification is
-pending a serialized retry. External CI, scanning and cluster verification remain
-separate from these local checks.
+and `git diff --check` passes. The production Dockerfile remains byte-for-byte
+identical to the checkout.
+
+## Local verification
+
+Both Dockerfiles built successfully on the arm64 workstation's Podman VM using
+Linux amd64 emulation. The final images were:
+
+- hardened: `59978ac74551398b19f7ffd0409993912c9406e6ddb492346999f649d50d6bab`
+- production: `03f7d70d70ded04f51ee077ab4fca4c12afe62bbf7ac263b329ab695dfdb0daf`
+
+```sh
+podman build --platform linux/amd64 --cpu-quota=100000 \
+  --volume /tmp/hummingbird-go-cache:/tmp/go-build:z --pull=never \
+  -f build/Dockerfile.hummingbird -t route-monitor-operator-hummingbird-test .
+podman build --platform linux/amd64 --cpu-quota=300000 \
+  --volume /var/tmp/hummingbird-go-cache:/tmp/go-build:z --pull=never \
+  -f build/Dockerfile -t route-monitor-operator-production-test .
+```
+
+The shared cache is local verification infrastructure, not a Dockerfile or CI
+requirement. The hardened compile's live CPU quota was raised to three CPUs; the
+cache was subsequently moved from tmpfs to disk before the production build.
+Earlier parallel attempts disconnected (`unexpected EOF`); the completed builds
+above replaced those attempts.
+
+`podman run --rm --platform linux/amd64 --entrypoint /manager
+route-monitor-operator-hummingbird-test --help` passed, as did the same command
+with `--user 1001230000:0`. The generated FIPS startup assertion ran successfully
+before flag processing. `file` reports the executable as dynamically linked with
+interpreter `/lib64/ld-linux-x86-64.so.2`; its successful runs demonstrate the
+Hummingbird runtime supplies the necessary loader and startup libraries.
+
+The unchanged production image builds, but its default `USER nonroot:nonroot`
+fails before execution: `unable to find user nonroot: no matching entries in
+passwd file` (exit 126). Running the production `/manager --help` with explicit
+`--user 65532:65532` passes. This existing production configuration issue is
+reported without modifying the production Dockerfile.
+
+A live OpenShift cluster, full reconciliation, external CI, scanning and release
+gates were not exercised by these local build and startup checks.
