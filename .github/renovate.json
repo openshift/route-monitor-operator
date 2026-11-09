@@ -14,5 +14,24 @@
       ],
       "enabled": false
     }
-  ]
+  ],
+  "dockerfile": {
+    "includePaths": [
+      "build/Dockerfile",
+      "build/Dockerfile.hummingbird"
+    ],
+    "packageRules": [
+      {
+        "description": "Review Hummingbird runtime digest updates before merging",
+        "matchPackageNames": [
+          "registry.access.redhat.com/hi/core-runtime"
+        ],
+        "matchUpdateTypes": [
+          "digest"
+        ],
+        "automerge": false,
+        "platformAutomerge": false
+      }
+    ]
+  }
 }

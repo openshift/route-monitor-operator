@@ -1,0 +1,20 @@
+FROM quay.io/redhat-services-prod/openshift/boilerplate:latest AS builder
+
+WORKDIR /workspace
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+# Copy the go source
+COPY . .
+
+# Build
+# RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod vendor -o manager main.go
+RUN make go-build
+
+# FIPS-capable minimal runtime; the tag and digest remain visible to Renovate.
+FROM registry.access.redhat.com/hi/core-runtime:2.43-openssl-fips@sha256:dda4ca9f205064c1391168713fae4dfe32057f3a1e619540db34f9d167b71c74
+WORKDIR /
+COPY --from=builder /workspace/build/_output/bin/* /manager
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]
