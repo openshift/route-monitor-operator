@@ -232,8 +232,8 @@ github.com/openshift-online/ocm-api-model/model v0.0.461 h1:g45+qqHP44XALBwKkap1
 github.com/openshift-online/ocm-api-model/model v0.0.461/go.mod h1:PQIoq6P8Vlb7goOdRMLK8nJY+B7HH0RTqYAa4kyidTE=
 github.com/openshift-online/ocm-sdk-go v0.1.507 h1:3sv+blhiIRlgJVpGGnFeFQ1aQNZ2HIMSiTfOo8Chmug=
 github.com/openshift-online/ocm-sdk-go v0.1.507/go.mod h1:6HRHFFcP71rXkTvcexoikR/kZUk4MYCl505THEIuZkI=
-github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9 h1:kMpI8KDdRUVg9+WweBahw3w5D0fRsURAkVZ50KttC90=
-github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
+github.com/openshift/api v0.0.0-20261111192622-61403fc4e89f h1:ZTjUIh2gQ39yoZx4KU/YviuobHSDYuUBSLgqv3SPcqs=
+github.com/openshift/api v0.0.0-20261111192622-61403fc4e89f/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
 github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364 h1:wrR8DiJqUaS4pv7F1p1pOIsUvQN/z81C7TvM3PcS8GQ=
 github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364/go.mod h1:+/t18O2NwRYEzWbi76OImNMivJXi6bbFVG3ODGeQjMk=
 github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c h1:NBH3no8kaW7Hem/mf/0lIfZZEIeaNTwo7XfTqUm2cJc=
