@@ -11,7 +11,7 @@ metadata:
       == "master"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: route-monitor-operator-hummingbird
+    appstudio.openshift.io/application: route-monitor-operator
     appstudio.openshift.io/component: route-monitor-operator-hummingbird
     pipelines.appstudio.openshift.io/type: build
   name: route-monitor-operator-hummingbird-on-push
