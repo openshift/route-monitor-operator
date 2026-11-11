@@ -9,7 +9,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
-	github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9
+	github.com/openshift/api v0.0.0-20261111192622-61403fc4e89f
 	github.com/openshift/aws-vpce-operator v0.0.0-20241211114942-1daecf2e4364
 	github.com/openshift/hypershift/api v0.0.0-20241204143212-857ccab4fd7c
 	github.com/openshift/osde2e v0.0.0-20261027143422-36cc03a8312b
